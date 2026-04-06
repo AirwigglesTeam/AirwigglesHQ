@@ -713,8 +713,40 @@ hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
 .proj-complete-btn:hover{border-color:var(--green);color:rgba(31,186,122,.5);background:rgba(31,186,122,.06);}
 .proj-complete-btn.ready{border-color:var(--green);color:var(--green);background:rgba(31,186,122,.1);}
 .proj-complete-btn.ready:hover{background:var(--green);color:var(--black);}
-/* ── SPONSORS ── */
-.sp-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(300px,1fr));gap:12px;margin-bottom:20px;}
+/* ── SPONSOR PROFILE (full page, not modal) ── */
+.sp-profile-layout{display:grid;grid-template-columns:320px 1fr;gap:16px;align-items:start;}
+@media(max-width:900px){.sp-profile-layout{grid-template-columns:1fr;}}
+.sp-profile-sidebar{display:flex;flex-direction:column;gap:12px;}
+.sp-profile-main{display:flex;flex-direction:column;gap:12px;}
+.sp-section{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;}
+.sp-section-hd{padding:11px 14px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between;}
+.sp-section-title{font-size:.75rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--acc);}
+.sp-section-bd{padding:14px;}
+.sp-product-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 11px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;font-size:.75rem;margin:3px;}
+.sp-audience-tag{display:inline-flex;padding:3px 9px;background:rgba(167,139,250,.1);border:1px solid rgba(167,139,250,.25);color:#a78bfa;border-radius:20px;font-size:.65rem;font-weight:600;margin:3px;}
+.sp-integration-chip{display:inline-flex;align-items:center;gap:5px;padding:5px 10px;background:var(--teal-dim);border:1px solid var(--teal-mid);color:var(--acc);border-radius:7px;font-size:.7rem;margin:3px;cursor:pointer;transition:all .13s;}
+.sp-integration-chip:hover{background:var(--teal-mid);}
+.sp-back-btn{display:inline-flex;align-items:center;gap:6px;font-size:.78rem;color:var(--text2);cursor:pointer;padding:5px 0;background:none;border:none;transition:color .14s;}
+.sp-back-btn:hover{color:var(--acc);}
+/* Sponsor badges on project cards */
+.proj-sponsor-badge{display:inline-flex;align-items:center;gap:5px;padding:3px 8px;border-radius:5px;font-size:.65rem;font-weight:600;cursor:pointer;transition:all .13s;border:1px solid transparent;}
+.proj-sponsor-badge:hover{filter:brightness(1.15);}
+/* AI prefill loading */
+.ai-prefill-bar{display:flex;align-items:center;gap:8px;padding:9px 12px;background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:8px;font-size:.75rem;color:var(--acc);margin-bottom:12px;}
+/* Sponsor type selector in project modal */
+.sp-type-btn{display:flex;flex-direction:column;align-items:center;gap:4px;padding:10px 14px;background:var(--surface2);border:1.5px solid var(--border);border-radius:9px;cursor:pointer;font-size:.7rem;color:var(--text2);transition:all .14s;flex:1;}
+.sp-type-btn:hover{border-color:var(--acc);color:var(--acc);}
+.sp-type-btn.sel{border-color:var(--acc);background:var(--teal-dim);color:var(--acc);}
+/* Match score bar */
+.match-bar{height:4px;background:var(--surface3);border-radius:99px;overflow:hidden;margin-top:5px;}
+.match-fill{height:100%;border-radius:99px;background:var(--acc);}
+/* Sponsor list on sponsor page */
+.sp-list-row{display:flex;align-items:center;gap:12px;padding:10px 14px;border-bottom:1px solid var(--border2);cursor:pointer;transition:background .13s;}
+.sp-list-row:last-child{border-bottom:none;}
+.sp-list-row:hover{background:rgba(255,255,255,.03);}
+.sp-list-row.active{background:var(--teal-dim);border-left:2px solid var(--acc);}
+.sp-avatar{width:34px;height:34px;border-radius:8px;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:.7rem;font-weight:700;color:var(--text2);flex-shrink:0;overflow:hidden;}
+.sp-avatar img{width:100%;height:100%;object-fit:cover;}
 .sp-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px 18px;cursor:pointer;transition:transform .15s,border-color .15s;position:relative;overflow:hidden;}
 .sp-card::before{content:'';position:absolute;top:0;left:0;right:0;height:3px;background:var(--acc);}
 .sp-card:hover{transform:translateY(-2px);border-color:rgba(255,255,255,.15);}
@@ -2228,6 +2260,67 @@ function renderDetail(id){
   </div>
 </div>
 <hr class="div">
+<!-- SPONSORS IN PROJECT -->
+${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Sponsors</span>
+    <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')" style="font-size:.65rem;">Edit sponsors</button>
+  </div>
+  <div style="display:flex;flex-direction:column;gap:10px;">
+    ${(p.sponsors||[]).map(sp=>{
+      const s=getSponsor(sp.id);if(!s)return'';
+      const t=SP_TYPES[sp.type]||SP_TYPES.product;
+      const tmpl=S.taskTemplates.find(x=>x.sponsorType===sp.type);
+      const allocatedProducts=sp.products||[];
+      // Group products by category
+      const byCategory={};
+      allocatedProducts.forEach(prod=>{
+        (prod.categories||[]).forEach(cat=>{
+          if(!byCategory[cat])byCategory[cat]=[];
+          byCategory[cat].push(prod.name);
+        });
+      });
+      const catColors={'Prize':'var(--yellow)','Raffle':'var(--purple)','Team Member':'var(--blue)','Airwiggles Award':'var(--acc)'};
+      return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+        <!-- Sponsor header -->
+        <div style="display:flex;align-items:center;gap:10px;padding:10px 13px;">
+          <div class="sp-avatar" style="width:30px;height:30px;font-size:.6rem;flex-shrink:0;cursor:pointer;" onclick="_spSelectedId='${s.id}';V='sponsors';render();" title="View ${s.name} profile">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
+          <div style="flex:1;">
+            <div style="display:flex;align-items:center;gap:7px;">
+              <span style="font-size:.84rem;font-weight:700;cursor:pointer;" onclick="_spSelectedId='${s.id}';V='sponsors';render();" title="View profile">${s.name}</span>
+              <span style="font-size:.62rem;padding:1px 7px;background:${t.color}22;color:${t.color};border-radius:3px;font-weight:600;">${t.label}</span>
+              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" style="cursor:pointer;" onclick="_spSelectedId='${s.id}';V='sponsors';render();"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+            </div>
+          </div>
+          <button class="btn btn-ghost btn-xs" style="font-size:.6rem;" onclick="${tmpl?`openModal('taskTmpl','${tmpl.id}')`:`_createSponsorTemplate('${sp.type}')`}">
+            <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+            ${tmpl?'Edit template':'Create template'}
+          </button>
+        </div>
+        <!-- Product allocations -->
+        ${allocatedProducts.length>0?`
+        <div style="padding:8px 13px 10px;border-top:1px solid var(--border2);">
+          <div style="font-size:.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">Product Allocations</div>
+          ${Object.keys(byCategory).length>0?
+            Object.entries(byCategory).map(([cat,prods])=>`
+            <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:5px;">
+              <span style="font-size:.65rem;font-weight:700;padding:2px 8px;border-radius:10px;background:${catColors[cat]||'var(--acc)'}22;color:${catColors[cat]||'var(--acc)'};white-space:nowrap;flex-shrink:0;margin-top:1px;">${cat}</span>
+              <div style="display:flex;flex-wrap:wrap;gap:4px;">
+                ${prods.map(name=>`<span style="font-size:.72rem;padding:2px 8px;background:var(--surface3);border:1px solid var(--border);border-radius:5px;">${name}</span>`).join('')}
+              </div>
+            </div>`).join('')
+          :''}
+          <!-- Show any unallocated products too -->
+          ${allocatedProducts.filter(prod=>!prod.categories?.length).map(prod=>`
+            <div style="font-size:.72rem;color:var(--muted);padding:2px 0;">${prod.name} — <em>no category assigned</em></div>
+          `).join('')}
+        </div>`:''}
+        ${allocatedProducts.length===0&&(s.products||[]).length>0?`
+        <div style="padding:6px 13px 9px;border-top:1px solid var(--border2);font-size:.68rem;color:var(--muted);">No products allocated yet. <button class="btn btn-ghost btn-xs" style="margin-left:4px;" onclick="openModal('project','${p.id}')">Assign products →</button></div>`:''}
+      </div>`;
+    }).join('')}
+  </div>
+</div><hr class="div">`:''}
 <!-- PROJECT QUICK LINKS -->
 <div style="margin-bottom:18px;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
@@ -2500,21 +2593,79 @@ function removeArea(i){const a=S.areas[i];if(DEFAULT_AREAS.includes(a)){if(!conf
 
 /* ════ TEMPLATES ════ */
 function renderTemplates(){
-  return`<div class="fu"><div class="page-hd"><div class="page-title">Task <em>Templates</em></div><button class="btn btn-acc btn-sm" onclick="openModal('taskTmpl',null)">+ New Template</button></div>
-${S.taskTemplates.length===0?`<div class="empty"><div class="empty-ico">${ICO.copy}</div><div class="empty-txt">No templates yet.</div></div>`:
-`<div class="tmpl-grid">${S.taskTemplates.map(tmpl=>`<div class="tmpl-card">
-<div class="tmpl-name">${tmpl.name}</div>
+  const sponsorTmpls=S.taskTemplates.filter(t=>t.sponsorType);
+  const generalTmpls=S.taskTemplates.filter(t=>!t.sponsorType);
+
+  // Check which sponsorship types have no template yet
+  const missingTypes=Object.keys(SP_TYPES).filter(type=>!S.taskTemplates.some(t=>t.sponsorType===type));
+
+  const tmplCard=(tmpl)=>{
+    const spType=tmpl.sponsorType?SP_TYPES[tmpl.sponsorType]:null;
+    return`<div class="tmpl-card" style="${spType?`border-top:3px solid ${spType.color};`:''}">
+<div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;">
+  <div class="tmpl-name" style="flex:1;">${tmpl.name}</div>
+  ${spType?`<span style="font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:4px;background:${spType.color}22;color:${spType.color};white-space:nowrap;flex-shrink:0;">${spType.label}</span>`:''}
+</div>
 <div class="tmpl-desc">${tmpl.description||''}</div>
-<div style="margin-bottom:11px;">${(tmpl.tasks||[]).slice(0,5).map(t=>`<div class="ttp"><span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${t.priority||'Medium'}</span>${t.name}${t.subtasks?.length?` (${t.subtasks.length} subtasks)`:''}</div>`).join('')}${(tmpl.tasks||[]).length>5?`<div style="font-size:.65rem;color:var(--muted);padding:3px 0;">+${tmpl.tasks.length-5} more</div>`:''}</div>
-<div style="display:flex;gap:7px;flex-wrap:wrap;">
-  <button class="btn btn-acc btn-sm" onclick="applyTmpl('${tmpl.id}')">Use</button>
+<div style="margin-bottom:11px;">${(tmpl.tasks||[]).slice(0,5).map(t=>`<div class="ttp"><span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${t.priority||'Medium'}</span>${t.name}${t.subtasks?.length?` (${t.subtasks.length} subtasks)`:''}</div>`).join('')}${(tmpl.tasks||[]).length>5?`<div style="font-size:.65rem;color:var(--muted);padding:3px 0;">+${tmpl.tasks.length-5} more tasks</div>`:''}</div>
+<div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
+  ${!tmpl.sponsorType?`<button class="btn btn-acc btn-sm" onclick="applyTmpl('${tmpl.id}')">Use</button>`:''}
   <button class="btn btn-ghost btn-sm" onclick="openModal('taskTmpl','${tmpl.id}')">Edit</button>
   <button class="btn btn-danger btn-xs" onclick="deleteTmpl('${tmpl.id}')">Delete</button>
-</div></div>`).join('')}</div>`}
+  ${tmpl._builtIn?`<span style="font-size:.62rem;color:var(--muted);margin-left:auto;">built-in · editable</span>`:''}
+</div></div>`;
+  };
+
+  return`<div class="fu">
+<div class="page-hd">
+  <div class="page-title">Task <em>Templates</em></div>
+  <button class="btn btn-acc btn-sm" onclick="openModal('taskTmpl',null)">+ New Template</button>
+</div>
+
+<!-- Sponsorship templates -->
+<div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;margin-bottom:18px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;">
+    <div style="font-size:.72rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;">Sponsorship Templates</div>
+    <span style="font-size:.68rem;color:var(--muted);">${sponsorTmpls.length} of 4 types configured</span>
+  </div>
+  <div style="font-size:.74rem;color:var(--text2);margin-bottom:14px;line-height:1.6;">
+    When you assign a sponsor to a project, these templates automatically populate the project with the right tasks. <strong style="color:var(--text);">Edit any template to customise exactly what tasks get created.</strong>
+  </div>
+  ${missingTypes.length>0?`<div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:14px;">${missingTypes.map(type=>{const t=SP_TYPES[type];return`<div style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--surface2);border:1px dashed var(--border);border-radius:7px;font-size:.72rem;color:var(--muted);">
+    <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="${t.color}" stroke-width="2.5" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <span style="color:${t.color};font-weight:600;">${t.label}</span>
+    <span>— no custom template yet (using defaults)</span>
+    <button class="btn btn-ghost btn-xs" onclick="_createSponsorTemplate('${type}')">Create</button>
+  </div>`;}).join('')}</div>`:''}
+  ${sponsorTmpls.length>0?`<div class="tmpl-grid">${sponsorTmpls.map(tmplCard).join('')}</div>`:''}
+</div>
+
+<!-- General templates -->
+${generalTmpls.length>0?`
+<div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px;">General Templates</div>
+<div class="tmpl-grid">${generalTmpls.map(tmplCard).join('')}</div>
+`:''}
+
+${S.taskTemplates.filter(t=>!t.sponsorType).length===0?`<div class="empty"><div class="empty-ico">${ICO.copy}</div><div class="empty-txt">No general templates yet. Create one to speed up project setup.</div></div>`:''}
 </div>`;
 }
 function applyTmpl(id){const t=S.taskTemplates.find(x=>x.id===id);if(!t)return;openModal('task',{_fromTemplate:t});}
 function deleteTmpl(id){if(!confirm('Delete template?'))return;S.taskTemplates=S.taskTemplates.filter(t=>t.id!==id);save();render();}
+
+function _createSponsorTemplate(type){
+  // Pre-populate _ttBuf with defaults then open modal
+  const subtasks=SP_TYPE_SUBTASKS[type]||[];
+  _ttBuf=subtasks.map(name=>({name,priority:'Medium',subtasks:[]}));
+  const typeLabel=SP_TYPES[type]?.label||type;
+  // Open the template modal and pre-set the name and type
+  openModal('taskTmpl',null);
+  // After modal renders, set the type and name
+  setTimeout(()=>{
+    const nameEl=el('tt-name');if(nameEl)nameEl.value=`${typeLabel} Sponsorship`;
+    const typeEl=el('tt-sp-type');if(typeEl)typeEl.value=type;
+    renderTtBuf();
+  },50);
+}
 
 /* ════ FINANCE ════ */
 function renderFinance(){
@@ -3573,17 +3724,244 @@ function projectModalHtml(id){
   </div>
   <div class="field"><label class="flbl">Status</label><select class="sel" id="pm-status"><option value="active" ${(!p||p.status==='active')?'selected':''}>Active</option><option value="backlog" ${p?.status==='backlog'?'selected':''}>Backlog</option><option value="completed" ${p?.status==='completed'?'selected':''}>Completed</option></select></div>
   <div class="field"><label class="flbl">Graphics Folder URL (Google Drive, Dropbox, etc.)</label><input class="inp" id="pm-graphics" type="url" placeholder="https://drive.google.com/..." value="${p?.graphicsUrl||''}" style="margin-bottom:2px;"></div>
+
+  <!-- SPONSOR ASSIGNMENT -->
+  <hr class="div" style="margin:10px 0;">
+  <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Sponsors</div>
+  <div id="pm-sponsors-list">${renderProjSponsorsEdit(p?.sponsors||[])}</div>
+  ${S.sponsors.length>0?`<button class="add-row-btn" onclick="addProjSponsorRow()">+ Add sponsor</button>`:`<div style="font-size:.73rem;color:var(--muted);">No sponsors yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('sponsors')">Add sponsors →</span></div>`}
+
   <div class="field"><label class="flbl">Colour</label><div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${(p?.color||COLORS[0])===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}</div><input type="hidden" id="pm-clr" value="${p?.color||COLORS[0]}"></div>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProject('${p?.id||''}')">
 ${p?'Save changes':'Create project'}</button></div></div>`;
 }
 function pickC(gId,iId,c,dot){document.getElementById(gId)?.querySelectorAll('.clr-dot').forEach(d=>d.classList.remove('sel'));dot.classList.add('sel');const inp=document.getElementById(iId);if(inp)inp.value=c;}
+
+function renderProjSponsorsEdit(sponsors){
+  if(!sponsors||sponsors.length===0)return`<div id="pm-sponsors-rows" style="margin-bottom:8px;"></div>`;
+  return`<div id="pm-sponsors-rows" style="margin-bottom:8px;">${sponsors.map((sp,i)=>_projSponsorRow(sp,i)).join('')}</div>`;
+}
+
+const SP_PRODUCT_CATEGORIES=['Prize','Raffle','Team Member','Airwiggles Award'];
+
+function _projSponsorRow(sp,i){
+  const s=getSponsor(sp.id);
+  const products=s?.products||[];
+  const savedProducts=sp.products||[]; // [{name, category}]
+  return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:10px;margin-bottom:8px;overflow:hidden;" id="pm-sp-row-${i}" data-spid="${sp.id}">
+    <!-- Header row -->
+    <div style="display:flex;align-items:center;gap:8px;padding:9px 11px;">
+      <div class="sp-avatar" style="width:26px;height:26px;font-size:.55rem;flex-shrink:0;">${s?.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s?.name||'?').substring(0,2).toUpperCase()}</div>
+      <div style="flex:1;font-size:.82rem;font-weight:600;">${s?s.name:'Unknown sponsor'}</div>
+      <select class="fsel" id="pm-sp-type-${i}" style="font-size:.7rem;" onchange="refreshSponsorRow(${i})">
+        ${Object.entries(SP_TYPES).map(([k,v])=>`<option value="${k}" ${sp.type===k?'selected':''}>${v.label}</option>`).join('')}
+      </select>
+      <button class="del-btn" onclick="removeProjSponsorRow(${i})">×</button>
+    </div>
+    <!-- Product allocation -->
+    ${products.length>0?`
+    <div style="padding:0 11px 11px;border-top:1px solid var(--border2);">
+      <div style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:8px 0 7px;">Product Allocations</div>
+      <div style="display:flex;flex-direction:column;gap:5px;" id="pm-sp-prods-${i}">
+        ${products.map((prod,pi)=>{
+          const saved=savedProducts.find(x=>x.name===prod.name);
+          return`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:6px 9px;background:var(--surface3);border-radius:7px;">
+            <span style="font-size:.75rem;font-weight:500;flex:1;min-width:100px;">${prod.name}${prod.price?`<span style="color:var(--muted);font-size:.65rem;margin-left:5px;">${prod.price}</span>`:''}${prod.desc?`<div style="font-size:.65rem;color:var(--muted);margin-top:1px;">${prod.desc}</div>`:''}</span>
+            <div style="display:flex;gap:5px;flex-wrap:wrap;">
+              ${SP_PRODUCT_CATEGORIES.map(cat=>{
+                const checked=saved?.categories?.includes(cat)||false;
+                return`<label style="display:inline-flex;align-items:center;gap:3px;font-size:.65rem;cursor:pointer;padding:2px 7px;background:var(--surface2);border:1px solid ${checked?'var(--acc)':'var(--border)'};border-radius:12px;transition:all .12s;white-space:nowrap;" id="pm-sp-cat-lbl-${i}-${pi}-${cat.replace(/\s/g,'_')}">
+                  <input type="checkbox" style="display:none;" id="pm-sp-cat-${i}-${pi}-${cat.replace(/\s/g,'_')}" ${checked?'checked':''} onchange="toggleProdCat(this,'pm-sp-cat-lbl-${i}-${pi}-${cat.replace(/\s/g,'_')}')">
+                  ${cat}
+                </label>`;
+              }).join('')}
+            </div>
+          </div>`;
+        }).join('')}
+      </div>
+    </div>`:`<div style="padding:6px 11px 9px;font-size:.68rem;color:var(--muted);border-top:1px solid var(--border2);">No products in this sponsor's profile yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();_spSelectedId='${sp.id}';V='sponsors';render();">Add products →</span></div>`}
+  </div>`;
+}
+
+function toggleProdCat(cb,lblId){
+  const lbl=el(lblId);
+  if(lbl)lbl.style.borderColor=cb.checked?'var(--acc)':'var(--border)';
+}
+
+function refreshSponsorRow(i){
+  // Re-render just this row when type changes (no products change needed, just re-read on save)
+}
+
+function addProjSponsorRow(){
+  const wrap=el('pm-sponsors-rows');if(!wrap)return;
+  const existingRows=readProjSponsorRows();
+  const existingIds=existingRows.map(r=>r.id);
+  const available=S.sponsors.filter(s=>!existingIds.includes(s.id));
+  if(available.length===0){alert('All sponsors already added.');return;}
+  const newSp={id:available[0].id,type:'product',products:[]};
+  const i=existingRows.length;
+  wrap.insertAdjacentHTML('beforeend',_projSponsorRow(newSp,i));
+  // Add a sponsor picker before the row — replace the avatar with a select
+  const row=el(`pm-sp-row-${i}`);
+  if(row&&available.length>1){
+    // Inject a sponsor picker at the top
+    const hdr=row.querySelector('div');
+    if(hdr){
+      const sel=document.createElement('select');
+      sel.className='fsel';sel.id=`pm-sp-id-${i}`;sel.style.cssText='flex:1;font-size:.75rem;';
+      available.forEach(s=>{const o=document.createElement('option');o.value=s.id;o.textContent=s.name;sel.appendChild(o);});
+      sel.onchange=()=>{
+        // Re-render this row with the new sponsor's products
+        const newId=sel.value;
+        const type=el(`pm-sp-type-${i}`)?.value||'product';
+        const newRow=document.createElement('div');
+        newRow.innerHTML=_projSponsorRow({id:newId,type,products:[]},i);
+        row.replaceWith(newRow.firstElementChild);
+        el(`pm-sp-id-${i}`)?.remove(); // clean up orphan if any
+      };
+      // Replace avatar+name with select
+      const avatar=hdr.querySelector('.sp-avatar');
+      const nameDiv=hdr.querySelector('div:not(.sp-avatar)');
+      if(avatar)avatar.replaceWith(sel);
+      if(nameDiv)nameDiv.remove();
+    }
+  }
+}
+
+function removeProjSponsorRow(i){
+  const row=el(`pm-sp-row-${i}`);if(row)row.remove();
+}
+
+function readProjSponsorRows(){
+  const rows=[];
+  const wrap=el('pm-sponsors-rows');if(!wrap)return rows;
+  wrap.querySelectorAll('[id^="pm-sp-row-"]').forEach((row,newI)=>{
+    // Get sponsor ID — either from data-spid or from a select picker
+    const spId=row.querySelector(`#pm-sp-id-${newI}`)?.value||row.dataset.spid;
+    if(!spId)return;
+    const type=row.querySelector(`[id^="pm-sp-type-"]`)?.value||'product';
+    const s=getSponsor(spId);
+    const products=(s?.products||[]).map((prod,pi)=>{
+      const categories=SP_PRODUCT_CATEGORIES.filter(cat=>{
+        const cb=row.querySelector(`#pm-sp-cat-${newI}-${pi}-${cat.replace(/\s/g,'_')}`);
+        return cb?.checked;
+      });
+      return categories.length>0?{name:prod.name,categories}:null;
+    }).filter(Boolean);
+    rows.push({id:spId,type,products});
+  });
+  return rows;
+}
+
 function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:el('pm-area')?.value||'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',startDate:dpVal('pm-s'),endDate:dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',expenses:[]};
-  if(eid){const i=S.projects.findIndex(p=>p.id===eid);if(i>=0){proj.expenses=S.projects[i].expenses||[];S.projects[i]={...S.projects[i],...proj};}}else S.projects.push(proj);
+  const newSponsors=readProjSponsorRows();
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:el('pm-area')?.value||'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',startDate:dpVal('pm-s'),endDate:dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',expenses:[],sponsors:newSponsors};
+  if(eid){
+    const i=S.projects.findIndex(p=>p.id===eid);
+    if(i>=0){
+      const old=S.projects[i];
+      proj.expenses=old.expenses||[];
+      proj.quickLinks=old.quickLinks||[];
+      // Merge product allocations: if a sponsor row didn't show product checkboxes
+      // (because the sponsor had no products), preserve any existing allocation
+      proj.sponsors=newSponsors.map(sp=>{
+        const oldSp=(old.sponsors||[]).find(o=>o.id===sp.id);
+        // If new row has no products (sponsor had no products in profile), keep old
+        const products=sp.products?.length>0?sp.products:(oldSp?.products||[]);
+        return{...sp,products};
+      });
+      // Find newly added sponsors
+      const oldSpIds=(old.sponsors||[]).map(s=>s.id);
+      const addedSponsors=proj.sponsors.filter(s=>!oldSpIds.includes(s.id));
+      S.projects[i]={...old,...proj};
+      addedSponsors.forEach(sp=>autoGenerateSponsorTasks(eid,sp));
+    }
+  } else {
+    S.projects.push(proj);
+    newSponsors.forEach(sp=>autoGenerateSponsorTasks(proj.id,sp));
+  }
   save();closeModal();render();
+}
+
+function autoGenerateSponsorTasks(projectId,sponsorAssignment){
+  const sponsor=getSponsor(sponsorAssignment.id);
+  if(!sponsor)return;
+  const type=sponsorAssignment.type||'product';
+
+  // Check if a task for this sponsor already exists in this project
+  const existing=S.tasks.find(t=>t.projectId===projectId&&t._sponsorId===sponsorAssignment.id&&!t.parentId);
+  if(existing)return;
+
+  // Look up a template tagged with this sponsorship type (prefer non-built-in first)
+  const matchingTemplate=
+    S.taskTemplates.find(t=>t.sponsorType===type&&!t._builtIn)||
+    S.taskTemplates.find(t=>t.sponsorType===type);
+
+  const typeLabel=SP_TYPES[type]?.label||type;
+  const parentId=uid();
+
+  S.tasks.push({
+    id:parentId,
+    name:`${sponsor.name} — ${typeLabel} Sponsorship`,
+    description:matchingTemplate
+      ?`Tasks from template: "${matchingTemplate.name}"`
+      :`Auto-generated tasks for ${sponsor.name} ${typeLabel.toLowerCase()} sponsorship.`,
+    projectId,parentId:null,
+    priority:'High',
+    assignees:[],labels:[],blockedBy:[],
+    startDate:'',endDate:'',
+    kStatus:'todo',done:false,
+    recur:{enabled:false,type:'weekly',interval:1},
+    slackReminder:{},
+    _sponsorId:sponsorAssignment.id,
+    _sponsorType:type
+  });
+
+  // Use template tasks if found, otherwise fall back to hardcoded SP_TYPE_SUBTASKS
+  if(matchingTemplate&&matchingTemplate.tasks?.length){
+    matchingTemplate.tasks.forEach(tmplTask=>{
+      const taskId=uid();
+      S.tasks.push({
+        id:taskId,name:tmplTask.name,description:'',
+        projectId,parentId,
+        priority:tmplTask.priority||'Medium',
+        assignees:[],labels:[],blockedBy:[],
+        startDate:'',endDate:'',
+        kStatus:'todo',done:false,
+        recur:{enabled:false,type:'weekly',interval:1},
+        slackReminder:{}
+      });
+      // Also create subtasks from template if any
+      (tmplTask.subtasks||[]).forEach(sub=>{
+        S.tasks.push({
+          id:uid(),name:sub.name,description:'',
+          projectId,parentId:taskId,
+          priority:sub.priority||'Medium',
+          assignees:[],labels:[],blockedBy:[],
+          startDate:'',endDate:'',
+          kStatus:'todo',done:false,
+          recur:{enabled:false,type:'weekly',interval:1},
+          slackReminder:{}
+        });
+      });
+    });
+  } else {
+    // Fallback: hardcoded defaults
+    (SP_TYPE_SUBTASKS[type]||[]).forEach(name=>{
+      S.tasks.push({
+        id:uid(),name,description:'',
+        projectId,parentId,
+        priority:'Medium',
+        assignees:[],labels:[],blockedBy:[],
+        startDate:'',endDate:'',
+        kStatus:'todo',done:false,
+        recur:{enabled:false,type:'weekly',interval:1},
+        slackReminder:{}
+      });
+    });
+  }
 }
 
 /* TASK MODAL */
@@ -3939,12 +4317,18 @@ function deleteProjQL(projId,qlId){const p=getProject(projId);if(!p)return;p.qui
 function taskTmplModalHtml(id){
   const tmpl=id?S.taskTemplates.find(t=>t.id===id):null;
   // Always load existing tasks into _ttBuf so they are reorderable
-  if(tmpl&&_ttBuf.length===0)_ttBuf=[...(tmpl.tasks||[]).map(t=>({...t,subtasks:[...(t.subtasks||[])]}))];;
+  if(tmpl&&_ttBuf.length===0)_ttBuf=[...(tmpl.tasks||[]).map(t=>({...t,subtasks:[...(t.subtasks||[])]}))];
   return`<div class="mo-box mo-wide">
 <div class="mo-hd"><span class="mo-title">${tmpl?'Edit Template':'New Template'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
 <div class="mo-body">
   <div class="field"><label class="flbl">Name *</label><input class="inp" id="tt-name" value="${tmpl?.name||''}" placeholder="e.g. Design Sprint"></div>
   <div class="field"><label class="flbl">Description</label><input class="inp" id="tt-desc" value="${tmpl?.description||''}" placeholder="What is this template for?"></div>
+  <div class="field"><label class="flbl">Sponsorship Type (optional — links this template to auto-task generation)</label>
+    <select class="sel" id="tt-sp-type">
+      <option value="">— General template —</option>
+      ${Object.entries(SP_TYPES).map(([k,v])=>`<option value="${k}" ${tmpl?.sponsorType===k?'selected':''}>${v.label} Sponsorship</option>`).join('')}
+    </select>
+  </div>
   <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
     <div style="font-size:.72rem;font-weight:700;color:var(--text2);margin-bottom:9px;text-transform:uppercase;letter-spacing:.06em;">Tasks in template</div>
     <div id="tt-task-list"></div>
@@ -3988,7 +4372,40 @@ ${t.subtasks?.length?`<div style="padding-left:18px;margin-bottom:7px;">${t.subt
   <button class="btn btn-ghost btn-xs" onclick="commitTmplSub(${i})">+ Sub</button>
 </div>
 </div>`).join('');}
-function saveTmpl(eid){const name=el('tt-name')?.value.trim();if(!name)return;const tmpl={id:eid||uid(),name,description:el('tt-desc')?.value.trim()||'',tasks:[..._ttBuf]};if(eid){const i=S.taskTemplates.findIndex(t=>t.id===eid);if(i>=0)S.taskTemplates[i]=tmpl;}else S.taskTemplates.push(tmpl);_ttBuf=[];save();closeModal();render();}
+
+function saveTmpl(eid){
+  const name=el('tt-name')?.value.trim();if(!name)return;
+  const sponsorType=el('tt-sp-type')?.value||null;
+  const existing=eid?S.taskTemplates.find(t=>t.id===eid):null;
+  const tmpl={
+    id:eid||uid(),
+    name,
+    description:el('tt-desc')?.value.trim()||'',
+    sponsorType:sponsorType||null,
+    _builtIn:existing?._builtIn||false, // preserve built-in flag
+    tasks:[..._ttBuf]
+  };
+  if(eid){const i=S.taskTemplates.findIndex(t=>t.id===eid);if(i>=0)S.taskTemplates[i]=tmpl;}
+  else S.taskTemplates.push(tmpl);
+  _ttBuf=[];save();closeModal();render();
+}
+
+/* Create built-in sponsor templates on first load if they don't exist */
+function ensureBuiltInSponsorTemplates(){
+  Object.entries(SP_TYPE_SUBTASKS).forEach(([type,subtasks])=>{
+    const exists=S.taskTemplates.some(t=>t.sponsorType===type&&t._builtIn);
+    if(exists)return;
+    const typeLabel=SP_TYPES[type]?.label||type;
+    S.taskTemplates.push({
+      id:'sp-tmpl-'+type,
+      name:`${typeLabel} Sponsorship`,
+      description:`Auto-generated tasks for ${typeLabel.toLowerCase()} sponsors. Edit to customise.`,
+      sponsorType:type,
+      _builtIn:true,
+      tasks:subtasks.map(name=>({name,priority:'Medium',subtasks:[]}))
+    });
+  });
+}
 
 /* PROJECT EXPENSE MODAL */
 function projExpModalHtml(projId){const p=getProject(projId);if(!p)return'';
@@ -4794,241 +5211,424 @@ const SP_PRIO_CLASSES={
   'contest-alignment':'t-contest'
 };
 
+/* Sponsorship types for project assignment */
+const SP_TYPES={
+  'cash':      {label:'Cash',       color:'#1fba7a', icon:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>'},
+  'product':   {label:'Product/Prize', color:'#f59e0b', icon:'<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>'},
+  'both':      {label:'Cash + Product', color:'#3d82f0', icon:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>'},
+  'partnership':{label:'Partnership', color:'#a78bfa', icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'}
+};
+
+/* Default task subtasks to auto-generate per sponsorship type */
+const SP_TYPE_SUBTASKS={
+  'cash':[
+    'Invoice raised and sent',
+    'Payment received and confirmed',
+    'Receipt / confirmation sent to sponsor',
+    'Sponsor mentioned in event announcement'
+  ],
+  'product':[
+    'Prize details confirmed with sponsor',
+    'Prize value and description received',
+    'Sponsor logo and assets received',
+    'Prize delivery method agreed',
+    'Winner notified and prize details sent',
+    'Prize delivered / confirmed received by winner',
+    'Thank you sent to sponsor post-event'
+  ],
+  'both':[
+    'Invoice raised and sent',
+    'Payment received and confirmed',
+    'Prize details confirmed with sponsor',
+    'Prize value and description received',
+    'Sponsor logo and assets received',
+    'Prize delivery method agreed',
+    'Winner notified and prize details sent',
+    'Prize delivered / confirmed received by winner',
+    'Thank you and post-event report sent'
+  ],
+  'partnership':[
+    'Partnership agreement / scope defined',
+    'Sponsor logo and assets received',
+    'Co-branding guidelines agreed',
+    'Joint announcement drafted',
+    'Sponsor featured in all event marketing',
+    'Post-event debrief call scheduled',
+    'Partnership report sent'
+  ]
+};
+
 function getSponsor(id){return S.sponsors.find(s=>s.id===id);}
 
 function spTagHtml(p){return`<span class="sp-tag ${SP_PRIO_CLASSES[p]||''}">${SP_PRIO_LABELS[p]||p}</span>`;}
 
 function histTypeCls(t){return t==='prize'?'sp-type-prize':t==='cash'||t==='cash+prize'?'sp-type-cash':t==='partner'?'sp-type-partner':'sp-type-sponsor';}
 
+/* Which sponsor is selected in the split view */
+let _spSelectedId=null;
+
 function renderSponsors(){
+  // Ensure _spSelectedId is valid
+  if(_spSelectedId&&!getSponsor(_spSelectedId))_spSelectedId=null;
+  if(!_spSelectedId&&S.sponsors.length>0)_spSelectedId=S.sponsors[0].id;
+
   const q=(el('sp-search')||{}).value||'';
   const pFilter=(el('sp-prio-filter')||{}).value||'';
   let list=S.sponsors.filter(s=>{
-    if(q&&!s.name.toLowerCase().includes(q.toLowerCase())&&!s.notes.toLowerCase().includes(q.toLowerCase()))return false;
+    const search=(s.name+' '+(s.notes||'')+' '+(s.products||[]).map(p=>p.name).join(' ')).toLowerCase();
+    if(q&&!search.includes(q.toLowerCase()))return false;
     if(pFilter&&!(s.priorities||[]).includes(pFilter))return false;
     return true;
   });
-  const totalEvents=S.sponsors.reduce((a,s)=>a+(s.history||[]).length,0);
-  const totalSponsors=S.sponsors.length;
+
+  const sel=_spSelectedId?getSponsor(_spSelectedId):null;
 
   return`<div class="fu">
 <div class="page-hd">
   <div class="page-title"><em>Sponsors</em></div>
   <div class="page-acts">
-    <button class="btn btn-ghost btn-sm" onclick="openSponsorModal('match')">
-      <svg width="13" height="13" viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2"/></svg>
+    <button class="btn btn-ghost btn-sm" onclick="openSpMatch()">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
       Match to Event
     </button>
-    <button class="btn btn-acc btn-sm" onclick="openSponsorModal('new',null)">+ Add Sponsor</button>
+    <button class="btn btn-acc btn-sm" onclick="openNewSponsor()">+ New Sponsor</button>
   </div>
 </div>
 
-<!-- Stats row -->
-<div class="sp-overview-stats">
-  <div class="fin-metric"><div class="flbl2">Total Sponsors</div><div class="fval blue">${totalSponsors}</div></div>
-  <div class="fin-metric"><div class="flbl2">Sponsorship Events</div><div class="fval">${totalEvents}</div></div>
-  <div class="fin-metric"><div class="flbl2">With Contact Info</div><div class="fval green">${S.sponsors.filter(s=>s.contactEmail).length}</div></div>
-  <div class="fin-metric"><div class="flbl2">Budget Cycles Noted</div><div class="fval amber">${S.sponsors.filter(s=>s.budgetCycle).length}</div></div>
+<!-- Stats -->
+<div class="sp-overview-stats" style="margin-bottom:16px;">
+  <div class="fin-metric"><div class="flbl2">Total Sponsors</div><div class="fval blue">${S.sponsors.length}</div></div>
+  <div class="fin-metric"><div class="flbl2">Sponsorship Events</div><div class="fval">${S.sponsors.reduce((a,s)=>a+(s.history||[]).length,0)}</div></div>
+  <div class="fin-metric"><div class="flbl2">With Contact</div><div class="fval green">${S.sponsors.filter(s=>s.contactEmail).length}</div></div>
+  <div class="fin-metric"><div class="flbl2">Products Catalogued</div><div class="fval amber">${S.sponsors.reduce((a,s)=>a+(s.products||[]).length,0)}</div></div>
 </div>
 
-<!-- Search + filter -->
-<div style="display:flex;gap:8px;margin-bottom:14px;flex-wrap:wrap;align-items:center;">
-  <input id="sp-search" class="inp" placeholder="Search sponsors…" style="max-width:240px;padding:7px 11px;font-size:.78rem;" oninput="renderSponsorsInline()" value="">
-  <select id="sp-prio-filter" class="fsel" onchange="renderSponsorsInline()">
-    <option value="">All priorities</option>
-    ${Object.entries(SP_PRIO_LABELS).map(([v,l])=>`<option value="${v}">${l}</option>`).join('')}
-  </select>
-</div>
+<!-- Split layout: list on left, profile on right -->
+<div style="display:grid;grid-template-columns:280px 1fr;gap:14px;align-items:start;min-height:60vh;">
 
-<!-- Cards -->
-<div class="sp-grid" id="sp-grid">
-${list.length===0?`<div class="empty" style="grid-column:1/-1;"><div class="empty-ico">${ICO.star}</div><div class="empty-txt">No sponsors match your search.</div></div>`:''}
-${list.map(s=>`
-  <div class="sp-card" onclick="openSponsorModal('view','${s.id}')">
-    <div class="sp-name">${s.name}</div>
-    ${s.website?`<div class="sp-web">${s.website}</div>`:`<div class="sp-web" style="color:var(--border2);">No website set</div>`}
-    <div class="sp-tags">${(s.priorities||[]).map(spTagHtml).join('')}</div>
-    ${s.budgetCycle?`<div style="font-size:.68rem;color:var(--yellow);margin-bottom:4px;">${s.budgetCycle}</div>`:''}
-    <div class="sp-hist-count">${(s.history||[]).length} event${(s.history||[]).length!==1?'s':''} on record${s.contactName?` · ${s.contactName}`:''}</div>
+  <!-- LEFT: Sponsor list -->
+  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
+    <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:7px;">
+      <input id="sp-search" class="inp" placeholder="Search sponsors…" style="font-size:.75rem;padding:6px 10px;" oninput="render()" value="${q}">
+      <select id="sp-prio-filter" class="fsel" style="font-size:.72rem;" onchange="render()">
+        <option value="">All priorities</option>
+        ${Object.entries(SP_PRIO_LABELS).map(([v,l])=>`<option value="${v}" ${pFilter===v?'selected':''}>${l}</option>`).join('')}
+      </select>
+    </div>
+    <div>
+      ${list.length===0?`<div style="padding:24px;text-align:center;color:var(--muted);font-size:.78rem;">No sponsors match</div>`:''}
+      ${list.map(s=>`
+      <div class="sp-list-row${s.id===_spSelectedId?' active':''}" onclick="_spSelectedId='${s.id}';render()">
+        <div class="sp-avatar">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
+          <div style="font-size:.65rem;color:var(--muted);margin-top:1px;">${(s.history||[]).length} events · ${(s.products||[]).length} products</div>
+        </div>
+        ${(s.priorities||[]).slice(0,1).map(p=>`<span class="sp-tag ${SP_PRIO_CLASSES[p]||''}" style="font-size:.55rem;padding:1px 5px;">${SP_PRIO_LABELS[p]?.split(' ')[0]||p}</span>`).join('')}
+      </div>`).join('')}
+    </div>
   </div>
-`).join('')}
+
+  <!-- RIGHT: Profile view / editor -->
+  <div id="sp-profile-panel">
+    ${sel?renderSpProfile(sel):`<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--muted);font-size:.82rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;">Select a sponsor to view their profile</div>`}
+  </div>
+
 </div>
+
+<!-- Sponsor Matching Panel (hidden by default) -->
+<div id="sp-match-panel" style="display:none;margin-top:20px;"></div>
+
 </div>`;
 }
 
-function renderSponsorsInline(){
-  const grid=el('sp-grid');if(!grid)return;
-  const q=el('sp-search')?.value||'';
-  const pf=el('sp-prio-filter')?.value||'';
-  const list=S.sponsors.filter(s=>{
-    if(q&&!s.name.toLowerCase().includes(q.toLowerCase())&&!(s.notes||'').toLowerCase().includes(q.toLowerCase()))return false;
-    if(pf&&!(s.priorities||[]).includes(pf))return false;
-    return true;
-  });
-  grid.innerHTML=list.length===0?`<div class="empty" style="grid-column:1/-1;"><div class="empty-ico">${ICO.star}</div><div class="empty-txt">No sponsors match.</div></div>`
-    :list.map(s=>`<div class="sp-card" onclick="openSponsorModal('view','${s.id}')"><div class="sp-name">${s.name}</div>${s.website?`<div class="sp-web">${s.website}</div>`:`<div class="sp-web" style="color:var(--border2);">No website set</div>`}<div class="sp-tags">${(s.priorities||[]).map(spTagHtml).join('')}</div>${s.budgetCycle?`<div style="font-size:.68rem;color:var(--yellow);margin-bottom:4px;">${s.budgetCycle}</div>`:''}<div class="sp-hist-count">${(s.history||[]).length} event${(s.history||[]).length!==1?'s':''} on record${s.contactName?` · ${s.contactName}`:''}</div></div>`).join('');
-}
+function renderSpProfile(s){
+  if(!s)return'';
+  const projectsUsing=S.projects.filter(p=>(p.sponsors||[]).some(sp=>sp.id===s.id));
+  return`<div style="display:flex;flex-direction:column;gap:12px;">
 
-function initSponsorSearch(){
-  const si=el('sp-search');if(si)si.addEventListener('input',renderSponsorsInline);
-}
+  <!-- Header card -->
+  <div class="sp-section">
+    <div class="sp-section-bd" style="display:flex;align-items:flex-start;gap:14px;">
+      <div class="sp-avatar" style="width:52px;height:52px;border-radius:10px;font-size:1rem;flex-shrink:0;">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:3px;">${s.name}</div>
+        ${s.website?`<a href="https://${s.website.replace(/^https?:\/\//,'')}" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none;">${s.website}</a>`:''}
+        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">${(s.priorities||[]).map(spTagHtml).join('')}</div>
+      </div>
+      <div style="display:flex;gap:6px;flex-shrink:0;">
+        <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}')">Edit</button>
+        <button class="btn btn-danger btn-xs" onclick="deleteSponsor('${s.id}')">Delete</button>
+      </div>
+    </div>
+  </div>
 
-function openSponsorModal(type,id){
-  const mc=el('mc');
-  if(type==='new'||type==='edit'){
-    const s=id?getSponsor(id):null;
-    mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${sponsorEditModalHtml(s)}</div>`;
-  } else if(type==='view'){
-    const s=getSponsor(id);if(!s)return;
-    mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${sponsorViewModalHtml(s)}</div>`;
-  } else if(type==='match'){
-    mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${sponsorMatchModalHtml()}</div>`;
-  }
-}
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
 
-function sponsorViewModalHtml(s){
-  const histHtml=(s.history||[]).length===0
-    ?`<div class="empty"><div class="empty-ico">${ICO.copy}</div><div class="empty-txt">No event history yet.</div></div>`
-    :(s.history||[]).map(h=>`<div class="sp-hist-row">
+    <!-- Contact -->
+    <div class="sp-section">
+      <div class="sp-section-hd"><span class="sp-section-title">Contact</span></div>
+      <div class="sp-section-bd" style="font-size:.78rem;">
+        ${s.contactName?`<div style="margin-bottom:6px;"><span style="color:var(--muted);font-size:.65rem;display:block;margin-bottom:1px;">PRIMARY</span><strong>${s.contactName}</strong>${s.contactRole?` · ${s.contactRole}`:''}</div>`:''}
+        ${s.contactEmail?`<div style="margin-bottom:6px;"><a href="mailto:${s.contactEmail}" style="color:var(--acc);">${s.contactEmail}</a></div>`:''}
+        ${s.backupContact?`<div style="margin-bottom:4px;color:var(--text2);font-size:.7rem;"><span style="color:var(--muted);">Backup: </span>${s.backupContact}</div>`:''}
+        ${s.relationshipOwner?`<div style="color:var(--text2);font-size:.7rem;"><span style="color:var(--muted);">Our lead: </span>${s.relationshipOwner}</div>`:''}
+        ${!s.contactName&&!s.contactEmail?`<div style="color:var(--muted);font-size:.75rem;">No contact info yet</div>`:''}
+        ${s.budgetCycle?`<div style="margin-top:8px;padding:6px 9px;background:rgba(240,201,107,.08);border:1px solid rgba(240,201,107,.2);border-radius:6px;font-size:.68rem;color:var(--yellow);">${s.budgetCycle}</div>`:''}
+      </div>
+    </div>
+
+    <!-- Products -->
+    <div class="sp-section">
+      <div class="sp-section-hd">
+        <span class="sp-section-title">Products</span>
+        <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}','products')">Edit</button>
+      </div>
+      <div class="sp-section-bd">
+        ${(s.products||[]).length===0?`<div style="color:var(--muted);font-size:.75rem;">No products catalogued yet</div>`:''}
+        ${(s.products||[]).map(p=>`<div style="padding:6px 0;border-bottom:1px solid var(--border2);">
+          <div style="font-size:.78rem;font-weight:600;">${p.name}</div>
+          ${p.desc?`<div style="font-size:.68rem;color:var(--text2);margin-top:2px;">${p.desc}</div>`:''}
+          ${p.price?`<div style="font-size:.65rem;color:var(--acc);margin-top:2px;">${p.price}</div>`:''}
+        </div>`).join('')}
+      </div>
+    </div>
+
+  </div>
+
+  <!-- Target Audience -->
+  <div class="sp-section">
+    <div class="sp-section-hd">
+      <span class="sp-section-title">Target Audience</span>
+      <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}','audience')">Edit</button>
+    </div>
+    <div class="sp-section-bd">
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;">
+        ${(s.audienceTags||[]).map(t=>`<span class="sp-audience-tag">${t}</span>`).join('')}
+        ${(s.audienceTags||[]).length===0?`<span style="color:var(--muted);font-size:.75rem;">No audience tags yet</span>`:''}
+      </div>
+      ${s.audienceNotes?`<div style="font-size:.75rem;color:var(--text2);line-height:1.6;">${s.audienceNotes}</div>`:''}
+    </div>
+  </div>
+
+  <!-- Integration Ideas -->
+  <div class="sp-section">
+    <div class="sp-section-hd">
+      <span class="sp-section-title">Integration Ideas & Capabilities</span>
+      <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}','integrations')">Edit</button>
+    </div>
+    <div class="sp-section-bd">
+      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;">
+        ${(s.integrationTypes||[]).map(t=>`<span class="sp-integration-chip">${t}</span>`).join('')}
+        ${(s.integrationTypes||[]).length===0?`<span style="color:var(--muted);font-size:.75rem;">No integration types noted</span>`:''}
+      </div>
+      ${s.integrationNotes?`<div style="font-size:.75rem;color:var(--text2);line-height:1.6;margin-top:6px;">${s.integrationNotes}</div>`:''}
+    </div>
+  </div>
+
+  <!-- Assets -->
+  ${(s.assetsUrl||s.assets)?`<div class="sp-section">
+    <div class="sp-section-hd"><span class="sp-section-title">Assets</span></div>
+    <div class="sp-section-bd">
+      ${s.assetsUrl?`<a href="${s.assetsUrl}" target="_blank" rel="noopener" class="ql-btn" style="margin-bottom:8px;display:inline-flex;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> Open assets folder</a>`:''}
+      ${s.assets?`<div style="font-size:.75rem;color:var(--text2);">${s.assets}</div>`:''}
+    </div>
+  </div>`:''}
+
+  <!-- Notes -->
+  ${s.notes?`<div class="sp-section">
+    <div class="sp-section-hd"><span class="sp-section-title">Notes</span></div>
+    <div class="sp-section-bd" style="font-size:.78rem;color:var(--text2);line-height:1.6;">${s.notes}</div>
+  </div>`:''}
+
+  <!-- Event History -->
+  <div class="sp-section">
+    <div class="sp-section-hd"><span class="sp-section-title">Event History (${(s.history||[]).length})</span></div>
+    <div class="sp-section-bd">
+      ${(s.history||[]).length===0?`<div style="color:var(--muted);font-size:.75rem;">No events recorded yet</div>`:''}
+      ${(s.history||[]).map(h=>`<div class="sp-hist-row">
         <span class="sp-hist-event">${h.event}</span>
         <span class="sp-hist-prize">${h.prizeDesc||'—'}</span>
         <span class="sp-hist-type ${histTypeCls(h.type)}">${h.type||'sponsor'}</span>
-      </div>`).join('');
-
-  const delivItems=['Logo added to marketing','Sponsored post drafted','Sponsored post published','Post-event report sent'];
-  const delivKey=`deliv_${s.id}_${Date.now().toString().slice(0,8)}`;
-
-  return`<div class="mo-box mo-wide" style="max-width:680px;">
-<div class="mo-hd">
-  <span class="mo-title">${s.name}</span>
-  <div style="display:flex;gap:6px;align-items:center;">
-    <button class="btn btn-ghost btn-xs" onclick="openSponsorModal('edit','${s.id}')">Edit</button>
-    <button class="mo-close" onclick="closeModal()">×</button>
-  </div>
-</div>
-<div class="mo-body">
-
-  <!-- Contact -->
-  <div class="sec-lbl" style="margin-bottom:8px;">Contact</div>
-  <div class="sp-detail-grid">
-    <div>
-      <div class="sp-field"><label>Primary Contact</label><div style="font-size:.82rem;">${s.contactName||'<span style="color:var(--muted)">Not set</span>'}</div></div>
-      <div class="sp-field"><label>Role</label><div style="font-size:.82rem;">${s.contactRole||'<span style="color:var(--muted)">Not set</span>'}</div></div>
-      <div class="sp-field"><label>Email</label><div style="font-size:.82rem;">${s.contactEmail?`<a href="/cdn-cgi/l/email-protection#785c030b561b17160c191b0c3d1519111405" style="color:var(--acc);">${s.contactEmail}</a>`:'<span style="color:var(--muted)">Not set</span>'}</div></div>
-    </div>
-    <div>
-      <div class="sp-field"><label>Backup Contact</label><div style="font-size:.82rem;">${s.backupContact||'<span style="color:var(--muted)">Not set</span>'}</div></div>
-      <div class="sp-field"><label>Relationship Owner (us)</label><div style="font-size:.82rem;">${s.relationshipOwner||'<span style="color:var(--muted)">Not set</span>'}</div></div>
-      <div class="sp-field"><label>Best Contact Method</label><div style="font-size:.82rem;">${s.bestContact||'<span style="color:var(--muted)">Not set</span>'}</div></div>
+      </div>`).join('')}
     </div>
   </div>
 
-  <hr class="div">
-
-  <!-- Priorities -->
-  <div class="sec-lbl" style="margin-bottom:8px;">Marketing Priorities</div>
-  <div style="display:flex;flex-wrap:wrap;gap:5px;margin-bottom:10px;">${(s.priorities||[]).length?s.priorities.map(spTagHtml).join(''):'<span style="color:var(--muted);font-size:.75rem;">None set</span>'}</div>
-
-  <!-- Budget cycle -->
-  ${s.budgetCycle?`<div class="info-box" style="margin-bottom:10px;width:100%;box-sizing:border-box;">Budget cycle / window: ${s.budgetCycle}</div>`:`<div class="warn-box" style="margin-bottom:10px;width:100%;box-sizing:border-box;">Budget cycle not yet noted — add it to time outreach perfectly.</div>`}
-
-  <!-- Notes -->
-  ${s.notes?`<div class="sec-lbl" style="margin-bottom:6px;">Notes</div><div style="font-size:.78rem;color:var(--text2);line-height:1.6;margin-bottom:12px;">${s.notes}</div>`:''}
-
-  <!-- Assets -->
-  ${s.assets?`<div class="sec-lbl" style="margin-bottom:6px;">Assets Held</div><div style="font-size:.78rem;color:var(--text2);line-height:1.6;margin-bottom:12px;">${s.assets}</div>`:''}
-
-  <hr class="div">
-
-  <!-- Event history -->
-  <div class="sec-lbl" style="margin-bottom:8px;">Event History (${(s.history||[]).length})</div>
-  ${histHtml}
-
-  <hr class="div">
-
-  <!-- AI Tools -->
-  <div class="sec-lbl" style="margin-bottom:8px;">AI Tools</div>
-  <div style="display:flex;gap:7px;flex-wrap:wrap;margin-bottom:10px;">
-    
-    
-    
-  </div>
-  <div id="ai-output-${s.id}" style="display:none;">
-    <div class="ai-draft-area" id="ai-text-${s.id}"></div>
-    <div style="display:flex;gap:6px;margin-top:7px;">
-      <button class="btn btn-ghost btn-xs" onclick="copyAiDraft('${s.id}')">Copy</button>
-      <button class="btn btn-ghost btn-xs" onclick="el('ai-output-${s.id}').style.display='none'">Clear</button>
+  <!-- Projects using this sponsor -->
+  ${projectsUsing.length>0?`<div class="sp-section">
+    <div class="sp-section-hd"><span class="sp-section-title">Active in Projects</span></div>
+    <div class="sp-section-bd" style="display:flex;flex-wrap:wrap;gap:7px;">
+      ${projectsUsing.map(p=>`<div onclick="S.detailId='${p.id}';V='projects';render();" style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:.75rem;transition:border-color .13s;" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'"><div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>${p.name}</div>`).join('')}
     </div>
-  </div>
+  </div>`:''}
 
-  <hr class="div">
-
-  <!-- Deliverables checklist -->
-  <div class="sec-lbl" style="margin-bottom:8px;">Deliverables Checklist</div>
-  <div id="deliv-list-${s.id}">
-    ${renderDelivChecklist(s.id)}
-  </div>
-  <button class="add-row-btn" style="margin-top:6px;" onclick="addDelivItem('${s.id}')">+ Add item</button>
-
-</div>
-<div class="mo-ft">
-  <button class="btn btn-danger btn-sm" onclick="deleteSponsor('${s.id}')">Delete</button>
-  <button class="btn btn-ghost" onclick="closeModal()">Close</button>
-  <button class="btn btn-acc btn-sm" onclick="openSponsorModal('edit','${s.id}')">Edit Profile</button>
-</div>
 </div>`;
 }
 
-function renderDelivChecklist(sid){
-  const s=getSponsor(sid);if(!s)return'';
-  const items=s.deliverables||[
-    {id:'d1',label:'Logo added to marketing materials',done:false},
-    {id:'d2',label:'Sponsored post drafted',done:false},
-    {id:'d3',label:'Sponsored post published',done:false},
-    {id:'d4',label:'Post-event report sent',done:false}
-  ];
-  if(!s.deliverables){s.deliverables=items;save();}
-  return items.map(d=>`<div class="deliv-row">
-    <div class="deliv-check${d.done?' done':''}" onclick="toggleDeliv('${sid}','${d.id}')"></div>
-    <span style="font-size:.78rem;${d.done?'color:var(--muted);text-decoration:line-through;':''}">${d.label}</span>
-    <button style="background:none;border:none;color:var(--muted);cursor:pointer;font-size:12px;margin-left:auto;" onclick="removeDeliv('${sid}','${d.id}')">×</button>
+function renderSponsorsInline(){render();} // now a full re-render for simplicity
+function initSponsorSearch(){} // no longer needed - handled by render()
+
+function openNewSponsor(){
+  _spSelectedId=null;
+  openSponsorModal('new',null);
+}
+function openEditSponsor(id,tab){
+  openSponsorModal('edit',id,tab);
+}
+
+function openSponsorModal(type,id,tab){
+  const mc=el('mc');
+  if(type==='new'||type==='edit'){
+    const s=id?getSponsor(id):null;
+    mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${sponsorEditModalHtml(s,tab)}</div>`;
+  } else if(type==='view'){
+    // Legacy: just select in list
+    _spSelectedId=id;render();
+  } else if(type==='match'){
+    openSpMatch();
+  }
+}
+
+function openSpMatch(){
+  const panel=el('sp-match-panel');
+  if(!panel)return;
+  if(panel.style.display!=='none'){panel.style.display='none';return;}
+  panel.style.display='block';
+  panel.innerHTML=renderSpMatchPanel();
+}
+
+function renderSpMatchPanel(){
+  return`<div class="sp-section">
+  <div class="sp-section-hd">
+    <span class="sp-section-title">Match Sponsors to Event</span>
+    <button class="btn btn-ghost btn-xs" onclick="el('sp-match-panel').style.display='none'">×</button>
+  </div>
+  <div class="sp-section-bd">
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px;">
+      <div class="field"><label class="flbl">Event Type</label>
+        <select class="sel" id="spm-type">
+          <option value="">— select —</option>
+          ${['Sound Design Challenge','Music Competition','Noisevember','AirCon Conference','Film Audio Faceoff','Online Meetup','Educational Series','Giveaway'].map(t=>`<option>${t}</option>`).join('')}
+        </select>
+      </div>
+      <div class="field"><label class="flbl">Sponsorship Type Needed</label>
+        <select class="sel" id="spm-sptype">
+          <option value="">— any —</option>
+          ${Object.entries(SP_TYPES).map(([k,v])=>`<option value="${k}">${v.label}</option>`).join('')}
+        </select>
+      </div>
+    </div>
+    <div class="field"><label class="flbl">Target Audience / Keywords</label>
+      <input class="inp" id="spm-audience" placeholder="e.g. game audio, sound designers, composers…">
+    </div>
+    <button class="btn btn-acc btn-sm" onclick="runSpMatch()">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      Find Best Matches
+    </button>
+    <div id="spm-results" style="margin-top:14px;"></div>
+  </div>
+</div>`;
+}
+
+function runSpMatch(){
+  const eventType=el('spm-type')?.value||'';
+  const spType=el('spm-sptype')?.value||'';
+  const audience=(el('spm-audience')?.value||'').toLowerCase();
+  const res=el('spm-results');if(!res)return;
+
+  // Score each sponsor
+  const scored=S.sponsors.map(s=>{
+    let score=0;
+    const sText=(s.name+' '+(s.notes||'')+' '+(s.audienceNotes||'')+' '+(s.audienceTags||[]).join(' ')+' '+(s.integrationTypes||[]).join(' ')+' '+(s.products||[]).map(p=>p.name+' '+(p.desc||'')).join(' ')).toLowerCase();
+
+    // Audience keyword match
+    if(audience){
+      const words=audience.split(/\s+/).filter(Boolean);
+      words.forEach(w=>{if(sText.includes(w))score+=15;});
+    }
+    // Event history match
+    if(eventType){
+      (s.history||[]).forEach(h=>{if(h.event.toLowerCase().includes(eventType.toLowerCase()))score+=20;});
+    }
+    // Has contact info
+    if(s.contactEmail)score+=5;
+    // Has products catalogued
+    score+=(s.products||[]).length*3;
+    // History depth
+    score+=(s.history||[]).length*4;
+    // Integration types
+    score+=(s.integrationTypes||[]).length*2;
+
+    const reasons=[];
+    if((s.history||[]).length>0)reasons.push(`${(s.history||[]).length} events on record`);
+    if((s.products||[]).length>0)reasons.push(`${(s.products||[]).length} products`);
+    if((s.integrationTypes||[]).length>0)reasons.push(s.integrationTypes.slice(0,2).join(', '));
+
+    return{s,score,reasons};
+  }).filter(x=>x.score>0).sort((a,b)=>b.score-a.score).slice(0,6);
+
+  if(scored.length===0){
+    res.innerHTML=`<div style="color:var(--muted);font-size:.78rem;">No strong matches found. Try adding more audience info to sponsor profiles.</div>`;
+    return;
+  }
+
+  const maxScore=scored[0].score;
+  res.innerHTML=`<div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:9px;">Top Matches</div>`+
+  scored.map(({s,score,reasons})=>`<div style="display:flex;align-items:center;gap:12px;padding:9px 11px;background:var(--surface2);border-radius:8px;margin-bottom:6px;cursor:pointer;transition:all .13s;" onclick="_spSelectedId='${s.id}';el('sp-match-panel').style.display='none';render();" onmouseover="this.style.background='var(--surface3)'" onmouseout="this.style.background='var(--surface2)'">
+    <div class="sp-avatar" style="width:30px;height:30px;font-size:.65rem;flex-shrink:0;">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
+    <div style="flex:1;min-width:0;">
+      <div style="font-size:.82rem;font-weight:600;">${s.name}</div>
+      <div class="match-bar" style="margin-top:4px;"><div class="match-fill" style="width:${Math.round(score/maxScore*100)}%;"></div></div>
+      ${reasons.length?`<div style="font-size:.65rem;color:var(--muted);margin-top:2px;">${reasons.join(' · ')}</div>`:''}
+    </div>
+    <div style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--acc);">${Math.round(score/maxScore*100)}%</div>
   </div>`).join('');
 }
 
-function toggleDeliv(sid,did){
-  const s=getSponsor(sid);if(!s||!s.deliverables)return;
-  const d=s.deliverables.find(x=>x.id===did);if(!d)return;
-  d.done=!d.done;save();
-  const dl=el(`deliv-list-${sid}`);if(dl)dl.innerHTML=renderDelivChecklist(sid);
-}
+/* deliverables are now handled via sponsor task subtasks */
 
-function removeDeliv(sid,did){
-  const s=getSponsor(sid);if(!s||!s.deliverables)return;
-  s.deliverables=s.deliverables.filter(x=>x.id!==did);save();
-  const dl=el(`deliv-list-${sid}`);if(dl)dl.innerHTML=renderDelivChecklist(sid);
-}
-
-function addDelivItem(sid){
-  const label=prompt('Deliverable item:');if(!label)return;
-  const s=getSponsor(sid);if(!s)return;
-  if(!s.deliverables)s.deliverables=[];
-  s.deliverables.push({id:uid(),label,done:false});save();
-  const dl=el(`deliv-list-${sid}`);if(dl)dl.innerHTML=renderDelivChecklist(sid);
-}
-
-function sponsorEditModalHtml(s){
+function sponsorEditModalHtml(s,activeTab){
   const allPrios=Object.keys(SP_PRIO_LABELS);
   const selPrios=s?.priorities||[];
-  return`<div class="mo-box mo-wide" style="max-width:600px;">
-<div class="mo-hd"><span class="mo-title">${s?'Edit Sponsor':'New Sponsor'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
+  const tab=activeTab||'main';
+  const tabs=['main','products','audience','integrations','history'];
+  const tabLabels={main:'Overview',products:'Products',audience:'Audience',integrations:'Integrations',history:'History'};
+
+  return`<div class="mo-box mo-wide" style="max-width:680px;max-height:90vh;overflow-y:auto;">
+<div class="mo-hd" style="position:sticky;top:0;z-index:10;background:var(--surface);">
+  <span class="mo-title">${s?`Edit — ${s.name}`:'New Sponsor'}</span>
+  <button class="mo-close" onclick="closeModal()">×</button>
+</div>
 <div class="mo-body">
+
+  ${!s?`<!-- AI Prefill for new sponsors -->
+  <div style="background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
+    <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+      AI Profile Prefill
+    </div>
+    <div style="display:flex;gap:8px;align-items:flex-end;">
+      <div class="field" style="flex:1;margin-bottom:0;"><label class="flbl">Company website URL</label><input class="inp" id="sp-ai-url" placeholder="https://kilohearts.com" style="font-size:.78rem;"></div>
+      <button class="btn btn-acc btn-sm" onclick="runSpAIPrefill()">Generate Profile</button>
+    </div>
+    <div style="font-size:.67rem;color:var(--text2);margin-top:6px;">AI will fetch the website and prefill products, audience, and integration ideas. Review before saving.</div>
+    <div id="sp-ai-status" style="display:none;margin-top:8px;"></div>
+  </div>`:``}
+
+  <!-- Tab nav -->
+  <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;">
+    ${tabs.map(t=>`<button onclick="openEditSponsor('${s?.id||''}','${t}')" style="padding:5px 12px;background:${tab===t?'var(--acc)':'var(--surface2)'};color:${tab===t?'var(--black)':'var(--text2)'};border:1px solid ${tab===t?'var(--acc)':'var(--border)'};border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .13s;">${tabLabels[t]}</button>`).join('')}
+  </div>
+
+  ${tab==='main'?`
   <div class="sp-detail-grid">
     <div class="field"><label class="flbl">Company Name *</label><input class="inp" id="sp-nm" value="${s?.name||''}" placeholder="e.g. Kilohearts"></div>
     <div class="field"><label class="flbl">Website</label><input class="inp" id="sp-web" value="${s?.website||''}" placeholder="kilohearts.com"></div>
   </div>
+  <div class="field"><label class="flbl">Company Description</label><textarea class="txta" id="sp-desc" style="min-height:60px;">${s?.description||''}</textarea></div>
   <div class="sp-detail-grid">
-    <div class="field"><label class="flbl">Primary Contact Name</label><input class="inp" id="sp-cn" value="${s?.contactName||''}" placeholder="Jane Smith"></div>
-    <div class="field"><label class="flbl">Contact Role / Title</label><input class="inp" id="sp-cr" value="${s?.contactRole||''}" placeholder="Marketing Manager"></div>
+    <div class="field"><label class="flbl">Primary Contact</label><input class="inp" id="sp-cn" value="${s?.contactName||''}" placeholder="Jane Smith"></div>
+    <div class="field"><label class="flbl">Role / Title</label><input class="inp" id="sp-cr" value="${s?.contactRole||''}" placeholder="Marketing Manager"></div>
   </div>
   <div class="sp-detail-grid">
     <div class="field"><label class="flbl">Contact Email</label><input class="inp" id="sp-ce" type="email" value="${s?.contactEmail||''}" placeholder="jane@company.com"></div>
@@ -5036,27 +5636,203 @@ function sponsorEditModalHtml(s){
   </div>
   <div class="sp-detail-grid">
     <div class="field"><label class="flbl">Relationship Owner (our side)</label><input class="inp" id="sp-ro" value="${s?.relationshipOwner||''}" placeholder="Lewis / Greg / Team"></div>
-    <div class="field"><label class="flbl">Best Contact Method / Notes</label><input class="inp" id="sp-bm" value="${s?.bestContact||''}" placeholder="Email, prefers mornings, etc."></div>
+    <div class="field"><label class="flbl">Best Contact Method</label><input class="inp" id="sp-bm" value="${s?.bestContact||''}" placeholder="Email, prefers mornings…"></div>
   </div>
   <div class="field"><label class="flbl">Budget Cycle / Outreach Window</label><input class="inp" id="sp-bc2" value="${s?.budgetCycle||''}" placeholder="e.g. Closes budget in October for following year"></div>
+  <div class="field"><label class="flbl">Assets Folder URL (Google Drive, Dropbox, etc.)</label><input class="inp" id="sp-assets-url" type="url" value="${s?.assetsUrl||''}" placeholder="https://drive.google.com/…"></div>
+  <div class="field"><label class="flbl">Assets Notes</label><textarea class="txta" id="sp-as" style="min-height:50px;">${s?.assets||''}</textarea></div>
   <div class="field"><label class="flbl">Marketing Priorities</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:4px;">
       ${allPrios.map(p=>`<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:.75rem;padding:4px 10px;background:var(--surface2);border:1.5px solid ${selPrios.includes(p)?'var(--acc)':'var(--border)'};border-radius:20px;transition:border-color .13s;" id="spp-${p}" onclick="toggleSpPrio('${p}',this)"><input type="checkbox" id="sp-p-${p}" style="display:none;" ${selPrios.includes(p)?'checked':''}>${SP_PRIO_LABELS[p]}</label>`).join('')}
     </div>
   </div>
-  <div class="field"><label class="flbl">Notes / What they care about</label><textarea class="txta" id="sp-nt" style="min-height:80px;">${s?.notes||''}</textarea></div>
-  <div class="field"><label class="flbl">Assets Held (logos, approved copy, etc.)</label><textarea class="txta" id="sp-as" style="min-height:60px;">${s?.assets||''}</textarea></div>
+  <div class="field"><label class="flbl">General Notes</label><textarea class="txta" id="sp-nt" style="min-height:70px;">${s?.notes||''}</textarea></div>
+  `:''}
 
-  <hr class="div">
-  <div class="detail-sec-title" style="font-size:.82rem;">Event History</div>
+  ${tab==='products'?`
+  <div style="font-size:.75rem;color:var(--text2);margin-bottom:12px;">Catalogue all products this sponsor makes. This helps with prize selection and integration ideas.</div>
+  <div id="sp-products-list">${renderProductsEdit(s?.products||[])}</div>
+  <button class="add-row-btn" onclick="addProductRow()">+ Add product</button>
+  `:''}
+
+  ${tab==='audience'?`
+  <div class="field"><label class="flbl">Audience Tags (press Enter to add)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;min-height:42px;margin-bottom:4px;" id="sp-audience-tags-wrap">
+      ${(s?.audienceTags||[]).map(t=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:20px;font-size:.68rem;" data-tag="${t}">${t}<span onclick="removeAudienceTag('${t}')" style="cursor:pointer;opacity:.7;margin-left:2px;">×</span></span>`).join('')}
+      <input id="sp-audience-inp" style="border:none;background:none;color:var(--text);font-size:.78rem;outline:none;min-width:120px;padding:2px 4px;" placeholder="Game audio, sound designers…" onkeydown="if(event.key==='Enter'||event.key===','){event.preventDefault();addAudienceTag();}">
+    </div>
+    <input type="hidden" id="sp-audience-hidden" value="${(s?.audienceTags||[]).join(',')}">
+  </div>
+  <div class="field"><label class="flbl">Audience Description / Notes</label>
+    <textarea class="txta" id="sp-audience-notes" style="min-height:100px;">${s?.audienceNotes||''}</textarea>
+  </div>
+  <div class="field"><label class="flbl">Price Point / Accessibility</label>
+    <select class="sel" id="sp-price-tier">
+      <option value="">— not set —</option>
+      ${['Free / Open Source','Freemium','Budget (under £50)','Mid-range (£50–£200)','Professional (£200+)','Enterprise / Subscription'].map(t=>`<option value="${t}" ${s?.priceTier===t?'selected':''}>${t}</option>`).join('')}
+    </select>
+  </div>
+  `:''}
+
+  ${tab==='integrations'?`
+  <div class="field"><label class="flbl">Integration Types (what they can offer our events)</label>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
+      ${['Prize Sponsor','Cash Sponsor','Featured Tutorial','Sponsored Post','Co-host','Exclusive Partner','Product Giveaway','Discount Code','Guest Speaker','Workshop','Streaming Partner','Award Category'].map(t=>`<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:.73rem;padding:4px 10px;background:var(--surface2);border:1.5px solid ${(s?.integrationTypes||[]).includes(t)?'var(--acc)':'var(--border)'};border-radius:20px;transition:all .13s;" onclick="toggleIntegration('${t}',this)"><input type="checkbox" style="display:none;" ${(s?.integrationTypes||[]).includes(t)?'checked':''}><span id="spint-${t.replace(/\s+/g,'_')}">${t}</span></label>`).join('')}
+    </div>
+    <input type="hidden" id="sp-integrations-hidden" value="${(s?.integrationTypes||[]).join('||')}">
+  </div>
+  <div class="field"><label class="flbl">Integration Ideas / Notes</label>
+    <textarea class="txta" id="sp-integration-notes" style="min-height:100px;">${s?.integrationNotes||''}</textarea>
+  </div>
+  `:''}
+
+  ${tab==='history'?`
   <div id="sp-hist-edit">${renderHistEdit(s?.history||[])}</div>
   <button class="add-row-btn" onclick="addHistRow()">+ Add event</button>
+  `:''}
+
 </div>
-<div class="mo-ft">
+<div class="mo-ft" style="position:sticky;bottom:0;background:var(--surface);padding-top:10px;">
+  ${s?`<button class="btn btn-danger btn-sm" onclick="deleteSponsor('${s.id}')">Delete</button>`:''}
   <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
   <button class="btn btn-acc" onclick="saveSponsor('${s?.id||''}')">Save</button>
 </div>
 </div>`;
+}
+
+function renderProductsEdit(products){
+  return products.map((p,i)=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:8px 0;border-bottom:1px solid var(--border2);">
+    <div style="flex:1;display:flex;flex-direction:column;gap:5px;">
+      <input class="inp" id="sp-prod-name-${i}" value="${p.name||''}" placeholder="Product name" style="font-size:.78rem;padding:5px 8px;">
+      <input class="inp" id="sp-prod-desc-${i}" value="${p.desc||''}" placeholder="Brief description" style="font-size:.75rem;padding:5px 8px;">
+      <input class="inp" id="sp-prod-price-${i}" value="${p.price||''}" placeholder="Price / tier (e.g. Free, £49, Subscription)" style="font-size:.72rem;padding:5px 8px;">
+    </div>
+    <button class="del-btn" onclick="removeProductRow(${i})" style="margin-top:6px;">×</button>
+  </div>`).join('')||`<div style="color:var(--muted);font-size:.75rem;padding:8px 0;">No products added yet.</div>`;
+}
+
+function addProductRow(){
+  const existing=readProductRows();
+  existing.push({name:'',desc:'',price:''});
+  const el2=el('sp-products-list');if(el2)el2.innerHTML=renderProductsEdit(existing);
+}
+function removeProductRow(i){
+  const existing=readProductRows();
+  existing.splice(i,1);
+  const el2=el('sp-products-list');if(el2)el2.innerHTML=renderProductsEdit(existing);
+}
+function readProductRows(){
+  const rows=[];let i=0;
+  while(el(`sp-prod-name-${i}`)){
+    rows.push({name:el(`sp-prod-name-${i}`).value.trim(),desc:el(`sp-prod-desc-${i}`)?.value.trim()||'',price:el(`sp-prod-price-${i}`)?.value.trim()||''});
+    i++;
+  }
+  return rows.filter(r=>r.name);
+}
+
+function addAudienceTag(){
+  const inp=el('sp-audience-inp');if(!inp)return;
+  const tag=inp.value.trim().replace(/,$/,'');
+  if(!tag)return;
+  const hidden=el('sp-audience-hidden');
+  const existing=(hidden?.value||'').split(',').filter(Boolean);
+  if(existing.includes(tag)){inp.value='';return;}
+  existing.push(tag);
+  if(hidden)hidden.value=existing.join(',');
+  inp.value='';
+  // Re-render tags
+  const wrap=el('sp-audience-tags-wrap');
+  if(wrap){
+    const spans=wrap.querySelectorAll('[data-tag]');
+    const newSpan=document.createElement('span');
+    newSpan.dataset.tag=tag;
+    newSpan.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:20px;font-size:.68rem;';
+    newSpan.innerHTML=`${tag}<span onclick="removeAudienceTag('${tag}')" style="cursor:pointer;opacity:.7;margin-left:2px;">×</span>`;
+    wrap.insertBefore(newSpan,inp);
+  }
+}
+function removeAudienceTag(tag){
+  const hidden=el('sp-audience-hidden');
+  if(hidden)hidden.value=(hidden.value||'').split(',').filter(t=>t!==tag).join(',');
+  const wrap=el('sp-audience-tags-wrap');
+  if(wrap){const span=wrap.querySelector(`[data-tag="${tag}"]`);if(span)span.remove();}
+}
+
+function toggleIntegration(type,lbl){
+  const cb=lbl.querySelector('input[type="checkbox"]');
+  cb.checked=!cb.checked;
+  lbl.style.borderColor=cb.checked?'var(--acc)':'var(--border)';
+  lbl.style.background=cb.checked?'var(--teal-dim)':'var(--surface2)';
+  // Update hidden input
+  const hidden=el('sp-integrations-hidden');if(!hidden)return;
+  const current=(hidden.value||'').split('||').filter(Boolean);
+  if(cb.checked){if(!current.includes(type))current.push(type);}
+  else{const idx=current.indexOf(type);if(idx>=0)current.splice(idx,1);}
+  hidden.value=current.join('||');
+}
+
+/* AI Prefill from website */
+async function runSpAIPrefill(){
+  const url=el('sp-ai-url')?.value.trim();
+  if(!url){alert('Please enter a website URL first.');return;}
+  const status=el('sp-ai-status');
+  if(status){
+    status.style.display='flex';
+    status.style.cssText='display:flex;align-items:center;gap:8px;font-size:.74rem;color:var(--acc);margin-top:8px;';
+    status.innerHTML=`<div class="ai-dot"></div><div class="ai-dot"></div><div class="ai-dot"></div><span>Analysing ${url}…</span>`;
+  }
+  try{
+    const response=await fetch('https://api.anthropic.com/v1/messages',{
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({
+        model:'claude-sonnet-4-20250514',
+        max_tokens:1200,
+        tools:[{type:'web_search_20250305',name:'web_search'}],
+        messages:[{role:'user',content:`Research this company for a sponsorship database: ${url}
+
+Return ONLY a JSON object (no markdown, no explanation) with these exact fields:
+{
+  "name": "Company name",
+  "description": "1-2 sentence company description",
+  "products": [{"name":"Product name","desc":"Brief description","price":"Price or tier"}],
+  "audienceTags": ["tag1","tag2","tag3"],
+  "audienceNotes": "Who their target audience is",
+  "integrationTypes": ["Prize Sponsor","Product Giveaway"],
+  "integrationNotes": "Ideas for how they could integrate with audio community events",
+  "priceTier": "one of: Free / Open Source, Freemium, Budget (under £50), Mid-range (£50–£200), Professional (£200+), Enterprise / Subscription"
+}
+
+Focus on: what products they make, who uses them (game audio? film composers? hobbyists?), price points, and how they could sponsor community events for audio creatives.`}]
+      })
+    });
+    const data=await response.json();
+    const text=data.content.filter(b=>b.type==='text').map(b=>b.text).join('');
+    const jsonMatch=text.match(/\{[\s\S]+\}/);
+    if(!jsonMatch)throw new Error('No JSON in response');
+    const profile=JSON.parse(jsonMatch[0]);
+
+    // Apply to form fields
+    if(profile.name&&el('sp-nm'))el('sp-nm').value=profile.name;
+    if(profile.description&&el('sp-desc'))el('sp-desc').value=profile.description;
+    if(profile.notes){const nt=el('sp-nt');if(nt&&!nt.value)nt.value=profile.notes||'';}
+
+    // Store for when user switches tabs
+    window._spAIPrefill=profile;
+
+    if(status){
+      status.innerHTML=`<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg> <span style="color:var(--green);">Profile generated! Switch to Products, Audience, and Integrations tabs to review.</span>`;
+    }
+
+    // Pre-apply products if on products tab
+    if(profile.products?.length){
+      const pl=el('sp-products-list');
+      if(pl)pl.innerHTML=renderProductsEdit(profile.products);
+    }
+  }catch(e){
+    if(status)status.innerHTML=`<span style="color:var(--red);">Failed to fetch profile. You can fill in the details manually.</span>`;
+    console.warn('AI prefill error:',e);
+  }
 }
 
 function toggleSpPrio(p,lbl){
@@ -5099,63 +5875,62 @@ function readHistRows(){
 
 function saveSponsor(eid){
   const name=el('sp-nm')?.value.trim();
-  if(!name){el('sp-nm').style.borderColor='var(--red)';return;}
+  if(!name){if(el('sp-nm'))el('sp-nm').style.borderColor='var(--red)';return;}
   const priorities=Object.keys(SP_PRIO_LABELS).filter(p=>el(`sp-p-${p}`)?.checked);
-  const history=readHistRows().filter(h=>h.event);
+  const history=el('sp-hist-edit')?readHistRows().filter(h=>h.event):(eid?getSponsor(eid)?.history||[]:[]);
+  const products=el('sp-products-list')?readProductRows():(eid?getSponsor(eid)?.products||[]:[]);
+  const audienceTags=(el('sp-audience-hidden')?.value||'').split(',').filter(Boolean);
+  const integrationTypes=(el('sp-integrations-hidden')?.value||'').split('||').filter(Boolean);
+
+  // Apply AI prefill data for tabs not currently shown
+  const prefill=window._spAIPrefill||{};
+
+  const existing=eid?getSponsor(eid):{};
   const data={
     name,
-    website:el('sp-web')?.value.trim()||'',
-    contactName:el('sp-cn')?.value.trim()||'',
-    contactRole:el('sp-cr')?.value.trim()||'',
-    contactEmail:el('sp-ce')?.value.trim()||'',
-    backupContact:el('sp-bc')?.value.trim()||'',
-    relationshipOwner:el('sp-ro')?.value.trim()||'',
-    bestContact:el('sp-bm')?.value.trim()||'',
-    budgetCycle:el('sp-bc2')?.value.trim()||'',
-    priorities,
-    notes:el('sp-nt')?.value.trim()||'',
-    assets:el('sp-as')?.value.trim()||'',
-    history
+    website:el('sp-web')?.value.trim()||existing?.website||'',
+    description:el('sp-desc')?.value.trim()||existing?.description||prefill.description||'',
+    contactName:el('sp-cn')?.value.trim()||existing?.contactName||'',
+    contactRole:el('sp-cr')?.value.trim()||existing?.contactRole||'',
+    contactEmail:el('sp-ce')?.value.trim()||existing?.contactEmail||'',
+    backupContact:el('sp-bc')?.value.trim()||existing?.backupContact||'',
+    relationshipOwner:el('sp-ro')?.value.trim()||existing?.relationshipOwner||'',
+    bestContact:el('sp-bm')?.value.trim()||existing?.bestContact||'',
+    budgetCycle:el('sp-bc2')?.value.trim()||existing?.budgetCycle||'',
+    assetsUrl:el('sp-assets-url')?.value.trim()||existing?.assetsUrl||'',
+    assets:el('sp-as')?.value.trim()||existing?.assets||'',
+    priorities:priorities.length?priorities:(existing?.priorities||[]),
+    notes:el('sp-nt')?.value.trim()||existing?.notes||'',
+    products:products.length?products:(existing?.products||prefill.products||[]),
+    audienceTags:audienceTags.length?audienceTags:(existing?.audienceTags||prefill.audienceTags||[]),
+    audienceNotes:el('sp-audience-notes')?.value.trim()||existing?.audienceNotes||prefill.audienceNotes||'',
+    priceTier:el('sp-price-tier')?.value||existing?.priceTier||prefill.priceTier||'',
+    integrationTypes:integrationTypes.length?integrationTypes:(existing?.integrationTypes||prefill.integrationTypes||[]),
+    integrationNotes:el('sp-integration-notes')?.value.trim()||existing?.integrationNotes||prefill.integrationNotes||'',
+    history,
+    deliverables:existing?.deliverables||[]
   };
+
   if(eid){
     const idx=S.sponsors.findIndex(s=>s.id===eid);
-    if(idx>-1){const existing=S.sponsors[idx];S.sponsors[idx]={...existing,...data};}
+    if(idx>-1){S.sponsors[idx]={...existing,...data};}
   } else {
-    S.sponsors.push({id:'sp'+uid(),...data,deliverables:[]});
+    const newSponsor={id:'sp'+uid(),...data};
+    S.sponsors.push(newSponsor);
+    _spSelectedId=newSponsor.id;
   }
+  window._spAIPrefill=null;
   save();closeModal();
-  if(V==='sponsors'){el('content').innerHTML=renderSponsors();setTimeout(()=>initSponsorSearch(),50);}
+  if(V==='sponsors'){el('content').innerHTML=renderSponsors();}
 }
 
 function deleteSponsor(id){
   if(!confirm('Delete this sponsor profile?'))return;
-  S.sponsors=S.sponsors.filter(s=>s.id!==id);save();closeModal();
-  if(V==='sponsors'){el('content').innerHTML=renderSponsors();setTimeout(()=>initSponsorSearch(),50);}
+  S.sponsors=S.sponsors.filter(s=>s.id!==id);
+  if(_spSelectedId===id)_spSelectedId=S.sponsors.length>0?S.sponsors[0].id:null;
+  save();closeModal();
+  if(V==='sponsors')render();
 }
-
-function sponsorMatchModalHtml(){
-  const eventTypes=['Sound Design Challenge','Music Competition','Large-scale Contest (e.g. Faceoff)','AirCon Conference','Noisevember','Online Meetup / Social Event'];
-  return`<div class="mo-box mo-wide" style="max-width:560px;">
-<div class="mo-hd"><span class="mo-title">✦ Match Sponsors to Event</span><button class="mo-close" onclick="closeModal()">×</button></div>
-<div class="mo-body">
-  <div class="field"><label class="flbl">Event Name</label></div>
-  <button class="btn btn-acc" style="width:100%;margin-top:4px;" onclick="runSponsorMatch()">✦ Generate Suggestions</button>
-  <div id="match-out" style="margin-top:14px;display:none;">
-    <div class="sec-lbl" style="margin-bottom:8px;">Suggested Sponsors</div>
-    <div id="match-results"></div>
-  </div>
-</div>
-<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Close</button></div>
-</div>`;
-}
-
-// AI function runSponsorMatch removed
-
-// AI function aiDraftOutreach removed
-
-// AI function aiDraftPost removed
-
-// AI function aiDraftReport removed
 
 function copyAiDraft(sid){
   const txt=el(`ai-text-${sid}`);if(!txt)return;
@@ -5174,6 +5949,7 @@ async function init(){
     <span style="font-size:.8rem;color:var(--muted);">Loading workspace…</span>
   </div>`;
   await load();
+  ensureBuiltInSponsorTemplates();
   initPWA();
   if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
   if(S.hideDone===undefined)S.hideDone=false;
