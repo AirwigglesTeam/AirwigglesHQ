@@ -1079,7 +1079,7 @@ function _setSyncStatus(status,msg=''){
 /* ── Core save — debounced, queued ── */
 function save(){
   // Keep localStorage as offline fallback
-  save();
+  try{localStorage.setItem('pf4',JSON.stringify(S));}catch(e){}
   // Debounce remote saves — don't hammer Supabase on every keystroke
   if(_saveDebounce)clearTimeout(_saveDebounce);
   _saveDebounce=setTimeout(_doSave,600);
@@ -3360,6 +3360,12 @@ function addFinOO(){S.finance.oneoff.push({id:'o'+uid(),name:'New expense',to:''
 /* ════ SETTINGS ════ */
 function renderSettings(){
   const nv=S.settings.navVisible||{};
+  const _devTodayStr=new Date().toLocaleDateString('en-GB');
+  const _devTodos=S.settings.devTodos||(()=>{
+    const defaults=[{id:'dt1',text:'🔐 Implement proper authentication — replace the hardcoded JS password with Supabase Auth. Each team member should have their own email+password login. This properly secures both the app and the database, and lets you revoke access if someone leaves. Ask Claude to "implement Supabase Auth for ProjectFlow" to continue.',done:false,date:_devTodayStr}];
+    if(!S.settings.devTodos){S.settings.devTodos=defaults;}
+    return defaults;
+  })();
   return`<div class="fu"><div class="page-hd"><div class="page-title">Settings</div></div>
 
 <div class="settings-sec">
@@ -3429,7 +3435,52 @@ function renderSettings(){
   <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear all data</button>
   <span style="font-size:.7rem;color:var(--muted);margin-left:10px;">Cannot be undone.</span>
 </div>
+
+<div class="settings-sec">
+  <div class="settings-ttl">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    Developer To-Do
+  </div>
+  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Notes and reminders for the next development session. These are saved with your workspace data.</p>
+  <div id="dev-todo-list" style="margin-bottom:10px;">
+    ${_devTodos.map((t,i)=>`
+    <div style="display:flex;align-items:flex-start;gap:10px;padding:9px 11px;background:var(--surface2);border-radius:8px;margin-bottom:6px;border-left:3px solid ${t.done?'var(--green)':'var(--acc)'};">
+      <input type="checkbox" ${t.done?'checked':''} onchange="toggleDevTodo('${t.id}',this.checked)" style="margin-top:3px;width:15px;height:15px;accent-color:var(--acc);cursor:pointer;flex-shrink:0;">
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.78rem;${t.done?'text-decoration:line-through;color:var(--muted);':'color:var(--text);'}">${t.text}</div>
+        ${t.date?`<div style="font-size:.65rem;color:var(--muted);margin-top:3px;">${t.date}</div>`:''}
+      </div>
+      <button onclick="deleteDevTodo('${t.id}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:16px;line-height:1;padding:0 2px;flex-shrink:0;transition:color .14s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'">×</button>
+    </div>`).join('')}
+  </div>
+  <div style="display:flex;gap:8px;">
+    <input class="inp" id="dev-todo-inp" placeholder="Add a development note or reminder…" style="flex:1;" onkeydown="if(event.key==='Enter')addDevTodo()">
+    <button class="btn btn-ghost btn-sm" onclick="addDevTodo()">Add</button>
+  </div>
+</div>
 </div>`;
+}
+
+function addDevTodo(){
+  const inp=el('dev-todo-inp');
+  const text=inp?.value.trim();
+  if(!text)return;
+  if(!S.settings.devTodos)S.settings.devTodos=[];
+  S.settings.devTodos.push({id:uid(),text,done:false,date:new Date().toLocaleDateString('en-GB')});
+  inp.value='';
+  save();render();
+  // Re-scroll to the dev todo section
+  setTimeout(()=>document.getElementById('dev-todo-list')?.scrollIntoView({behavior:'smooth',block:'nearest'}),100);
+}
+function toggleDevTodo(id,done){
+  if(!S.settings.devTodos)return;
+  const t=S.settings.devTodos.find(x=>x.id===id);
+  if(t){t.done=done;save();render();}
+}
+function deleteDevTodo(id){
+  if(!S.settings.devTodos)return;
+  S.settings.devTodos=S.settings.devTodos.filter(x=>x.id!==id);
+  save();render();
 }
 
 function uploadLogo(input){
