@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<link rel="icon" id="favicon" type="image/png">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Airwiggles — ProjectFlow</title>
@@ -481,6 +482,15 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 .kb-dot{width:8px;height:8px;border-radius:50%;}
 .kb-cnt{font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);background:var(--surface3);padding:1px 6px;border-radius:10px;}
 .kb-cards{flex:1;padding:7px;display:flex;flex-direction:column;gap:6px;min-height:100px;}
+
+/* ── Blocked kanban card ── */
+.kcard-blocked{border-color:rgba(244,63,94,.35)!important;background:rgba(244,63,94,.06)!important;}
+.kcard-blocked .kcard-name{color:var(--text2);}
+.kcard-blocked-badge{display:inline-flex;align-items:center;gap:4px;font-size:.6rem;font-weight:700;color:#f43f5e;background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.25);border-radius:4px;padding:1px 6px;margin-bottom:6px;}
+.kb-blocker-tip{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1px solid rgba(244,63,94,.4);border-radius:8px;padding:8px 10px;z-index:600;box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none;}
+.kb-blocker-tip-title{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f43f5e;margin-bottom:5px;}
+.kb-blocker-tip-item{font-size:.7rem;color:var(--text2);padding:2px 0;display:flex;align-items:center;gap:5px;}
+.kb-blocker-tip-item::before{content:'';display:inline-block;width:5px;height:5px;border-radius:50%;background:#f43f5e;flex-shrink:0;}
 .kcard{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:12px;cursor:grab;user-select:none;transition:transform .15s,box-shadow .15s;}
 .kcard:hover{transform:translateY(-1px);box-shadow:0 4px 16px rgba(0,0,0,.3);}
 .kcard.dragging{opacity:.45;cursor:grabbing;}
@@ -1254,10 +1264,10 @@ function _showSyncToast(){
 /* ── Online/offline detection ── */
 window.addEventListener('online',()=>{_online=true;_setSyncStatus('saving');save();});
 window.addEventListener('offline',()=>{_online=false;_setSyncStatus('offline');});
-const COLORS=['#62D0AA','#6366f1','#ec4899','#f97316','#f59e0b','#14b8a6','#06b6d4','#8b5cf6','#ef4444','#84cc16','#3b82f6','#a855f7','#f43f5e','#22d3ee','#fb923c'];
+const COLORS=['#62D0AA','#14b8a6','#06b6d4','#22d3ee','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#ef4444','#f97316','#fb923c','#f59e0b','#84cc16'];
 const PRIOS=['High','Medium','Low'];
 const DEFAULT_AREAS=['Engineering','Design','Marketing','Operations','Sales','Product','Research','Finances','HR','Other'];
-const KB_COLS=[{id:'todo',name:'To Do',color:'#888'},{id:'in-progress',name:'In Progress',color:'#62D0AA'},{id:'review',name:'In Review',color:'#f59e0b'},{id:'done',name:'Done',color:'#1fba7a'}];
+const KB_COLS=[{id:'todo',name:'To Do',color:'#888'},{id:'blocked',name:'Blocked',color:'#f43f5e'},{id:'in-progress',name:'In Progress',color:'#62D0AA'},{id:'review',name:'In Review',color:'#f59e0b'},{id:'done',name:'Done',color:'#1fba7a'}];
 const YEAR=new Date().getFullYear();
 const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
@@ -1288,7 +1298,7 @@ let S={
   projFilter:'all',
   kbFilter:{project:'',member:'',label:''},
   expandedTasks:[],expandedGantt:[],
-  settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',navVisible:{dashboard:true,projects:true,kanban:true,team:true,labels:true,templates:true,finance:true,sponsors:true,settings:true}},
+  settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',anthropicKey:'',navVisible:{dashboard:true,projects:true,kanban:true,team:true,labels:true,templates:true,finance:true,sponsors:true,settings:true}},
   sponsors:[
     {id:'sp1',name:'A Sound Effect',website:'asoundeffect.com',contactName:'',contactEmail:'',contactRole:'',backupContact:'',relationshipOwner:'',bestContact:'',budgetCycle:'',priorities:['brand-awareness','community-association'],notes:'Exclusive partner. Present across virtually every event. Co-organises AirCon. Prizes often curated from their indie creator catalogue.',assets:'',history:[{event:'Sound Design Showdown 2023',type:'cash+prize',prizeDesc:'Co-sponsor with BOOM Library — specific products TBC'},{event:'Noisevember 2023',type:'prize',prizeDesc:'Kilohearts prizes via ASE store (refund model); Phase Plant 1st, Multipass runners-up'},{event:'Noisevember 2024',type:'prize',prizeDesc:'100+ prizes ~$13k total; indie creator packs from Mattia Cellotto, Mindful Audio, Moon Echo Audio, Pole Position Production, Rock The Speakerbox, sonik Sound, Thomas Rex Beverly'},{event:'AirCon 2023',type:'partner',prizeDesc:'Exclusive partner'},{event:'AirCon 2024',type:'partner',prizeDesc:'Exclusive partner'},{event:'AirCon 2025',type:'partner',prizeDesc:'Exclusive partner'},{event:'Film Audio Faceoff 2025',type:'partner',prizeDesc:'In partnership with ASE'},{event:'Audio Challenge 2025',type:'sponsor',prizeDesc:'Co-sponsor with Kilohearts'}]},
     {id:'sp2',name:'Kilohearts',website:'kilohearts.com',contactName:'',contactEmail:'',contactRole:'',backupContact:'',relationshipOwner:'',bestContact:'',budgetCycle:'',priorities:['product-spotlight','community-association'],notes:'Extremely consistent partner. Featured Phase Plant and plugins heavily. Published an Airwiggles interview on their own blog — relationship is warm and mutual.',assets:'',history:[{event:'Noisevember 2023',type:'prize',prizeDesc:'Phase Plant (1st prize), Multipass (runners-up) for best breakdown videos'},{event:'Music Contest 2024',type:'prize',prizeDesc:'Prize contributor across scene categories'},{event:'Noisevember 2024',type:'prize',prizeDesc:'Ultimate Bundle (raffle prizes confirmed)'},{event:'Film Audio Faceoff 2025',type:'prize',prizeDesc:'Ultimate Bundle + Phase Plant'},{event:'Audio Challenge 2025',type:'sponsor',prizeDesc:'Raffle prizes; co-sponsor with A Sound Effect'},{event:'AirCon 2024',type:'sponsor',prizeDesc:'Prize contributor'},{event:'AirCon 2025',type:'sponsor',prizeDesc:'Prize contributor'}]},
@@ -1458,7 +1468,7 @@ function clearBulk(){
 function bulkMarkDone(done){
   if(!_bulkSel.size)return;
   saveWithUndo(done?'Bulk mark done':'Bulk mark undone');
-  _bulkSel.forEach(id=>{const t=getTask(id);if(t){t.done=done;if(done)t.kStatus='done';else if(t.kStatus==='done')t.kStatus='todo';}});
+  _bulkSel.forEach(id=>{const t=getTask(id);if(t){t.done=done;if(done){t.kStatus='done';cascadeChildrenDone(id);}else{syncBlockedStatus(id);}S.tasks.filter(x=>(x.blockedBy||[]).includes(id)).forEach(x=>syncBlockedStatus(x.id));}});
   save();
   clearBulk();render();
 }
@@ -1739,6 +1749,58 @@ function fmtD(d){if(!d)return'';return new Date(d).toLocaleDateString('en-US',{m
 function toISO(d){if(!d)return'';return new Date(d).toISOString().slice(0,10);}
 function addDays(s,n){const d=new Date(s);d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
 function overdue(d){if(!d)return false;const e=new Date(d);e.setHours(23,59,59,0);return e<new Date();}
+
+
+
+function applyKanbanStatusChange(task, newStatus){
+  const wasBlocked = task.kStatus === 'blocked';
+  task.kStatus = newStatus;
+  // Moving out of blocked → clear blockers (user is saying "this is unblocked")
+  if(wasBlocked && newStatus !== 'blocked'){
+    task.blockedBy = [];
+  }
+  if(newStatus === 'done'){
+    task.done = true;
+    cascadeChildrenDone(task.id);
+    if(task.recur?.enabled) spawnRecurring(task);
+  } else if(task.done && newStatus !== 'done'){
+    task.done = false;
+    // Re-check if it should be in blocked now (blockedBy was cleared above if wasBlocked)
+    syncBlockedStatus(task.id);
+  }
+  // Sync anything that was blocked by this task
+  S.tasks.filter(x=>(x.blockedBy||[]).includes(task.id)).forEach(x=>syncBlockedStatus(x.id));
+}
+
+function cascadeChildrenDone(parentId){
+  kids(parentId).forEach(child=>{
+    if(!child.done){
+      child.done=true;
+      child.kStatus='done';
+      // recurse for subtasks
+      cascadeChildrenDone(child.id);
+    }
+    // Unblock anything waiting on this child too
+    S.tasks.filter(x=>(x.blockedBy||[]).includes(child.id)).forEach(x=>syncBlockedStatus(x.id));
+  });
+}
+
+function syncBlockedStatus(id){
+  const t=getTask(id);
+  if(!t)return;
+  // Blocked = has at least one blocker that is not yet done
+  const hasActiveBlocker=(t.blockedBy||[]).some(bid=>{
+    const b=getTask(bid);
+    return b&&!b.done;
+  });
+  if(hasActiveBlocker&&!t.done&&t.kStatus!=='blocked'){
+    t.kStatus='blocked';
+  } else if(!hasActiveBlocker&&t.kStatus==='blocked'){
+    // All blockers done — move to done if task is done, else to-do
+    t.kStatus=t.done?'done':'todo';
+  }
+}
+
 function isBlocked(t){return(t.blockedBy||[]).some(id=>{const d=getTask(id);return d&&taskComp(d)<100;});}
 function blockerNames(t){return(t.blockedBy||[]).filter(id=>{const d=getTask(id);return d&&taskComp(d)<100;}).map(id=>getTask(id)?.name).filter(Boolean);}
 function activeBlockerIds(t){return(t.blockedBy||[]).filter(id=>{const d=getTask(id);return d&&taskComp(d)<100;});}
@@ -2146,9 +2208,13 @@ function toggleDone(id){
   const t=getTask(id);if(!t)return;
   const ch=kids(id);if(ch.length>0)return;
   t.done=!t.done;
-  if(t.done)t.kStatus='done';
-  else if(t.kStatus==='done')t.kStatus='todo';
+  if(t.done){t.kStatus='done';}
+  else{syncBlockedStatus(id);} // restore to blocked or todo based on active blockers
   if(t.done&&t.recur?.enabled)spawnRecurring(t);
+  // Cascade: if marking a parent done, also complete all children
+  if(t.done)cascadeChildrenDone(id);
+  // Unblock any tasks that were waiting on this one
+  S.tasks.filter(x=>(x.blockedBy||[]).includes(id)).forEach(x=>syncBlockedStatus(x.id));
   save();render();
 }
 
@@ -2412,7 +2478,11 @@ function renderKanban(){
     if(kMem&&(!t.assignees||!t.assignees.includes(kMem)))return false;
     if(kLbl&&(!t.labels||!t.labels.includes(kLbl)))return false;
     return true;
-  }).forEach(t=>{const st=t.kStatus||'todo';if(tasksByCol[st])tasksByCol[st].push(t);});
+  }).forEach(t=>{
+    const st=t.kStatus||'todo';
+    if(tasksByCol[st])tasksByCol[st].push(t);
+    else tasksByCol['todo'].push(t); // fallback for unknown status
+  });
 
   return`<div class="fu">
 <div class="page-hd"><div class="page-title">Kanban <em>Board</em></div><button class="btn btn-acc btn-sm" onclick="openModal('task',null)">+ Task</button></div>
@@ -2442,8 +2512,12 @@ ${KB_COLS.map(col=>`
     ${tasksByCol[col.id].map(t=>{
       const p=getProject(t.projectId);const comp=taskComp(t);const ch=kids(t.id).length;
       const parentTask=t.parentId?getTask(t.parentId):null;
-      return`<div class="kcard" draggable="true" data-task-id="${t.id}"${t.done?' style="opacity:.65;"':''}>
-${parentTask?`<div style="font-size:.58rem;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="color:var(--border2);">↳</span>${parentTask.name}</div>`:''}<div class="kcard-name${t.done?' done':''}" style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${t.name}</div>
+      const kBlocked=(t.kStatus==='blocked')&&!t.done;
+      const kBlockerNames=kBlocked?blockerNames(t):[];
+      return`<div class="kcard${kBlocked?' kcard-blocked':''}" draggable="true" data-task-id="${t.id}" style="position:relative;${t.done?'opacity:.65;':''}"
+        ${kBlocked?`onmouseenter="el('kbt-${t.id}').style.display='block'" onmouseleave="el('kbt-${t.id}').style.display='none'"`:''}>
+${parentTask?`<div style="font-size:.58rem;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="color:var(--border2);">↳</span>${parentTask.name}</div>`:''}
+${kBlocked?`<div class="kcard-blocked-badge"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Blocked</div>`:''}<div class="kcard-name${t.done?' done':''}" style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${t.name}</div>
 <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:7px;">
   ${(t.labels||[]).slice(0,2).map(id=>lcHtml(id)).join('')}
   ${t.recur?.enabled?`<span style="font-size:.58rem;color:var(--purple);display:inline-flex;align-items:center;" title="Recurring"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg></span>`:''}
@@ -2460,7 +2534,8 @@ ${parentTask?`<div style="font-size:.58rem;color:var(--muted);margin-bottom:4px;
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
     </button>
   </div>
-</div></div>`;}).join('')}
+</div>
+${kBlocked?`<div id="kbt-${t.id}" class="kb-blocker-tip" style="display:none;"><div class="kb-blocker-tip-title">Blocked by</div>${kBlockerNames.map(n=>`<div class="kb-blocker-tip-item">${n}</div>`).join('')}</div>`:''}</div>`;}).join('')}
     ${tasksByCol[col.id].length===0?`<div class="kb-empty">Drop tasks here</div>`:''}
   </div>
 </div>`).join('')}
@@ -2472,8 +2547,10 @@ function toggleKanbanDone(id){
   const t=getTask(id);if(!t)return;
   t.done=!t.done;
   if(t.done){t.kStatus='done';}
-  else if(t.kStatus==='done'){t.kStatus='todo';}
+  else{syncBlockedStatus(id);}
   if(t.done&&t.recur?.enabled)spawnRecurring(t);
+  if(t.done)cascadeChildrenDone(id);
+  S.tasks.filter(x=>(x.blockedBy||[]).includes(id)).forEach(x=>syncBlockedStatus(x.id));
   save();render();
 }
 // initKanbanDnD replaced by pointer DnD
@@ -3552,6 +3629,17 @@ function renderSettings(){
   return`<div class="fu"><div class="page-hd"><div class="page-title">Settings</div></div>
 
 <div class="settings-sec">
+  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg> AI Features</div>
+  <p style="font-size:.76rem;color:var(--text2);margin-bottom:10px;font-weight:300;">An Anthropic API key is required to use AI features (product scanner, sponsor profile prefill). <a href="https://console.anthropic.com/" target="_blank" style="color:var(--acc);">Get a key →</a></p>
+  <div style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">
+    <input class="inp" type="password" id="anthropic-key-inp" value="${S.settings.anthropicKey||''}" placeholder="sk-ant-…" style="flex:1;min-width:200px;font-family:'DM Mono',monospace;font-size:.78rem;" autocomplete="off">
+    <button class="btn btn-acc btn-sm" onclick="saveAnthropicKey()">Save key</button>
+    ${S.settings.anthropicKey?`<span style="font-size:.72rem;color:var(--green);">✓ Key saved</span>`:''}
+  </div>
+  <p style="font-size:.68rem;color:var(--muted);margin-top:7px;">Stored in your browser's localStorage. Never sent anywhere except directly to api.anthropic.com.</p>
+</div>
+
+<div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Data &amp; Backup</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Export all data to JSON, then re-import later to restore everything.</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap;">
@@ -3568,7 +3656,7 @@ function renderSettings(){
   </div>
   <div class="field"><label class="flbl">Custom Logo (PNG/SVG)</label>
     <input type="file" id="st-logo-file" accept="image/*" onchange="uploadLogo(this)" style="color:var(--text2);font-size:.78rem;">
-    ${S.settings.logoUrl?`<div style="margin-top:8px;display:flex;align-items:center;gap:10px;"><img src="${S.settings.logoUrl}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;background:var(--acc);padding:4px;"><button class="btn btn-danger btn-xs" onclick="S.settings.logoUrl=null;save();applyBranding();render()">Remove logo</button></div>`:''}
+    ${S.settings.logoUrl?`<div style="margin-top:8px;display:flex;align-items:center;gap:10px;"><img src="${S.settings.logoUrl}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;background:var(--acc);padding:4px;"><button class="btn btn-danger btn-xs" onclick="S.settings.logoUrl=null;save();applyBranding();updateFavicon();render()">Remove logo</button></div>`:''}
   </div>
   <div class="field"><label class="flbl">Accent Colour</label>
     <div class="clr-grid" id="st-colors">
@@ -3669,7 +3757,7 @@ function deleteDevTodo(id){
 function uploadLogo(input){
   const file=input.files[0];if(!file)return;
   const reader=new FileReader();
-  reader.onload=e=>{S.settings.logoUrl=e.target.result;save();applyBranding();render();};
+  reader.onload=e=>{S.settings.logoUrl=e.target.result;save();applyBranding();updateFavicon();render();};
   reader.readAsDataURL(file);
 }
 
@@ -3696,7 +3784,8 @@ function applyBranding(){
 }
 
 function toggleNavVis(view,btn){
-  if(!S.settings.navVisible)S.settings.navVisible={};
+  if(S.settings.anthropicKey===undefined)S.settings.anthropicKey='';
+      if(!S.settings.navVisible)S.settings.navVisible={};
   const current=S.settings.navVisible[view]!==false;
   S.settings.navVisible[view]=!current;
   btn.classList.toggle('on',S.settings.navVisible[view]);
@@ -4218,6 +4307,11 @@ function saveTask(eid,defParent,tmplId){
   if(eid){const i=S.tasks.findIndex(t=>t.id===eid);if(i>=0)S.tasks[i]=task;}else S.tasks.push(task);
   // From template — create subtasks
   if(!eid&&tmplId){const tmpl=S.taskTemplates.find(t=>t.id===tmplId);if(tmpl?.tasks){tmpl.tasks.forEach(st=>{const sub={id:uid(),name:st.name,description:'',projectId:task.projectId,parentId:task.id,priority:st.priority||'Medium',assignees:[],labels:[],blockedBy:[],startDate:'',endDate:'',kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}};S.tasks.push(sub);if(st.subtasks)st.subtasks.forEach(ss=>{S.tasks.push({...sub,id:uid(),name:ss.name,priority:ss.priority||'Medium',parentId:sub.id});});});}}
+  // Auto-sync kStatus for blocked state when dependencies change
+  syncBlockedStatus(task.id);
+  (task.blockedBy||[]).forEach(bid=>{
+    S.tasks.filter(t=>t.blockedBy?.includes(bid)).forEach(t=>syncBlockedStatus(t.id));
+  });
   saveWithUndo(eid?'Edit task':'New task');closeModal();render();
 }
 
@@ -4227,19 +4321,60 @@ function saveAsTmpl(taskId){const t=getTask(taskId);if(!t)return;const name=prom
 function dependencyModalHtml(taskId){
   const t=getTask(taskId);if(!t)return'';
   const currentDeps=t.blockedBy||[];
-  return`<div class="mo-box" style="max-width:420px;">
-<div class="mo-hd"><span class="mo-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Task Dependencies</span><button class="mo-close" onclick="closeModal()">×</button></div>
+  // All tasks except this one and its own children — include subtasks as potential blockers
+  const candidates=S.tasks.filter(x=>x.id!==taskId&&x.id!==t.parentId);
+  // Group by project
+  const byProj={};
+  candidates.forEach(x=>{
+    const pid=x.projectId||'__none__';
+    if(!byProj[pid])byProj[pid]=[];
+    byProj[pid].push(x);
+  });
+  return`<div class="mo-box" style="max-width:460px;">
+<div class="mo-hd"><span class="mo-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg>Blocked by…</span><button class="mo-close" onclick="closeModal()">×</button></div>
 <div class="mo-body">
-  <p style="font-size:.8rem;color:var(--text2);margin-bottom:12px;">"<strong style="color:var(--white);">${t.name}</strong>" is blocked by:</p>
-  <div class="field"><label class="flbl">Blocked by tasks (hold Ctrl/Cmd to multi-select)</label>
-    <select class="sel" id="dep-sel" multiple style="height:130px;">
-      ${S.tasks.filter(x=>x.id!==taskId&&!x.parentId).map(x=>{const p=getProject(x.projectId);return`<option value="${x.id}" ${currentDeps.includes(x.id)?'selected':''}>${p?p.name+' / ':''}${x.name}</option>`;}).join('')}
-    </select>
+  <p style="font-size:.8rem;color:var(--text2);margin-bottom:14px;"><strong style="color:var(--white);">${t.name}</strong> is blocked until these tasks are done. Tick to add, untick to remove.</p>
+  ${currentDeps.length>0?`<div style="margin-bottom:14px;padding:8px 10px;background:rgba(244,63,94,.07);border:1px solid rgba(244,63,94,.2);border-radius:8px;">
+    <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f43f5e;margin-bottom:6px;">Currently blocking</div>
+    ${currentDeps.map(id=>{const bt=getTask(id);return bt?`<div style="display:flex;align-items:center;gap:7px;font-size:.78rem;padding:2px 0;"><div style="width:8px;height:8px;border-radius:50%;background:${bt.done?'var(--green)':'#f43f5e'};flex-shrink:0;"></div>${bt.name}${bt.done?' <em style="font-size:.65rem;color:var(--green);">done</em>':''}</div>`:''}).join('')}
+  </div>`:''}
+  <div style="font-size:.72rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:8px;">Select blockers</div>
+  <div style="max-height:240px;overflow-y:auto;display:flex;flex-direction:column;gap:2px;">
+    ${candidates.length>0?candidates.map(x=>{
+      const p=getProject(x.projectId);
+      const checked=currentDeps.includes(x.id);
+      return`<label style="display:flex;align-items:center;gap:9px;padding:7px 9px;border-radius:7px;cursor:pointer;transition:background .12s;background:${checked?'rgba(244,63,94,.07)':'transparent'};" onmouseover="this.style.background='var(--surface2)'" onmouseout="this.style.background='${checked?'rgba(244,63,94,.07)':'transparent'}'">
+        <input type="checkbox" class="dep-cb" value="${x.id}" ${checked?'checked':''} style="width:14px;height:14px;cursor:pointer;accent-color:var(--acc);">
+        <span style="flex:1;font-size:.78rem;">${x.name}${x.done?'<span style="color:var(--green);font-size:.65rem;margin-left:5px;">✓ done</span>':''}</span>
+        ${p?`<span style="font-size:.62rem;color:var(--muted);flex-shrink:0;">${p.name}</span>`:''}
+      </label>`;
+    }).join(''):`<div style="color:var(--muted);font-size:.78rem;padding:8px 0;">No other tasks available.</div>`}
   </div>
 </div>
-<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveDep('${taskId}')">Save</button></div>
+<div class="mo-ft">
+  <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+  <button class="btn btn-danger btn-sm" onclick="saveDepDirect('${taskId}',[])" style="${currentDeps.length>0?'':'display:none;'}">Remove all blockers</button>
+  <button class="btn btn-acc" onclick="saveDepFromCheckboxes('${taskId}')">Save</button>
+</div>
 </div>`;}
-function saveDep(taskId){const t=getTask(taskId);if(!t)return;t.blockedBy=Array.from(el('dep-sel')?.selectedOptions||[]).map(o=>o.value);save();closeModal();render();}
+
+
+function saveDepFromCheckboxes(taskId){
+  const checked=Array.from(document.querySelectorAll('.dep-cb:checked')).map(cb=>cb.value);
+  saveDepDirect(taskId, checked);
+}
+
+function saveDepDirect(taskId,selected){
+  const t=getTask(taskId);
+  if(!t)return;
+  // selected passed directly
+  t.blockedBy=selected;
+  // Sync kStatus: syncBlockedStatus checks if any blocker is actually incomplete
+  syncBlockedStatus(taskId);
+  save();
+  closeModal();
+  render();
+}
 
 /* REMINDER MODAL */
 function reminderModalHtml(taskId){const t=getTask(taskId);if(!t)return'';const ex=t.slackReminder?.datetime||'';
@@ -5032,8 +5167,12 @@ function _dndDrop(e){
       if(ct&&ct.dataset.taskId!==_dnd.data.taskId){
         const dropT=getTask(ct.dataset.taskId);if(!dropT)return;
         const newSt=dropT.kStatus||'todo';
-        task.kStatus=newSt;
-        if(newSt==='done'){task.done=true;if(task.recur?.enabled)spawnRecurring(task);}else if(task.done&&newSt!=='done')task.done=false;
+        if(newSt==='blocked'){
+          save();render();
+          openModal('dependency',task.id);
+          return;
+        }
+        applyKanbanStatusChange(task, newSt);
         const r=ct.getBoundingClientRect();
         const before=e.clientY<r.top+r.height/2;
         const ai=S.tasks.indexOf(task),bi=S.tasks.indexOf(dropT);
@@ -5041,8 +5180,14 @@ function _dndDrop(e){
       } else {
         const col=pt?.closest('.kb-cards[data-status]');
         if(col){
-          task.kStatus=col.dataset.status;
-          if(task.kStatus==='done'){task.done=true;if(task.recur?.enabled)spawnRecurring(task);}else if(task.done&&task.kStatus!=='done')task.done=false;
+          const newStatus=col.dataset.status;
+          if(newStatus==='blocked'){
+            // Open dependency modal so user picks what's blocking it
+            save();render();
+            openModal('dependency',task.id);
+            return;
+          }
+          applyKanbanStatusChange(task, newStatus);
         }
       }
       save();render();break;}
@@ -5197,6 +5342,7 @@ function importData(input){
       }
       // Settings
       if(!S.settings)S.settings={logoUrl:null,brandName:'airwiggles — ProjectFlow',navVisible:{}};
+      if(S.settings.anthropicKey===undefined)S.settings.anthropicKey='';
       if(!S.settings.navVisible)S.settings.navVisible={};
       if(S.settings.navVisible.sponsors===undefined)S.settings.navVisible.sponsors=true;
       save();applyBranding();applyNavVis();nav('dashboard');
@@ -5828,6 +5974,21 @@ function sponsorEditModalHtml(s,activeTab){
 
   <!-- ═══ MAIN TAB ═══ -->
   <div id="sp-tab-main" style="display:${activeT==='main'?'block':'none'};">
+    <!-- Logo upload -->
+    <div style="display:flex;align-items:center;gap:14px;margin-bottom:16px;padding:12px 14px;background:var(--surface2);border-radius:10px;border:1px solid var(--border);">
+      <div id="sp-logo-preview" style="width:64px;height:64px;border-radius:10px;flex-shrink:0;background:var(--surface3);border:1.5px dashed var(--border);display:flex;align-items:center;justify-content:center;overflow:hidden;cursor:pointer;" onclick="el('sp-logo-file').click()" title="Upload logo">
+        ${s?.logoDataUrl?`<img src="${s.logoDataUrl}" style="width:100%;height:100%;object-fit:contain;">`:`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`}
+      </div>
+      <div style="flex:1;">
+        <div style="font-size:.78rem;font-weight:600;margin-bottom:4px;">Sponsor Logo</div>
+        <div style="font-size:.68rem;color:var(--muted);margin-bottom:8px;">Compressed to 120×120px automatically. Won't significantly impact storage.</div>
+        <div style="display:flex;gap:7px;flex-wrap:wrap;">
+          <button class="btn btn-ghost btn-xs" onclick="el('sp-logo-file').click()">Upload image</button>
+          ${s?.logoDataUrl?`<button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="removeSponsorLogo()">Remove</button>`:''}
+        </div>
+      </div>
+      <input type="file" id="sp-logo-file" accept="image/*" style="display:none;" onchange="uploadSponsorLogo(this)">
+    </div>
     <!-- hidden name mirror so saveSponsor always has it -->
     <input type="hidden" id="sp-nm-mirror" value="${s?.name||''}">
     <div class="sp-detail-grid">
@@ -6032,7 +6193,56 @@ function toggleIntegration(type,lbl){
 
 /* AI Prefill from website */
 
+
+
+/* ════ SPONSOR LOGO UPLOAD ════ */
+function uploadSponsorLogo(input){
+  const file=input.files[0];
+  if(!file)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    const img=new Image();
+    img.onload=()=>{
+      // Compress: max 120×120, JPEG 72%
+      const MAX=120;
+      const canvas=document.createElement('canvas');
+      const scale=Math.min(MAX/img.width,MAX/img.height,1);
+      canvas.width=Math.round(img.width*scale);
+      canvas.height=Math.round(img.height*scale);
+      canvas.getContext('2d').drawImage(img,0,0,canvas.width,canvas.height);
+      const dataUrl=canvas.toDataURL('image/jpeg',0.72);
+      // Show preview immediately
+      const preview=el('sp-logo-preview');
+      if(preview)preview.innerHTML=`<img src="${dataUrl}" style="width:100%;height:100%;object-fit:contain;">`;
+      // Store in a temp variable — saved on modal save
+      window._spLogoDataUrl=dataUrl;
+      // Show remove button
+      const btns=preview?.nextElementSibling?.querySelector('.btn-ghost.btn-xs:last-child');
+    };
+    img.src=e.target.result;
+  };
+  reader.readAsDataURL(file);
+}
+
+function removeSponsorLogo(){
+  const preview=el('sp-logo-preview');
+  if(preview)preview.innerHTML=`<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="1.5" stroke-linecap="round"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>`;
+  window._spLogoDataUrl='__remove__';
+}
+
+function saveAnthropicKey(){
+  const key=el('anthropic-key-inp')?.value.trim()||'';
+  S.settings.anthropicKey=key;
+  save();
+  render();
+}
+
+function getAnthropicKey(){
+  return S.settings.anthropicKey||'';
+}
+
 async function runSpProductScan(){
+  if(!getAnthropicKey()){alert('Please add your Anthropic API key in Settings first.');nav('settings');return;}
   const url=el('sp-prod-ai-url')?.value.trim();
   if(!url){alert('Please enter a website URL.');return;}
   const status=el('sp-prod-ai-status');
@@ -6046,7 +6256,12 @@ async function runSpProductScan(){
   try{
     const response=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+        'Content-Type':'application/json',
+        'x-api-key':getAnthropicKey(),
+        'anthropic-version':'2023-06-01',
+        'anthropic-dangerous-direct-browser-access':'true'
+      },
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1500,
@@ -6091,6 +6306,7 @@ Rules:
 }
 
 async function runSpAIPrefill(){
+  if(!getAnthropicKey()){alert('Please add your Anthropic API key in Settings first.');nav('settings');return;}
   const url=el('sp-ai-url')?.value.trim();
   if(!url){alert('Please enter a website URL first.');return;}
   const status=el('sp-ai-status');
@@ -6102,7 +6318,12 @@ async function runSpAIPrefill(){
   try{
     const response=await fetch('https://api.anthropic.com/v1/messages',{
       method:'POST',
-      headers:{'Content-Type':'application/json'},
+      headers:{
+          'Content-Type':'application/json',
+          'x-api-key':getAnthropicKey(),
+          'anthropic-version':'2023-06-01',
+          'anthropic-dangerous-direct-browser-access':'true'
+        },
       body:JSON.stringify({
         model:'claude-sonnet-4-20250514',
         max_tokens:1200,
@@ -6233,7 +6454,9 @@ function saveSponsor(eid){
     integrationTypes:integrationTypes.length?integrationTypes:(existing?.integrationTypes||prefill.integrationTypes||[]),
     integrationNotes:el('sp-integration-notes')?.value.trim()||existing?.integrationNotes||prefill.integrationNotes||'',
     history,
-    deliverables:existing?.deliverables||[]
+    deliverables:existing?.deliverables||[],
+    logoDataUrl:window._spLogoDataUrl==='__remove__'?null:
+               window._spLogoDataUrl||existing?.logoDataUrl||null
   };
 
   if(eid){
@@ -6245,6 +6468,7 @@ function saveSponsor(eid){
     _spSelectedId=newSponsor.id;
   }
   window._spAIPrefill=null;
+  window._spLogoDataUrl=null;
   save();closeModal();
   if(V==='sponsors'){el('content').innerHTML=renderSponsors();}
 }
@@ -6284,6 +6508,7 @@ async function init(){
   applyNavVis();
   applyNavIcons();
   nav('dashboard');
+  updateFavicon();
   startPolling();
   _setSyncStatus('synced','Connected');
 }
@@ -6292,6 +6517,52 @@ if(sessionStorage.getItem('pfa')){
   el('pw-screen').style.display='none';
   el('app').style.display='flex';
   init();
+}
+
+/* ════ FAVICON ════ */
+function updateFavicon(){
+  const canvas=document.createElement('canvas');
+  canvas.width=64;canvas.height=64;
+  const ctx=canvas.getContext('2d');
+  const logo=S.settings&&S.settings.logoUrl;
+  if(logo){
+    const img=new Image();
+    img.onload=function(){
+      ctx.fillStyle='#141414';
+      _faviconRoundRect(ctx,0,0,64,64,12);ctx.fill();
+      ctx.drawImage(img,6,6,52,52);
+      _setFavicon(canvas.toDataURL('image/png'));
+    };
+    img.onerror=function(){_faviconMonogram(ctx,canvas);};
+    img.src=logo;
+  } else {
+    _faviconMonogram(ctx,canvas);
+  }
+}
+function _faviconMonogram(ctx,canvas){
+  const acc='#62D0AA';
+  ctx.fillStyle='#141414';
+  _faviconRoundRect(ctx,0,0,64,64,14);ctx.fill();
+  ctx.fillStyle=acc;
+  _faviconRoundRect(ctx,7,7,50,50,10);ctx.fill();
+  ctx.fillStyle='#141414';
+  ctx.font='bold 26px sans-serif';
+  ctx.textAlign='center';ctx.textBaseline='middle';
+  ctx.fillText('PF',32,33);
+  _setFavicon(canvas.toDataURL('image/png'));
+}
+function _faviconRoundRect(ctx,x,y,w,h,r){
+  ctx.beginPath();
+  ctx.moveTo(x+r,y);ctx.lineTo(x+w-r,y);ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r);ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h);ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r);ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+function _setFavicon(dataUrl){
+  let l=document.getElementById('favicon');
+  if(!l){l=document.createElement('link');l.id='favicon';l.rel='icon';l.type='image/png';document.head.appendChild(l);}
+  l.href=dataUrl;
 }
 </script>
 
