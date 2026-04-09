@@ -564,10 +564,22 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 .cal-d{width:28px;height:28px;min-width:28px;min-height:28px;max-width:28px;max-height:28px;display:flex;align-items:center;justify-content:center;border-radius:4px;cursor:pointer;font-size:.68rem;color:var(--text2);border:none;background:none;padding:0;margin:0;-webkit-appearance:none;appearance:none;line-height:1;box-sizing:border-box;transition:background .1s,color .1s;}
 .cal-d:hover{background:var(--teal-dim);color:var(--acc);}
 .cal-d.today{color:var(--acc);font-weight:700;}
-.cal-d.sel{background:var(--acc)!important;color:var(--black);font-weight:700;}
+.cal-d.sel,.cal-d.range-start,.cal-d.range-end{background:var(--acc)!important;color:var(--black);font-weight:700;}
+.cal-d.in-range{background:var(--teal-dim);color:var(--acc);}
 .cal-d.other{opacity:.3;}
 .cal-d.empty{pointer-events:none;background:none;}
 .cal-ft{display:flex;gap:5px;justify-content:flex-end;margin-top:7px;padding-top:7px;border-top:1px solid var(--border);}
+.cal-hint{font-size:.62rem;color:var(--muted);margin-top:5px;text-align:center;}
+/* Pill selectors */
+.pill-sel{display:flex;flex-wrap:wrap;gap:5px;}
+.pill-opt{padding:4px 11px;border-radius:20px;font-size:.73rem;font-weight:600;cursor:pointer;border:1.5px solid var(--border);color:var(--text2);background:var(--surface2);transition:all .12s;user-select:none;}
+.pill-opt:hover{border-color:var(--acc);color:var(--acc);}
+.pill-opt.active{background:var(--acc);color:var(--black);border-color:var(--acc);}
+/* Avatar toggle grid */
+.av-toggle-grid{display:flex;flex-wrap:wrap;gap:6px;}
+.av-toggle{display:flex;align-items:center;gap:6px;padding:4px 8px 4px 4px;border-radius:20px;border:1.5px solid var(--border);cursor:pointer;transition:all .12s;user-select:none;font-size:.73rem;color:var(--text2);}
+.av-toggle:hover{border-color:var(--acc);}
+.av-toggle.active{border-color:var(--acc);background:var(--teal-dim);color:var(--acc);}
 
 /* ── MULTI-SELECT ── */
 .ms-wrap{background:var(--bg);border:1.5px solid var(--border);border-radius:7px;padding:6px 8px;display:flex;flex-wrap:wrap;gap:4px;min-height:40px;cursor:text;transition:border-color .14s;position:relative;}
@@ -1090,6 +1102,9 @@ hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
     <button class="rbtn" data-v="kanban" data-tip="Kanban Board" onclick="nav('kanban')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>
     </button>
+    <button class="rbtn" data-v="campaign" data-tip="Campaign Board" onclick="nav('campaign')">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="10" r="2"/><circle cx="10" cy="4" r="2"/><circle cx="16" cy="10" r="2"/><circle cx="10" cy="16" r="2"/><line x1="6" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="10" y1="6" x2="10" y2="8"/><line x1="10" y1="12" x2="10" y2="14"/></svg>
+    </button>
     <button class="rbtn" data-v="templates" data-tip="Templates" onclick="nav('templates')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="2" y="2" width="11" height="14" rx="1.5"/><rect x="7" y="6" width="11" height="12" rx="1.5" fill="var(--surface)" stroke="currentColor"/><path d="M10 10h5M10 13h3"/></svg>
     </button>
@@ -1127,6 +1142,8 @@ hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
     <div class="nav-row"><div class="nitem active" data-v="dashboard" onclick="nav('dashboard')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>Dashboard</div></div>
     <div id="panel-bookmarks"></div>
     <div class="nav-row"><div class="nitem" data-v="kanban" onclick="nav('kanban')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>Kanban Board</div></div>
+    <div class="nav-row"><div class="nitem" data-v="campaign" onclick="nav('campaign')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="10" r="2"/><circle cx="10" cy="4" r="2"/><circle cx="16" cy="10" r="2"/><circle cx="10" cy="16" r="2"/><line x1="6" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="10" y1="6" x2="10" y2="8"/><line x1="10" y1="12" x2="10" y2="14"/></svg>Campaign Board</div></div>
+    <div class="nav-row"><div class="nitem" data-v="campaign" onclick="nav('campaign')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="4" height="14" rx="1"/><rect x="8" y="3" width="4" height="14" rx="1"/><rect x="14" y="3" width="4" height="14" rx="1"/><line x1="2" y1="7" x2="18" y2="7"/></svg>Campaign Board</div></div>
     <div class="pnav-sep"></div>
     <div class="nav-row"><div class="nitem" data-v="templates" onclick="nav('templates')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="2" y="2" width="11" height="14" rx="1.5"/><rect x="7" y="6" width="11" height="12" rx="1.5" fill="var(--surface)"/></svg>Templates</div></div>
     <div class="nav-row"><div class="nitem" data-v="finance" onclick="nav('finance')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>Finances</div></div>
@@ -1340,10 +1357,11 @@ function _applyDefaults(){
   if(!S.finance.finAuth)S.finance.finAuth=false;
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
   if(!S.kbFilter)S.kbFilter={project:'',member:'',label:''};
-  if(!S.sponsors)S.sponsors=[];
+  if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
   if(!S.coworkDays)S.coworkDays=[];
   (S.members||[]).forEach(m=>{if(!m.timeLog)m.timeLog=[];if(m.isDirector===undefined)m.isDirector=false;});
   (S.projects||[]).forEach(p=>{if(!p.expenses)p.expenses=[];});
+  (S.tasks||[]).forEach(t=>{if(t.phase===undefined)t.phase='';});
 }
 
 /* ── Real-time polling (checks every 15s for changes from other users) ── */
@@ -1423,11 +1441,12 @@ let S={
   projFilter:'all',
   kbFilter:{project:'',member:'',label:''},
   expandedTasks:[],expandedGantt:[],
-  settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',anthropicKey:'',navVisible:{dashboard:true,kanban:true,templates:true,finance:true,sponsors:true,settings:true},bookmarks:[]},
+  settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',anthropicKey:'',navVisible:{dashboard:true,kanban:true,campaign:true,templates:true,finance:true,sponsors:true,settings:true},bookmarks:[]},
   projectTemplates:[],
   sponsors:[],
   finance:{revenue:0,recurring:[],oneoff:[],finTab:'overview'},
-  dashFilters:{project:'',member:'',label:''}
+  dashFilters:{project:'',member:'',label:''},
+  campaignFilter:{project:'',phase:'',member:''}
 };
 
 /* save(), load(), saveWithUndo(), undo(), redo() are defined above in the Supabase block */
@@ -1550,6 +1569,83 @@ function bulkDelete(){
   _bulkSel.forEach(id=>del(id));
   save();
   clearBulk();render();
+}
+
+const PHASES=['Planning','Pre-launch','Live','Post-event'];
+function phaseColor(ph){return{Planning:'var(--blue)','Pre-launch':'var(--yellow)',Live:'var(--green)','Post-event':'var(--muted)'}[ph]||'var(--muted)';}
+function phaseBg(ph){return{Planning:'rgba(61,130,240,.12)','Pre-launch':'rgba(240,201,107,.12)',Live:'rgba(31,186,122,.12)','Post-event':'rgba(255,255,255,.05)'}[ph]||'var(--surface3)';}
+
+function bulkSetPhasePrompt(){
+  if(!_bulkSel.size)return;
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
+  <div class="mo-box" style="max-width:320px;">
+    <div class="mo-hd"><span class="mo-title">Set phase</span><button class="mo-close" onclick="closeModal()">×</button></div>
+    <div class="mo-body" style="display:flex;flex-direction:column;gap:8px;">
+      ${PHASES.map(ph=>`<button class="btn btn-ghost" style="justify-content:flex-start;gap:10px;" onclick="bulkSetPhase('${ph}')"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${phaseColor(ph)};flex-shrink:0;"></span>${ph}</button>`).join('')}
+      <button class="btn btn-ghost" style="color:var(--muted);justify-content:flex-start;" onclick="bulkSetPhase('')">✕ Clear phase</button>
+    </div>
+  </div></div>`;
+}
+function bulkSetPhase(phase){
+  saveWithUndo('Bulk set phase');
+  _bulkSel.forEach(id=>{const t=getTask(id);if(t)t.phase=phase;});
+  save();closeModal();clearBulk();render();
+}
+
+function bulkAssignPrompt(){
+  if(!_bulkSel.size||!S.members.length)return;
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
+  <div class="mo-box" style="max-width:320px;">
+    <div class="mo-hd"><span class="mo-title">Assign to</span><button class="mo-close" onclick="closeModal()">×</button></div>
+    <div class="mo-body" style="display:flex;flex-direction:column;gap:6px;">
+      ${S.members.map(m=>`<button class="btn btn-ghost" style="justify-content:flex-start;gap:10px;" onclick="bulkAssign('${m.id}')">${avHtml(m.id,18)}<span>${m.name}</span></button>`).join('')}
+      <button class="btn btn-ghost" style="color:var(--muted);justify-content:flex-start;" onclick="bulkAssign('')">✕ Remove all assignees</button>
+    </div>
+  </div></div>`;
+}
+function bulkAssign(memberId){
+  saveWithUndo('Bulk assign');
+  _bulkSel.forEach(id=>{const t=getTask(id);if(!t)return;if(!memberId){t.assignees=[];}else if(!(t.assignees||[]).includes(memberId)){t.assignees=[...(t.assignees||[]),memberId];}});
+  save();closeModal();clearBulk();render();
+}
+
+function bulkLabelPrompt(){
+  if(!_bulkSel.size||!S.labels.length)return;
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
+  <div class="mo-box" style="max-width:320px;">
+    <div class="mo-hd"><span class="mo-title">Add label</span><button class="mo-close" onclick="closeModal()">×</button></div>
+    <div class="mo-body" style="display:flex;flex-direction:column;gap:6px;">
+      ${S.labels.map(l=>`<button class="btn btn-ghost" style="justify-content:flex-start;gap:10px;" onclick="bulkLabel('${l.id}')"><span style="display:inline-block;width:10px;height:10px;border-radius:2px;background:${l.color};flex-shrink:0;"></span><span>${l.name}</span></button>`).join('')}
+      <button class="btn btn-ghost" style="color:var(--muted);justify-content:flex-start;" onclick="bulkLabel('')">✕ Remove all labels</button>
+    </div>
+  </div></div>`;
+}
+function bulkLabel(labelId){
+  saveWithUndo('Bulk label');
+  _bulkSel.forEach(id=>{const t=getTask(id);if(!t)return;if(!labelId){t.labels=[];}else if(!(t.labels||[]).includes(labelId)){t.labels=[...(t.labels||[]),labelId];}});
+  save();closeModal();clearBulk();render();
+}
+
+function bulkMovePrompt(){
+  if(!_bulkSel.size)return;
+  const projs=S.projects.filter(p=>p.status==='active');
+  if(!projs.length)return;
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
+  <div class="mo-box" style="max-width:320px;">
+    <div class="mo-hd"><span class="mo-title">Move to project</span><button class="mo-close" onclick="closeModal()">×</button></div>
+    <div class="mo-body" style="display:flex;flex-direction:column;gap:6px;">
+      ${projs.map(p=>`<button class="btn btn-ghost" style="justify-content:flex-start;gap:10px;" onclick="bulkMove('${p.id}')"><span style="display:inline-block;width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0;"></span><span>${p.name}</span></button>`).join('')}
+    </div>
+  </div></div>`;
+}
+function bulkMove(projId){
+  saveWithUndo('Bulk move');
+  _bulkSel.forEach(id=>{const t=getTask(id);if(t){t.projectId=projId;t.parentId=null;}});
+  save();closeModal();clearBulk();render();
 }
 
 
@@ -1990,6 +2086,7 @@ function render(){
     case'dashboard':try{c.innerHTML=renderDash();}catch(e){console.error('Dashboard error:',e);c.innerHTML=`<div class='fu'><div class='page-hd'><div class='page-title'><em>Dashboard</em></div></div><div class='empty'><div class='empty-ico'><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="opacity:.35"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class='empty-txt'>Error loading dashboard: ${e.message}</div></div></div>`;}setTimeout(()=>{scrollGanttToday();initCoworkTooltips();},60);break;
     
     case'kanban':c.innerHTML=renderKanban();setTimeout(()=>initAllDnD(),80);return;
+    case'campaign':c.innerHTML=renderCampaign();break;
 
     case'labels':c.innerHTML=renderLabels();break;
     case'templates':c.innerHTML=renderTemplates();break;
@@ -2081,10 +2178,25 @@ ${active.length>0?`<div style="margin-bottom:18px;">
 <!-- QUICK LINKS -->
 ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
   <div class="sec-hd" style="margin-bottom:9px;"><span class="sec-lbl">Quick Links</span></div>
-  <div class="ql-grid">
-    ${S.quickLinks.map(q=>`<a href="${q.url}" target="_blank" rel="noopener" class="ql-btn"><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${q.name}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteQL('${q.id}')">×</span></a>`).join('')}
-    <button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>
-  </div>
+  ${(()=>{
+    const cats=[...new Set(S.quickLinks.map(q=>q.category||''))];
+    const hasCategories=cats.some(c=>c!=='');
+    if(!hasCategories){
+      return`<div class="ql-grid">
+        ${S.quickLinks.map(q=>`<a href="${q.url}" target="_blank" rel="noopener" class="ql-btn"><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${q.name}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteQL('${q.id}')">×</span></a>`).join('')}
+        <button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>
+      </div>`;
+    }
+    const grouped={};
+    S.quickLinks.forEach(q=>{const c=q.category||'Other';if(!grouped[c])grouped[c]=[];grouped[c].push(q);});
+    return Object.entries(grouped).map(([cat,links])=>`
+      <div style="margin-bottom:10px;">
+        <div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">${cat}</div>
+        <div class="ql-grid">
+          ${links.map(q=>`<a href="${q.url}" target="_blank" rel="noopener" class="ql-btn"><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${q.name}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteQL('${q.id}')">×</span></a>`).join('')}
+        </div>
+      </div>`).join('')+`<button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>`;
+  })()}
 </div>`:''}
 
 <!-- TWO COLUMN: events + focus -->
@@ -2366,6 +2478,7 @@ function renderTaskRow(t,depth=0,showProj=false){
   <!-- Right metadata zone — fixed-width cells, each fully visible or fully hidden -->
   <div class="ti-meta-zone">
   <div class="ti-col ti-col-labels">
+    ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phaseBg(t.phase)};color:${phaseColor(t.phase)};white-space:nowrap;">${t.phase}</span>`:''}
     ${(t.labels||[]).slice(0,2).map(id=>lcHtml(id)).join('')}
   </div>
   <div class="ti-col ti-col-proj">
@@ -2795,7 +2908,7 @@ ${(()=>{
   });
 
   // Cash value & invoice status
-  let cashTotal=0,invoicesSent=0,invoicesPaid=0,cashSponsorCount=0;
+  let cashTotal=0,invoicesSent=0,invoicesPaid=0,cashSponsorCount=0,fulfilledCount=0;
   spons.forEach(sp=>{
     const s=getSponsor(sp.id);
     if(!s)return;
@@ -2804,6 +2917,7 @@ ${(()=>{
       if(sp.invoiceSent)invoicesSent++;
       if(sp.invoicePaid)invoicesPaid++;
     }
+    if(sp.fulfilled)fulfilledCount++;
   });
 
   // Prize pool value
@@ -2817,10 +2931,55 @@ ${(()=>{
     },0);
   },0);
 
-  // Days to event
+  // Event date tile — three states using startDate and endDate
   const today=new Date();todayStr=toISO(today);
-  const daysToEvent=p.endDate?Math.round((new Date(p.endDate)-today)/86400000):null;
-  const daysLabel=daysToEvent===null?null:daysToEvent>0?`${daysToEvent}d to go`:daysToEvent===0?'Today!':p.status==='completed'?null:`${Math.abs(daysToEvent)}d ago`;
+  const msPerDay=86400000;
+  const eventDateTile=(()=>{
+    if(!p.startDate&&!p.endDate)return null;
+    const start=p.startDate?new Date(p.startDate):null;
+    const end=p.endDate?new Date(p.endDate):null;
+    const daysToStart=start?Math.round((start-today)/msPerDay):null;
+    const daysToEnd=end?Math.round((end-today)/msPerDay):null;
+    const daysSinceEnd=end?Math.round((today-end)/msPerDay):null;
+
+    // BEFORE event starts
+    if(daysToStart!==null&&daysToStart>0){
+      return{
+        label:'Starts in',
+        value:`${daysToStart}d`,
+        color:'var(--text2)',
+        sub:fmtD(p.startDate)
+      };
+    }
+    // Event starts today
+    if(daysToStart===0){
+      return{label:'Starts',value:'Today!',color:'var(--yellow)',sub:fmtD(p.startDate)};
+    }
+    // Event in progress (started, not ended yet)
+    if(daysToEnd!==null&&daysToEnd>0){
+      return{
+        label:'Event ends in',
+        value:`${daysToEnd}d`,
+        color:'var(--acc)',
+        sub:`Ends ${fmtD(p.endDate)}`
+      };
+    }
+    // Ends today
+    if(daysToEnd===0){
+      return{label:'Last day!',value:'Today',color:'var(--yellow)',sub:fmtD(p.endDate)};
+    }
+    // Event has ended
+    if(daysSinceEnd!==null&&daysSinceEnd>0){
+      return{
+        label:'Event ended',
+        value:`${daysSinceEnd}d ago`,
+        color:'var(--muted)',
+        sub:fmtD(p.endDate)
+      };
+    }
+    return null;
+  })();
+  const calIcon='<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>';
 
   const stat=(icon,label,value,color='var(--text2)',sub='')=>`
     <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-width:0;">
@@ -2834,7 +2993,13 @@ ${(()=>{
       </div>
     </div>`;
 
-  return`<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;margin-bottom:18px;">
+  return`<div style="margin-bottom:18px;">
+  <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;" onclick="toggleOverviewExpanded('${p.id}')">
+    <svg id="ov-toggle-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._ovExpanded||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
+    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Overview</span>
+  </div>
+  <div id="ov-body-${p.id}" style="display:${(window._ovExpanded||{})[p.id]!==false?'block':'none'};">
+  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
     ${stat('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',
       'Tasks',
       `${doneTasks}/${totalTasks}`,
@@ -2864,14 +3029,70 @@ ${(()=>{
       invoicesPaid===cashSponsorCount?'var(--green)':invoicesSent>0?'var(--acc)':'var(--muted)',
       invoicesPaid===cashSponsorCount?'All paid':invoicesSent>invoicesPaid?`${invoicesSent} sent, ${invoicesPaid} paid`:`${invoicesSent} sent`
     ):''}
-    ${daysLabel?stat('<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>',
-      p.endDate?'Event date':'Timeline',
-      daysLabel,
-      daysToEvent!==null&&daysToEvent<0&&p.status!=='completed'?'var(--red)':daysToEvent===0?'var(--yellow)':'var(--text2)',
-      p.endDate?fmtD(p.endDate):''
+    ${sponsorCount>0?stat('<polyline points="20 6 9 17 4 12"/>',
+      'Fulfilled',
+      `${fulfilledCount}/${sponsorCount}`,
+      fulfilledCount===sponsorCount?'var(--green)':fulfilledCount>0?'var(--acc)':'var(--muted)',
+      fulfilledCount===sponsorCount?'All fulfilled':fulfilledCount>0?`${sponsorCount-fulfilledCount} remaining`:''
     ):''}
-  </div>`;
+    ${eventDateTile?stat(calIcon,
+      eventDateTile.label,
+      eventDateTile.value,
+      eventDateTile.color,
+      eventDateTile.sub
+    ):''}
+  </div>
+  </div>
+</div>`;
 })()}
+
+<!-- PROJECT QUICK LINKS -->
+<div style="margin-bottom:18px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Quick Links</span>
+    <button class="btn btn-ghost btn-xs" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>
+  </div>
+  ${(()=>{
+    const links=p.quickLinks||[];
+    const hasCategories=links.some(q=>q.category);
+    const qlBtn=q=>`<a href="${q.url}" target="_blank" rel="noopener" class="ql-btn"><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${q.name}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteProjQL('${p.id}','${q.id}')">×</span></a>`;
+    if(!hasCategories){
+      return`<div class="ql-grid" style="margin-bottom:0;">${links.map(qlBtn).join('')}<button class="ql-btn add-ql" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button></div>`;
+    }
+    const grouped={};
+    links.forEach(q=>{const c=q.category||'Other';if(!grouped[c])grouped[c]=[];grouped[c].push(q);});
+    return Object.entries(grouped).map(([cat,grpLinks])=>`
+      <div style="margin-bottom:8px;">
+        <div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">${cat}</div>
+        <div class="ql-grid">${grpLinks.map(qlBtn).join('')}</div>
+      </div>`).join('')+`<button class="ql-btn add-ql" style="margin-top:4px;" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>`;
+  })()}
+</div>
+
+<!-- PROJECT TOOLS -->
+<div style="margin-bottom:18px;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Tools</span>
+    <button class="btn btn-ghost btn-xs" onclick="addProjectTool('${p.id}')">+ Add tool</button>
+  </div>
+  ${(p.tools||[]).length===0?`<div style="font-size:.75rem;color:var(--muted);">No tools added yet.</div>`:`
+  <div style="display:flex;flex-direction:column;gap:6px;">
+    ${(p.tools||[]).map(tool=>{
+      const costStyle=tool.cost==='free'?'background:rgba(31,186,122,.12);color:var(--green);':tool.cost==='subscription'?'background:rgba(61,130,240,.12);color:var(--blue);':tool.cost==='onetime'?'background:rgba(240,201,107,.12);color:var(--yellow);':'background:var(--surface3);color:var(--muted);';
+      const costLabel=tool.cost==='free'?'Free':tool.cost==='subscription'?'Subscription':tool.cost==='onetime'?'One-time':'—';
+      return`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;">
+        ${tool.url?`<img src="https://www.google.com/s2/favicons?domain=${tryDomain(tool.url)}&sz=32" onerror="this.style.display='none'" style="width:16px;height:16px;flex-shrink:0;" alt="">`:
+        `<div style="width:16px;height:16px;flex-shrink:0;background:var(--surface3);border-radius:3px;"></div>`}
+        <span style="flex:1;font-size:.82rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tool.name}</span>
+        <span style="font-size:.68rem;padding:2px 8px;border-radius:20px;flex-shrink:0;${costStyle}">${costLabel}</span>
+        ${tool.url?`<a href="${tool.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;flex-shrink:0;" title="Open tool"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}
+        <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:0 2px;" onclick="editProjectTool('${p.id}','${tool.id}')" title="Edit">✎</button>
+        <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:0 2px;" onclick="deleteProjectTool('${p.id}','${tool.id}')" title="Remove">×</button>
+      </div>`;
+    }).join('')}
+  </div>`}
+</div>
+
 <!-- SPONSORS IN PROJECT -->
 ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;cursor:pointer;" onclick="toggleSponsorsExpanded('${p.id}')">
@@ -2957,6 +3178,18 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
             <span style="color:${sp.invoicePaid?'var(--green)':'var(--text2)'};">Invoice paid</span>
           </label>
         </div>`:''}
+        ${sp.type==='venue'?`<div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
+            <div class="ti-check${sp.logisticsAgreed?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','logisticsAgreed')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.logisticsAgreed?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp.logisticsAgreed?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
+            <span style="color:${sp.logisticsAgreed?'var(--acc)':'var(--text2)'};">Logistics agreed</span>
+          </label>
+        </div>`:''}
+        <div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
+          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
+            <div class="ti-check${sp.fulfilled?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','fulfilled')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.fulfilled?'var(--green)':'rgba(255,255,255,.18)'};background:${sp.fulfilled?'var(--green)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
+            <span style="font-weight:600;color:${sp.fulfilled?'var(--green)':'var(--text2)'};">Sponsorship fulfilled</span>
+          </label>
+        </div>
         ${allocatedProducts.length>0?`<div style="padding:8px 13px 10px;border-top:1px solid var(--border2);flex:1;">
           <div style="font-size:.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-bottom:7px;">Product Allocations</div>
           ${allocatedProducts.map((prod,pi)=>{
@@ -2990,42 +3223,6 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
   })()}
 </div><hr class="div">`:''}
 
-<!-- PROJECT QUICK LINKS -->
-<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Quick Links</span>
-    <button class="btn btn-ghost btn-xs" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>
-  </div>
-  <div class="ql-grid" style="margin-bottom:0;">
-    ${(p.quickLinks||[]).map(q=>`<a href="${q.url}" target="_blank" rel="noopener" class="ql-btn"><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${q.name}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteProjQL('${p.id}','${q.id}')">×</span></a>`).join('')}
-    <button class="ql-btn add-ql" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>
-  </div>
-</div>
-
-<!-- PROJECT TOOLS -->
-<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Tools</span>
-    <button class="btn btn-ghost btn-xs" onclick="addProjectTool('${p.id}')">+ Add tool</button>
-  </div>
-  ${(p.tools||[]).length===0?`<div style="font-size:.75rem;color:var(--muted);">No tools added yet.</div>`:`
-  <div style="display:flex;flex-direction:column;gap:6px;">
-    ${(p.tools||[]).map(tool=>{
-      const costStyle=tool.cost==='free'?'background:rgba(31,186,122,.12);color:var(--green);':tool.cost==='subscription'?'background:rgba(61,130,240,.12);color:var(--blue);':tool.cost==='onetime'?'background:rgba(240,201,107,.12);color:var(--yellow);':'background:var(--surface3);color:var(--muted);';
-      const costLabel=tool.cost==='free'?'Free':tool.cost==='subscription'?'Subscription':tool.cost==='onetime'?'One-time':'—';
-      return`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;">
-        ${tool.url?`<img src="https://www.google.com/s2/favicons?domain=${tryDomain(tool.url)}&sz=32" onerror="this.style.display='none'" style="width:16px;height:16px;flex-shrink:0;" alt="">`:
-        `<div style="width:16px;height:16px;flex-shrink:0;background:var(--surface3);border-radius:3px;"></div>`}
-        <span style="flex:1;font-size:.82rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${tool.name}</span>
-        <span style="font-size:.68rem;padding:2px 8px;border-radius:20px;flex-shrink:0;${costStyle}">${costLabel}</span>
-        ${tool.url?`<a href="${tool.url}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;flex-shrink:0;" title="Open tool"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}
-        <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:0 2px;" onclick="editProjectTool('${p.id}','${tool.id}')" title="Edit">✎</button>
-        <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:0 2px;" onclick="deleteProjectTool('${p.id}','${tool.id}')" title="Remove">×</button>
-      </div>`;
-    }).join('')}
-  </div>`}
-</div>
-
 <hr class="div">
 <div class="detail-layout">
 
@@ -3053,6 +3250,7 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
     <span style="font-size:.7rem;color:var(--muted);">${fmtD(e.date)}</span>
     <span style="font-size:.7rem;color:var(--text2);background:var(--surface3);padding:2px 7px;border-radius:4px;">${e.category||'General'}</span>
     <span style="font-family:'DM Mono',monospace;font-size:.8rem;color:var(--yellow);">${fmtGBP(e.amount)}</span>
+    <button class="del-btn" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 3px;" onclick="editProjExp('${p.id}','${e.id}')" title="Edit">✎</button>
     <button class="del-btn" onclick="deleteProjExp('${p.id}','${e.id}')">×</button>
   </div>`).join('')}`}
 </div>
@@ -3288,6 +3486,123 @@ ${S.labels.length===0?`<div class="empty" style="padding:20px;"><div class="empt
 }
 
 /* ════ TEMPLATES ════ */
+function renderCampaign(){
+  // Filters stored on S.campaignFilter
+  if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
+  const cf=S.campaignFilter;
+  const allProjs=S.projects.filter(p=>p.status==='active');
+
+  // Get filtered tasks — top-level only for the board view
+  let tasks=S.tasks.filter(t=>{
+    const p=getProject(t.projectId);
+    if(!p||p.status!=='active')return false;
+    if(cf.project&&t.projectId!==cf.project)return false;
+    if(cf.phase&&t.phase!==cf.phase)return false;
+    if(cf.member&&!(t.assignees||[]).includes(cf.member))return false;
+    return true;
+  });
+
+  // Group by label — tasks with multiple labels appear in each group
+  // Tasks with no label go into an "Uncategorised" group
+  const labelMap={};
+  S.labels.forEach(l=>{labelMap[l.id]=l;});
+  const groups={}; // labelId -> {label, tasks[]}
+  const noLabel=[];
+  tasks.forEach(t=>{
+    const tLabels=(t.labels||[]).filter(id=>labelMap[id]);
+    if(tLabels.length===0){noLabel.push(t);}
+    else{tLabels.forEach(lid=>{if(!groups[lid])groups[lid]={label:labelMap[lid],tasks:[]};groups[lid].tasks.push(t);});}
+  });
+
+  // Phase summary counts
+  const phaseCounts={};
+  PHASES.forEach(ph=>{phaseCounts[ph]=tasks.filter(t=>t.phase===ph).length;});
+  const total=tasks.length;
+  const done=tasks.filter(t=>t.done).length;
+
+  const taskCard=(t)=>{
+    const proj=getProject(t.projectId);
+    const od=overdue(t.endDate)&&!t.done;
+    const ch=kids(t.id);
+    const comp=taskComp(t);
+    const phC=t.phase?phaseColor(t.phase):'';
+    const phBg=t.phase?phaseBg(t.phase):'';
+    return`<div style="background:var(--surface2);border:1px solid ${t.done?'var(--border2)':od?'rgba(224,96,96,.3)':'var(--border)'};border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;opacity:${t.done?.55:1};" onclick="openModal('task','${t.id}')">
+      <div style="display:flex;align-items:flex-start;gap:8px;">
+        <div class="ti-check ${t.done?'done':''}" onclick="event.stopPropagation();toggleDone('${t.id}')" style="margin-top:2px;flex-shrink:0;"></div>
+        <div style="flex:1;min-width:0;">
+          <div style="font-size:.8rem;font-weight:600;color:${t.done?'var(--muted)':'var(--text)'};text-decoration:${t.done?'line-through':'none'};line-height:1.35;margin-bottom:4px;">${t.name}</div>
+          <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
+            ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phBg};color:${phC};">${t.phase}</span>`:''}
+            ${proj?`<span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:${proj.color}22;color:${proj.color};font-weight:600;">${proj.name}</span>`:''}
+            ${t.endDate?`<span style="font-size:.6rem;color:${od?'var(--red)':'var(--muted)'};">${od?'⚠ ':''}${fmtD(t.endDate)}</span>`:''}
+            ${ch.length>0?`<span style="font-size:.6rem;color:var(--muted);">${comp}% (${ch.filter(c=>c.done).length}/${ch.length})</span>`:''}
+          </div>
+          ${(t.assignees||[]).length>0?`<div style="display:flex;gap:3px;margin-top:5px;">${(t.assignees||[]).map(id=>avHtml(id,16)).join('')}</div>`:''}
+        </div>
+      </div>
+    </div>`;
+  };
+
+  const orderedGroups=S.labels
+    .filter(l=>groups[l.id])
+    .map(l=>groups[l.id]);
+  if(noLabel.length>0)orderedGroups.push({label:{id:'__none',name:'Uncategorised',color:'var(--muted)'},tasks:noLabel});
+
+  const colHtml=orderedGroups.map(g=>`
+    <div style="min-width:260px;max-width:300px;flex:1;">
+      <div style="display:flex;align-items:center;gap:7px;margin-bottom:10px;padding:0 2px;">
+        <div style="width:10px;height:10px;border-radius:2px;background:${g.label.color};flex-shrink:0;"></div>
+        <span style="font-size:.75rem;font-weight:700;letter-spacing:.04em;text-transform:uppercase;color:var(--text2);">${g.label.name}</span>
+        <span style="font-size:.68rem;color:var(--muted);margin-left:auto;">${g.tasks.filter(t=>t.done).length}/${g.tasks.length}</span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:7px;">
+        ${g.tasks.map(taskCard).join('')}
+      </div>
+    </div>`).join('');
+
+  return`<div class="fu">
+<div class="page-hd" style="flex-wrap:wrap;gap:10px;">
+  <div class="page-title"><em>Campaign Board</em></div>
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <select class="fsel" style="font-size:.74rem;" onchange="S.campaignFilter.project=this.value;save();render()">
+      <option value="">All projects</option>
+      ${allProjs.map(p=>`<option value="${p.id}" ${cf.project===p.id?'selected':''}>${p.name}</option>`).join('')}
+    </select>
+    <select class="fsel" style="font-size:.74rem;" onchange="S.campaignFilter.phase=this.value;save();render()">
+      <option value="">All phases</option>
+      ${PHASES.map(ph=>`<option value="${ph}" ${cf.phase===ph?'selected':''}>${ph}</option>`).join('')}
+    </select>
+    <select class="fsel" style="font-size:.74rem;" onchange="S.campaignFilter.member=this.value;save();render()">
+      <option value="">All members</option>
+      ${S.members.map(m=>`<option value="${m.id}" ${cf.member===m.id?'selected':''}>${m.name}</option>`).join('')}
+    </select>
+    ${cf.project||cf.phase||cf.member?`<button class="btn btn-ghost btn-xs" onclick="S.campaignFilter={project:'',phase:'',member:''};save();render()">✕ Clear</button>`:''}
+  </div>
+</div>
+
+<!-- Phase progress strip -->
+<div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+  ${PHASES.map(ph=>{
+    const n=phaseCounts[ph];
+    if(!n)return'';
+    return`<div style="display:flex;align-items:center;gap:6px;padding:5px 11px;background:${phaseBg(ph)};border:1px solid ${phaseColor(ph)}44;border-radius:7px;cursor:pointer;${cf.phase===ph?'box-shadow:0 0 0 2px '+phaseColor(ph)+';':''}" onclick="S.campaignFilter.phase=S.campaignFilter.phase==='${ph}'?'':'${ph}';save();render()">
+      <span style="font-size:.65rem;font-weight:700;color:${phaseColor(ph)};">${ph}</span>
+      <span style="font-size:.65rem;font-family:'DM Mono',monospace;color:var(--muted);">${n}</span>
+    </div>`;
+  }).join('')}
+  <div style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--muted);">
+    <span style="font-family:'DM Mono',monospace;color:var(--green);">${done}</span>/<span style="font-family:'DM Mono',monospace;">${total}</span> done
+  </div>
+</div>
+
+${orderedGroups.length===0?`<div class="empty"><div class="empty-ico">${ICO.tag}</div><div class="empty-txt">No tasks with labels yet.<br>Add labels to your tasks to organise by channel.</div></div>`:`
+<div style="display:flex;gap:14px;overflow-x:auto;align-items:flex-start;padding-bottom:20px;">
+  ${colHtml}
+</div>`}
+</div>`;
+}
+
 function renderTemplates(){
   const ptab=window._tmplTab||'project';
   const sponsorTmpls=S.taskTemplates.filter(t=>t.sponsorType);
@@ -4374,7 +4689,7 @@ function renderSettings(){
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg> Navigation Icons</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Choose an icon for each navigation section.</p>
-  ${['dashboard','kanban','templates','finance','sponsors','settings'].map(view=>{
+  ${['dashboard','kanban','campaign','templates','finance','sponsors','settings'].map(view=>{
     const opts=NAV_ICON_OPTIONS[view]||[];
     const curId=S.settings?.navIcons?.[view]||opts[0]?.id;
     const cur=opts.find(o=>o.id===curId)||opts[0];
@@ -4390,7 +4705,7 @@ function renderSettings(){
 
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Navigation Visibility</div>
-  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Kanban Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Finances'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>`<div class="nav-vis-row">
+  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Kanban Board'},{v:'campaign',l:'Campaign Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Finances'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>`<div class="nav-vis-row">
     <span class="nav-vis-lbl">${item.l}</span>
     <button class="toggle-sw${nv[item.v]===false?'':' on'}" onclick="toggleNavVis('${item.v}',this)"></button>
   </div>`).join('')}
@@ -4575,16 +4890,19 @@ function closeModal(){_closeAllMs();const mc=el('mc');mc.innerHTML='';mc.style.d
 function projectModalHtml(id){
   const p=id?getProject(id):null;const today=toISO(new Date());
   const tmpl=!p?(window._pendingProjTmpl||null):null;
-  // Pre-fill values: from existing project, or from template, or blank
   const defName=p?.name||tmpl?.name?.replace(/ template$/i,'')||'';
   const defDesc=p?.description||tmpl?.description||'';
   const defPrio=p?.priority||tmpl?.priority||'';
   const defColor=p?.color||tmpl?.color||COLORS[0];
+  const defStatus=p?.status||'active';
   const projTmpls=S.projectTemplates||[];
+  const statusColors={active:'var(--green)',backlog:'var(--muted)',completed:'var(--acc)'};
+
   return`<div class="mo-box">
 <div class="mo-hd"><span class="mo-title">${p?'Edit Project':'New Project'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
-<div class="mo-body">
-  ${!p&&projTmpls.length>0?`<div style="margin-bottom:14px;">
+<div class="mo-body" style="display:flex;flex-direction:column;gap:13px;">
+
+  ${!p&&projTmpls.length>0?`<div>
     <label class="flbl">Start from a template</label>
     <div style="display:flex;gap:6px;flex-wrap:wrap;">
       <button class="btn btn-ghost btn-xs${!tmpl?' active':''}" style="${!tmpl?'border-color:var(--acc);color:var(--acc);':''}" onclick="window._pendingProjTmpl=null;openModal('project',null)">Blank</button>
@@ -4593,34 +4911,166 @@ function projectModalHtml(id){
       </button>`).join('')}
     </div>
     ${tmpl?`<div style="font-size:.7rem;color:var(--acc);margin-top:7px;">✓ Will create ${tmpl.tasks?.length||0} tasks from template</div>`:''}
-  </div><hr class="div" style="margin:0 0 14px 0;">`:''}
-  <div class="field"><label class="flbl">Name *</label><input class="inp" id="pm-name" value="${defName}" placeholder="Project name"></div>
-  <div class="field"><label class="flbl">Description</label><textarea class="txta" id="pm-desc">${defDesc}</textarea></div>
-  <div class="inp-row">
-    <div class="field"><label class="flbl">Priority</label><select class="sel" id="pm-prio"><option value="" ${!defPrio?'selected':''}>— No Priority —</option>${PRIOS.map(pr=>`<option ${defPrio===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
-  </div>
-  <div class="field"><label class="flbl">Owner</label><select class="sel" id="pm-owner"><option value="">— none —</option>${S.members.map(m=>`<option value="${m.id}" ${p?.ownerId===m.id?'selected':''}>${m.name}</option>`).join('')}</select></div>
-  <div class="inp-row">
-    <div class="field"><label class="flbl">Start</label><div class="date-wrap" id="pm-s-w">${dpHtml('pm-s',p?.startDate||today)}</div></div>
-    <div class="field"><label class="flbl">End</label><div class="date-wrap" id="pm-e-w">${dpHtml('pm-e',p?.endDate||'')}</div></div>
-  </div>
-  <div class="field"><label class="flbl">Status</label><select class="sel" id="pm-status"><option value="active" ${(!p||p.status==='active')?'selected':''}>Active</option><option value="backlog" ${p?.status==='backlog'?'selected':''}>Backlog</option><option value="completed" ${p?.status==='completed'?'selected':''}>Completed</option></select></div>
-  <div class="field"><label class="flbl">Graphics Folder URL (Google Drive, Dropbox, etc.)</label><input class="inp" id="pm-graphics" type="url" placeholder="https://drive.google.com/..." value="${p?.graphicsUrl||''}" style="margin-bottom:2px;"></div>
-  <div class="field"><label class="flbl">Event URL</label><input class="inp" id="pm-eventurl" type="url" placeholder="https://airwiggles.com/c/conference/aircon26" value="${p?.eventUrl||''}"></div>
+  </div><hr class="div" style="margin:0;">`:''}
 
-  <!-- SPONSOR ASSIGNMENT -->
-  <hr class="div" style="margin:10px 0;">
-  <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Sponsors</div>
+  <!-- Name -->
+  <div><input class="inp" id="pm-name" value="${defName}" placeholder="Project name…" style="font-size:.95rem;font-weight:600;"></div>
+
+  <!-- Description — collapsible -->
+  <div>
+    <button type="button" onclick="const b=el('pm-desc-body');const ico=el('pm-desc-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';ico.style.transform=open?'':'rotate(180deg)';if(!open)setTimeout(()=>b.focus(),30);}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;width:100%;">
+      <svg id="pm-desc-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${defDesc?'transform:rotate(180deg)':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      <span>Description${defDesc?` · <span style="color:var(--acc);font-size:.65rem;">has notes</span>`:''}</span>
+    </button>
+    <textarea class="txta" id="pm-desc" id="pm-desc-body" style="display:${defDesc?'block':'none'};min-height:60px;margin-top:6px;">${defDesc}</textarea>
+  </div>
+
+  <!-- Priority pills -->
+  <div><label class="flbl">Priority</label>
+  <div class="pill-sel" id="pm-prio-pills">
+    <span class="pill-opt${!defPrio?' active':''}" onclick="pmPickPrio(this,'')" data-val="">None</span>
+    ${PRIOS.map(pr=>{const active=defPrio===pr;return`<span class="pill-opt${active?' active':''}" style="${active?'background:'+(_prioColors[pr]||'var(--acc)')+';border-color:'+(_prioColors[pr]||'var(--acc)')+';color:var(--black);':''}" onclick="pmPickPrio(this,'${pr}')" data-val="${pr}">${pr}</span>`;}).join('')}
+  </div>
+  <input type="hidden" id="pm-prio" value="${defPrio}"></div>
+
+  <!-- Status pills -->
+  <div><label class="flbl">Status</label>
+  <div class="pill-sel" id="pm-status-pills">
+    ${['active','backlog','completed'].map(st=>{const active=defStatus===st;const label=st.charAt(0).toUpperCase()+st.slice(1);return`<span class="pill-opt${active?' active':''}" style="${active?'background:'+statusColors[st]+';border-color:'+statusColors[st]+';color:var(--black);':''}" onclick="pmPickStatus(this,'${st}')" data-val="${st}">${label}</span>`;}).join('')}
+  </div>
+  <input type="hidden" id="pm-status" value="${defStatus}"></div>
+
+  <!-- Owner — avatar grid -->
+  ${S.members.length>0?`<div><label class="flbl">Owner</label>
+  <div class="av-toggle-grid" id="pm-owner-grid">
+    <div class="av-toggle${!p?.ownerId?' active':''}" onclick="pmPickOwner('',this)" data-id="" style="font-size:.72rem;padding:4px 10px;"><span>None</span></div>
+    ${S.members.map(m=>{const sel=p?.ownerId===m.id;return`<div class="av-toggle${sel?' active':''}" onclick="pmPickOwner('${m.id}',this)" data-id="${m.id}">${avHtml(m.id,20)}<span>${m.name.split(' ')[0]}</span></div>`;}).join('')}
+  </div>
+  <input type="hidden" id="pm-owner" value="${p?.ownerId||''}"></div>`:`<input type="hidden" id="pm-owner" value="">`}
+
+  <!-- Date range -->
+  <div><label class="flbl">Dates <span style="font-size:.62rem;color:var(--muted);font-weight:400;">— click start then end</span></label>
+  <div class="date-wrap" id="pm-range-wrap" style="position:relative;">
+    <div class="date-btn" onclick="pmOpenRangeCal()" style="cursor:pointer;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span id="pm-range-label" style="flex:1;">${p?.startDate||p?.endDate?`${p.startDate?fmtD(p.startDate):'—'} → ${p.endDate?fmtD(p.endDate):'—'}`:'<span style="color:var(--muted);">Set dates…</span>'}</span>
+      ${(p?.startDate||p?.endDate)?`<button class="date-clr" onclick="event.stopPropagation();pmClearRange()" title="Clear dates">×</button>`:''}
+    </div>
+    <div id="pm-range-cal-inner"></div>
+  </div>
+  <input type="hidden" id="pm-s-v" value="${p?.startDate||today}">
+  <input type="hidden" id="pm-e-v" value="${p?.endDate||''}">
+  </div>
+
+  <!-- URLs -->
+  <div><label class="flbl">Graphics Folder URL</label><input class="inp" id="pm-graphics" type="url" placeholder="https://drive.google.com/…" value="${p?.graphicsUrl||''}"></div>
+  <div><label class="flbl">Event URL</label><input class="inp" id="pm-eventurl" type="url" placeholder="https://airwiggles.com/c/…" value="${p?.eventUrl||''}"></div>
+
+  <!-- Colour -->
+  <div><label class="flbl">Colour</label>
+  <div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${defColor===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}
+  <input type="hidden" id="pm-clr" value="${defColor}"></div></div>
+
+  <!-- Sponsors -->
+  <hr class="div" style="margin:4px 0;">
+  <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Sponsors</div>
   <div id="pm-sponsors-list">${renderProjSponsorsEdit(p?.sponsors||[],p?.id||'')}</div>
   ${S.sponsors.length>0?`<button class="add-row-btn" onclick="addProjSponsorRow()">+ Add sponsor</button>`:`<div style="font-size:.73rem;color:var(--muted);">No sponsors yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('sponsors')">Add sponsors →</span></div>`}
 
-  <div style="margin-top:20px;"></div>
-  <div class="field"><label class="flbl">Colour</label><div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${defColor===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}</div><input type="hidden" id="pm-clr" value="${defColor}"></div>
 </div>
-<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProject('${p?.id||''}')">
-${p?'Save changes':'Create project'}</button></div></div>`;
+<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProject('${p?.id||''}')">${p?'Save changes':'Create project'}</button></div></div>`;
 }
 function pickC(gId,iId,c,dot){document.getElementById(gId)?.querySelectorAll('.clr-dot').forEach(d=>d.classList.remove('sel'));dot.classList.add('sel');const inp=document.getElementById(iId);if(inp)inp.value=c;}
+
+function pmPickPrio(el,val){
+  document.querySelectorAll('#pm-prio-pills .pill-opt').forEach(p=>{p.classList.remove('active');p.style.background='';p.style.borderColor='';p.style.color='';});
+  el.classList.add('active');
+  if(val){el.style.background=_prioColors[val]||'var(--acc)';el.style.borderColor=_prioColors[val]||'var(--acc)';el.style.color='var(--black)';}
+  const inp=document.getElementById('pm-prio');if(inp)inp.value=val;
+}
+function pmPickStatus(el,val){
+  const cols={active:'var(--green)',backlog:'var(--muted)',completed:'var(--acc)'};
+  document.querySelectorAll('#pm-status-pills .pill-opt').forEach(p=>{p.classList.remove('active');p.style.background='';p.style.borderColor='';p.style.color='';});
+  el.classList.add('active');
+  el.style.background=cols[val]||'var(--acc)';el.style.borderColor=cols[val]||'var(--acc)';el.style.color='var(--black)';
+  const inp=document.getElementById('pm-status');if(inp)inp.value=val;
+}
+function pmPickOwner(id,el){
+  document.querySelectorAll('#pm-owner-grid .av-toggle').forEach(a=>{a.classList.remove('active');});
+  el.classList.add('active');
+  const inp=document.getElementById('pm-owner');if(inp)inp.value=id;
+}
+
+/* ── Project modal range date picker ── */
+let _pmRangeState={picking:'start'};
+function pmOpenRangeCal(){
+  const wrap=el('pm-range-wrap');if(!wrap)return;
+  const existing=wrap.querySelector('.cal');
+  if(existing){existing.remove();return;}
+  document.querySelectorAll('.cal').forEach(c=>c.remove());
+  const now=new Date();
+  if(!window._pmRangeCal)window._pmRangeCal={y:now.getFullYear(),m:now.getMonth()};
+  const sv=el('pm-s-v')?.value;
+  if(sv){const d=new Date(sv);window._pmRangeCal={y:d.getFullYear(),m:d.getMonth()};}
+  const pop=document.createElement('div');
+  pop.className='cal';
+  pop.style.cssText='position:absolute;top:calc(100% + 4px);left:0;z-index:700;width:220px;';
+  pop.addEventListener('click',e=>e.stopPropagation());
+  pop.innerHTML=_buildPmRangeCal(window._pmRangeCal.y,window._pmRangeCal.m);
+  wrap.appendChild(pop);
+}
+function _buildPmRangeCal(y,m){
+  const mn=['January','February','March','April','May','June','July','August','September','October','November','December'][m];
+  const fd=new Date(y,m,1).getDay();const dm=new Date(y,m+1,0).getDate();
+  const tod=toISO(new Date());const sv=el('pm-s-v')?.value||'';const ev=el('pm-e-v')?.value||'';
+  let cells=['M','T','W','T','F','S','S'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const off=(fd+6)%7;
+  for(let i=0;i<off;i++)cells+=`<div class="cal-d empty"></div>`;
+  for(let d=1;d<=dm;d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    let cls='cal-d';
+    if(ds===tod)cls+=' today';
+    if(sv&&ds===sv)cls+=' range-start';
+    else if(ev&&ds===ev)cls+=' range-end';
+    else if(sv&&ev&&ds>sv&&ds<ev)cls+=' in-range';
+    cells+=`<button class="${cls}" onclick="pmRangePickDay('${ds}')">${d}</button>`;
+  }
+  const hint=sv&&ev?`${fmtD(sv)} → ${fmtD(ev)}`:sv?`Start: ${fmtD(sv)} — now pick end`:'Click to set start date';
+  return`<div class="cal-nav">
+    <button class="cal-nb" onclick="event.stopPropagation();window._pmRangeCal.m--;if(window._pmRangeCal.m<0){window._pmRangeCal.m=11;window._pmRangeCal.y--;}el('pm-range-wrap').querySelector('.cal').innerHTML=_buildPmRangeCal(window._pmRangeCal.y,window._pmRangeCal.m)">‹</button>
+    <span class="cal-mo">${mn} ${y}</span>
+    <button class="cal-nb" onclick="event.stopPropagation();window._pmRangeCal.m++;if(window._pmRangeCal.m>11){window._pmRangeCal.m=0;window._pmRangeCal.y++;}el('pm-range-wrap').querySelector('.cal').innerHTML=_buildPmRangeCal(window._pmRangeCal.y,window._pmRangeCal.m)">›</button>
+  </div>
+  <div class="cal-grid">${cells}</div>
+  <div class="cal-hint">${hint}</div>
+  <div class="cal-ft">
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();pmClearRange()">Clear</button>
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();el('pm-range-wrap').querySelector('.cal')?.remove()">Done</button>
+  </div>`;
+}
+function pmRangePickDay(ds){
+  const sv=el('pm-s-v')?.value||'';const ev=el('pm-e-v')?.value||'';
+  if(!sv||_pmRangeState.picking==='start'||(sv&&ev)){
+    if(el('pm-s-v'))el('pm-s-v').value=ds;
+    if(el('pm-e-v'))el('pm-e-v').value='';
+    _pmRangeState.picking='end';
+  } else {
+    if(ds<sv){if(el('pm-e-v'))el('pm-e-v').value=sv;if(el('pm-s-v'))el('pm-s-v').value=ds;}
+    else{if(el('pm-e-v'))el('pm-e-v').value=ds;}
+    _pmRangeState.picking='start';
+  }
+  const newSv=el('pm-s-v')?.value||'';const newEv=el('pm-e-v')?.value||'';
+  const lbl=el('pm-range-label');
+  if(lbl){lbl.innerHTML=newSv||newEv?`${newSv?fmtD(newSv):'—'} → ${newEv?fmtD(newEv):'—'}`:'<span style="color:var(--muted);">Set dates…</span>';}
+  const calEl=el('pm-range-wrap')?.querySelector('.cal');
+  if(calEl)calEl.innerHTML=_buildPmRangeCal(window._pmRangeCal?.y||new Date().getFullYear(),window._pmRangeCal?.m??new Date().getMonth());
+}
+function pmClearRange(){
+  if(el('pm-s-v'))el('pm-s-v').value='';if(el('pm-e-v'))el('pm-e-v').value='';
+  _pmRangeState.picking='start';
+  const lbl=el('pm-range-label');if(lbl)lbl.innerHTML='<span style="color:var(--muted);">Set dates…</span>';
+  el('pm-range-wrap')?.querySelector('.cal')?.remove();
+}
 
 function renderProjSponsorsEdit(sponsors,projId){
   if(!sponsors||sponsors.length===0)return`<div id="pm-sponsors-rows" data-proj-id="${projId||''}" style="margin-bottom:8px;"></div>`;
@@ -4812,7 +5262,7 @@ function readProjSponsorRows(){
 function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
   const newSponsors=readProjSponsorRows();
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',startDate:dpVal('pm-s'),endDate:dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -4960,66 +5410,95 @@ function taskModalHtml(data){
   }
   const activeProjs=S.projects.filter(p=>p.status==='active');
   const parentOpts=(defProj||task?.projectId)?S.tasks.filter(t=>t.projectId===(defProj||task?.projectId)&&!t.parentId&&t.id!==task?.id).map(t=>`<option value="${t.id}" ${defParent===t.id?'selected':''}>${t.name}</option>`).join(''):'';
-  const depOpts=S.tasks.filter(t=>t.id!==task?.id&&!t.parentId).map(t=>{const p=getProject(t.projectId);return`<option value="${t.id}" ${(task?.blockedBy||[]).includes(t.id)?'selected':''}>${p?p.name+' / ':''}${t.name}</option>`;}).join('');
   const recurOn=task?.recur?.enabled;
   const tName=defFromTmpl?defFromTmpl.name:'';
+  const defPrio=task?.priority||'Medium';
+  const defPhase=task?.phase||'';
+
+  // Priority pill colours
+  const prioColors={Critical:'var(--red)',High:'var(--yellow)',Medium:'var(--acc)',Low:'var(--muted)'};
 
   return`<div class="mo-box mo-wide">
 <div class="mo-hd"><span class="mo-title">${task?'Edit Task':isQuickSub?'Add Subtask':'New Task'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
-<div class="mo-body">
-  ${defFromTmpl?`<div class="info-box" style="margin-bottom:12px;width:100%;display:flex;align-items:center;gap:7px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> From template: <strong>${defFromTmpl.name}</strong></div>`:''}
-  <div class="field"><label class="flbl">Task name *</label><input class="inp" id="tm-name" value="${task?.name||tName||''}" placeholder="What needs to be done?"></div>
-  <div class="field"><label class="flbl">Description</label><textarea class="txta" id="tm-desc" style="min-height:50px;">${task?.description||''}</textarea></div>
-  <div class="inp-row">
-    <div class="field"><label class="flbl">Project</label><select class="sel" id="tm-proj" onchange="updParentOpts(this.value)">${activeProjs.map(p=>`<option value="${p.id}" ${(task?.projectId||defProj)===p.id?'selected':''}>${p.name}</option>`).join('')}<option value="" ${!defProj&&!task?.projectId?'selected':''}>— none —</option></select></div>
-    <div class="field"><label class="flbl">Priority</label><select class="sel" id="tm-prio">${PRIOS.map(pr=>`<option ${(task?.priority||'Medium')===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
-  </div>
-  <div class="field"><label class="flbl">Parent task</label><select class="sel" id="tm-parent"><option value="">— top-level task —</option>${parentOpts}</select></div>
+<div class="mo-body" style="display:flex;flex-direction:column;gap:13px;">
 
-  <!-- Advanced toggle -->
-  <div style="margin:10px 0 4px;">
-    <button type="button" onclick="const s=el('tm-advanced');const ico=el('tm-adv-ico');if(s){const open=s.style.display!=='none';s.style.display=open?'none':'block';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;">
-      <svg id="tm-adv-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
-      Advanced options
+  ${defFromTmpl?`<div class="info-box" style="display:flex;align-items:center;gap:7px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> From template: <strong>${defFromTmpl.name}</strong></div>`:''}
+
+  <!-- Name -->
+  <div><input class="inp" id="tm-name" value="${task?.name||tName||''}" placeholder="Task name…" style="font-size:.95rem;font-weight:600;"></div>
+
+  <!-- Project + Parent in a row -->
+  <div style="display:flex;gap:8px;flex-wrap:wrap;">
+    <div style="flex:1;min-width:120px;"><label class="flbl">Project</label><select class="sel" id="tm-proj" onchange="updParentOpts(this.value)" style="width:100%;">${activeProjs.map(p=>`<option value="${p.id}" ${(task?.projectId||defProj)===p.id?'selected':''}>${p.name}</option>`).join('')}<option value="" ${!defProj&&!task?.projectId?'selected':''}>— none —</option></select></div>
+    <div style="flex:1;min-width:120px;"><label class="flbl">Parent task</label><select class="sel" id="tm-parent" style="width:100%;"><option value="">— top-level —</option>${parentOpts}</select></div>
+  </div>
+
+  <!-- Priority pills -->
+  <div><label class="flbl">Priority</label>
+  <div class="pill-sel" id="tm-prio-pills">
+    ${PRIOS.map(pr=>`<span class="pill-opt${defPrio===pr?' active':''}" style="${defPrio===pr?'background:'+prioColors[pr]+';border-color:'+prioColors[pr]+';color:var(--black);':''}" onclick="tmPickPrio(this,'${pr}')" data-val="${pr}">${pr}</span>`).join('')}
+  </div>
+  <input type="hidden" id="tm-prio" value="${defPrio}"></div>
+
+  <!-- Phase pills -->
+  <div><label class="flbl">Phase</label>
+  <div class="pill-sel" id="tm-phase-pills">
+    <span class="pill-opt${!defPhase?' active':''}" onclick="tmPickPhase(this,'')" data-val="">None</span>
+    ${PHASES.map(ph=>`<span class="pill-opt${defPhase===ph?' active':''}" style="${defPhase===ph?'background:'+phaseColor(ph)+';border-color:'+phaseColor(ph)+';color:var(--black);':''}" onclick="tmPickPhase(this,'${ph}')" data-val="${ph}">${ph}</span>`).join('')}
+  </div>
+  <input type="hidden" id="tm-phase" value="${defPhase}"></div>
+
+  <!-- Assignees — avatar grid -->
+  ${S.members.length>0?`<div><label class="flbl">Assigned to</label>
+  <div class="av-toggle-grid" id="tm-av-grid">
+    ${S.members.map(m=>{const sel=defAssignees.includes(m.id);return`<div class="av-toggle${sel?' active':''}" onclick="tmToggleAv('${m.id}',this)" data-id="${m.id}">${avHtml(m.id,20)}<span>${m.name.split(' ')[0]}</span>${sel?'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>':''}</div>`;}).join('')}
+  </div></div>`:''}
+
+  <!-- Labels — pill grid -->
+  ${S.labels.length>0?`<div><label class="flbl">Labels</label>
+  <div class="pill-sel" id="tm-lb-pills">
+    ${S.labels.map(l=>{const sel=defLabels.includes(l.id);return`<span class="pill-opt${sel?' active':''}" style="${sel?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':'border-color:'+l.color+'44;color:'+l.color+'88;'}" onclick="tmToggleLbl('${l.id}',this)" data-id="${l.id}">${l.name}</span>`;}).join('')}
+  </div></div>`:''}
+
+  <!-- Date range — single calendar -->
+  <div><label class="flbl">Dates <span style="font-size:.62rem;color:var(--muted);font-weight:400;">— click start then end</span></label>
+  <div class="date-wrap" id="tm-range-wrap" style="position:relative;">
+    <div class="date-btn" id="tm-range-display" onclick="tmOpenRangeCal()" style="cursor:pointer;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+      <span id="tm-range-label" style="flex:1;">${task?.startDate||task?.endDate?`${task.startDate?fmtD(task.startDate):'—'} → ${task.endDate?fmtD(task.endDate):'—'}`:'<span style="color:var(--muted);">Set dates…</span>'}</span>
+      ${(task?.startDate||task?.endDate)?`<button class="date-clr" onclick="event.stopPropagation();tmClearRange()" title="Clear dates">×</button>`:''}
+    </div>
+    <div id="tm-range-cal-wrap"></div>
+  </div>
+  <input type="hidden" id="tm-s-v" value="${task?.startDate||''}">
+  <input type="hidden" id="tm-e-v" value="${task?.endDate||''}">
+  </div>
+
+  <!-- Description — collapsible -->
+  <div>
+    <button type="button" onclick="const b=el('tm-desc-body');const ico=el('tm-desc-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';ico.style.transform=open?'':'rotate(180deg)';if(!open)b.focus();}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;width:100%;">
+      <svg id="tm-desc-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${task?.description?'transform:rotate(180deg)':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      <span>Description${task?.description?` · <span style="color:var(--acc);font-size:.65rem;">has notes</span>`:''}</span>
     </button>
-  </div>
-  <div id="tm-advanced" style="display:${task?'block':'none'};">
-  <div class="field"><label class="flbl">Assigned to</label>
-  <div style="position:relative;">
-    <div class="sel-dropdown" id="tm-av-btn" onclick="toggleMs('tm-av')">
-      <div id="tm-av-tags" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;">${defAssignees.length?defAssignees.map(id=>{const m=getMember(id);return m?`<span class="ms-tag" data-id="${id}">${m.name}<span class="ms-rm" onclick="event.stopPropagation();rmMs('tm-av','${id}')">×</span></span>`:''}).join(''):`<span style="color:var(--muted);font-size:.82rem;">Select members…</span>`}</div>
-      <svg width="11" height="7" viewBox="0 0 11 7" fill="none" style="flex-shrink:0;margin-left:6px;"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    </div>
-    <div class="ms-dd" id="tm-av-dd" style="display:none;">${S.members.length?S.members.map(m=>`<div class="ms-opt${defAssignees.includes(m.id)?' sel':''}" data-id="${m.id}" onclick="toggleMsOpt('tm-av','${m.id}')">${avHtml(m.id,18)}${m.name}</div>`).join(''):`<div style="padding:10px;font-size:.78rem;color:var(--muted);">No members yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();openModal('member',null)">Add team →</span></div>`}</div>
-  </div></div>
-  <div class="field"><label class="flbl">Labels</label>
-  <div style="position:relative;">
-    <div class="sel-dropdown" id="tm-lb-btn" onclick="toggleMs('tm-lb')">
-      <div id="tm-lb-tags" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;">${defLabels.length?defLabels.map(id=>{const l=getLabel(id);return l?`<span class="ms-tag" data-id="${id}" style="background:${l.color}22;border-color:${l.color}44;color:${l.color};">${l.name}<span class="ms-rm" onclick="event.stopPropagation();rmMs('tm-lb','${id}')">×</span></span>`:''}).join(''):`<span style="color:var(--muted);font-size:.82rem;">Select labels…</span>`}</div>
-      <svg width="11" height="7" viewBox="0 0 11 7" fill="none" style="flex-shrink:0;margin-left:6px;"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    </div>
-    <div class="ms-dd" id="tm-lb-dd" style="display:none;">${S.labels.length?S.labels.map(l=>`<div class="ms-opt${defLabels.includes(l.id)?' sel':''}" data-id="${l.id}" onclick="toggleMsOpt('tm-lb','${l.id}')"><div style="width:9px;height:9px;border-radius:2px;background:${l.color};margin-right:2px;"></div>${l.name}</div>`).join(''):`<div style="padding:10px;font-size:.78rem;color:var(--muted);">No labels yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('settings')">Create →</span></div>`}</div>
-  </div></div>
-  <div class="inp-row">
-    <div class="field"><label class="flbl">Start</label><div class="date-wrap" id="tm-s-w">${dpHtml('tm-s',task?.startDate||'')}</div></div>
-    <div class="field"><label class="flbl">End</label><div class="date-wrap" id="tm-e-w">${dpHtml('tm-e',task?.endDate||'')}</div></div>
+    <textarea class="txta" id="tm-desc" id="tm-desc-body" style="display:${task?.description?'block':'none'};min-height:60px;margin-top:6px;">${task?.description||''}</textarea>
   </div>
 
-  <!-- RECURRENCE -->
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-top:2px;">
+  <!-- Recurrence -->
+  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;">
     <div style="display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Recurring task</span>
+      <span style="font-size:.78rem;font-weight:500;display:flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Recurring</span>
       <button class="toggle-sw${recurOn?' on':''}" id="recur-sw" onclick="this.classList.toggle('on');const _c=document.getElementById('recur-cfg');if(_c)_c.style.display=this.classList.contains('on')?'flex':'none';"></button>
     </div>
     <div id="recur-cfg" style="display:${recurOn?'flex':'none'};gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
-      <span style="font-size:.76rem;color:var(--text2);">Repeat every</span>
-      <input class="inp" type="number" id="recur-n" value="${task?.recur?.interval||1}" min="1" style="width:60px;">
-      <select class="sel" id="recur-type" style="width:110px;">${['daily','weekly','monthly','yearly'].map(t=>`<option ${(task?.recur?.type||'weekly')===t?'selected':''}>${t}</option>`).join('')}</select>
+      <span style="font-size:.76rem;color:var(--text2);">Every</span>
+      <input class="inp" type="number" id="recur-n" value="${task?.recur?.interval||1}" min="1" style="width:55px;">
+      <select class="sel" id="recur-type" style="width:105px;">${['daily','weekly','monthly','yearly'].map(t=>`<option ${(task?.recur?.type||'weekly')===t?'selected':''}>${t}</option>`).join('')}</select>
     </div>
   </div>
 
-  ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="margin-top:12px;background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${st.priority}</span>${st.name}${st.subtasks?.length?`<span style="color:var(--muted);font-size:.65rem;">(${st.subtasks.length} sub)</span>`:''}</div>`).join('')}</div>`:''}
-  </div><!-- /tm-advanced -->
+  ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${st.priority}</span>${st.name}</div>`).join('')}</div>`:''}
+
+</div><!-- /mo-body -->
 <div class="mo-ft">
   ${task?`<button class="btn btn-ghost btn-sm" onclick="saveAsTmpl('${task.id}')">Save as template</button>`:''}
   <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -5030,6 +5509,143 @@ function taskModalHtml(data){
 }
 
 function updParentOpts(projId){const sel=el('tm-parent');if(!sel)return;const tasks=S.tasks.filter(t=>t.projectId===projId&&!t.parentId);sel.innerHTML=`<option value="">— top-level task —</option>${tasks.map(t=>`<option value="${t.id}">${t.name}</option>`).join('')}`;}
+
+/* ── Task modal pill / avatar helpers ── */
+const _prioColors={Critical:'var(--red)',High:'var(--yellow)',Medium:'var(--acc)',Low:'var(--muted)'};
+function tmPickPrio(el,val){
+  document.querySelectorAll('#tm-prio-pills .pill-opt').forEach(p=>{
+    p.classList.remove('active');
+    p.style.background='';p.style.borderColor='';p.style.color='';
+  });
+  el.classList.add('active');
+  el.style.background=_prioColors[val]||'var(--acc)';
+  el.style.borderColor=_prioColors[val]||'var(--acc)';
+  el.style.color='var(--black)';
+  const inp=document.getElementById('tm-prio');if(inp)inp.value=val;
+}
+function tmPickPhase(el,val){
+  document.querySelectorAll('#tm-phase-pills .pill-opt').forEach(p=>{
+    p.classList.remove('active');p.style.background='';p.style.borderColor='';p.style.color='';
+  });
+  el.classList.add('active');
+  if(val){el.style.background=phaseColor(val);el.style.borderColor=phaseColor(val);el.style.color='var(--black)';}
+  const inp=document.getElementById('tm-phase');if(inp)inp.value=val;
+}
+function tmToggleAv(id,el){
+  el.classList.toggle('active');
+  // toggle checkmark
+  const existing=el.querySelector('svg.av-check');
+  if(el.classList.contains('active')&&!existing){
+    el.insertAdjacentHTML('beforeend','<svg class="av-check" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>');
+  } else if(!el.classList.contains('active')){
+    el.querySelector('svg.av-check')?.remove();
+  }
+}
+function tmToggleLbl(id,el){
+  el.classList.toggle('active');
+  const l=getLabel(id);if(!l)return;
+  if(el.classList.contains('active')){
+    el.style.background=l.color+'22';el.style.borderColor=l.color;el.style.color=l.color;
+  } else {
+    el.style.background='';el.style.borderColor=l.color+'44';el.style.color=l.color+'88';
+  }
+}
+
+/* ── Range date picker for task modal ── */
+let _rangeState={picking:'start'}; // 'start' or 'end'
+function tmOpenRangeCal(){
+  const wrap=el('tm-range-wrap');if(!wrap)return;
+  // If already open, close it
+  const existing=wrap.querySelector('.cal');
+  if(existing){existing.remove();return;}
+  // Close any other open cals
+  document.querySelectorAll('.cal').forEach(c=>c.remove());
+  const now=new Date();
+  if(!window._rangeCal)window._rangeCal={y:now.getFullYear(),m:now.getMonth()};
+  // If existing dates, open to start date month
+  const sv=el('tm-s-v')?.value;
+  if(sv){const d=new Date(sv);window._rangeCal={y:d.getFullYear(),m:d.getMonth()};}
+  const pop=document.createElement('div');
+  pop.className='cal';
+  pop.style.cssText='position:absolute;top:calc(100% + 4px);left:0;z-index:700;width:220px;';
+  pop.addEventListener('click',e=>e.stopPropagation());
+  pop.innerHTML=_buildRangeCal(window._rangeCal.y,window._rangeCal.m);
+  wrap.appendChild(pop);
+}
+function _buildRangeCal(y,m){
+  const mn=['January','February','March','April','May','June','July','August','September','October','November','December'][m];
+  const fd=new Date(y,m,1).getDay();
+  const dm=new Date(y,m+1,0).getDate();
+  const tod=toISO(new Date());
+  const sv=el('tm-s-v')?.value||'';
+  const ev=el('tm-e-v')?.value||'';
+  let cells=['M','T','W','T','F','S','S'].map(d=>`<div class="cal-dow">${d}</div>`).join('');
+  const off=(fd+6)%7;
+  for(let i=0;i<off;i++)cells+=`<div class="cal-d empty"></div>`;
+  for(let d=1;d<=dm;d++){
+    const ds=`${y}-${String(m+1).padStart(2,'0')}-${String(d).padStart(2,'0')}`;
+    let cls='cal-d';
+    if(ds===tod)cls+=' today';
+    if(sv&&ds===sv)cls+=' range-start';
+    else if(ev&&ds===ev)cls+=' range-end';
+    else if(sv&&ev&&ds>sv&&ds<ev)cls+=' in-range';
+    cells+=`<button class="${cls}" onclick="tmRangePickDay('${ds}')">${d}</button>`;
+  }
+  const pickLabel=_rangeState.picking==='start'?'picking start date':'picking end date';
+  return`<div class="cal-nav">
+    <button class="cal-nb" onclick="event.stopPropagation();window._rangeCal.m--;if(window._rangeCal.m<0){window._rangeCal.m=11;window._rangeCal.y--;}el('tm-range-wrap').querySelector('.cal').innerHTML=_buildRangeCal(window._rangeCal.y,window._rangeCal.m)">‹</button>
+    <span class="cal-mo">${mn} ${y}</span>
+    <button class="cal-nb" onclick="event.stopPropagation();window._rangeCal.m++;if(window._rangeCal.m>11){window._rangeCal.m=0;window._rangeCal.y++;}el('tm-range-wrap').querySelector('.cal').innerHTML=_buildRangeCal(window._rangeCal.y,window._rangeCal.m)">›</button>
+  </div>
+  <div class="cal-grid">${cells}</div>
+  <div class="cal-hint">${sv&&ev?`${fmtD(sv)} → ${fmtD(ev)}`:sv?`Start: ${fmtD(sv)} — now pick end`:pickLabel}</div>
+  <div class="cal-ft">
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();tmClearRange()">Clear</button>
+    <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();el('tm-range-wrap').querySelector('.cal')?.remove()">Done</button>
+  </div>`;
+}
+function tmRangePickDay(ds){
+  const sv=el('tm-s-v')?.value||'';
+  const ev=el('tm-e-v')?.value||'';
+  if(!sv||_rangeState.picking==='start'||(sv&&ev)){
+    // Set start, clear end, wait for end
+    if(el('tm-s-v'))el('tm-s-v').value=ds;
+    if(el('tm-e-v'))el('tm-e-v').value='';
+    _rangeState.picking='end';
+  } else {
+    // Set end — if before start, swap
+    if(ds<sv){
+      if(el('tm-e-v'))el('tm-e-v').value=sv;
+      if(el('tm-s-v'))el('tm-s-v').value=ds;
+    } else {
+      if(el('tm-e-v'))el('tm-e-v').value=ds;
+    }
+    _rangeState.picking='start';
+  }
+  // Update display
+  const newSv=el('tm-s-v')?.value||'';
+  const newEv=el('tm-e-v')?.value||'';
+  const lbl=el('tm-range-label');
+  if(lbl){
+    if(newSv||newEv){lbl.innerHTML=`${newSv?fmtD(newSv):'—'} → ${newEv?fmtD(newEv):'—'}`;}
+    else{lbl.innerHTML='<span style="color:var(--muted);">Set dates…</span>';}
+  }
+  // Refresh cal
+  const calEl=el('tm-range-wrap')?.querySelector('.cal');
+  if(calEl){
+    calEl.innerHTML=_buildRangeCal(window._rangeCal?.y||new Date().getFullYear(),window._rangeCal?.m??new Date().getMonth());
+  }
+}
+function tmClearRange(){
+  if(el('tm-s-v'))el('tm-s-v').value='';
+  if(el('tm-e-v'))el('tm-e-v').value='';
+  _rangeState.picking='start';
+  const lbl=el('tm-range-label');
+  if(lbl)lbl.innerHTML='<span style="color:var(--muted);">Set dates…</span>';
+  // Remove clear button from display
+  el('tm-range-display')?.querySelector('.date-clr')?.remove();
+  el('tm-range-wrap')?.querySelector('.cal')?.remove();
+}
 
 function getMsTags(field){return Array.from(el(`${field}-tags`)?.querySelectorAll('.ms-tag')||[]).map(t=>t.dataset.id);}
 /* Portal-style dropdown: moves ms-dd to body so modal overflow can't clip it */
@@ -5117,15 +5733,18 @@ document.addEventListener('click',e=>{if(!e.target.closest('.ms-wrap')&&!e.targe
 
 function saveTask(eid,defParent,tmplId){
   const name=el('tm-name')?.value.trim();if(!name){if(el('tm-name'))el('tm-name').style.borderColor='var(--red)';return;}
-  const assignees=getMsTags('tm-av');const labels=getMsTags('tm-lb');
+  // Collect assignees from avatar toggle grid
+  const assignees=Array.from(document.querySelectorAll('#tm-av-grid .av-toggle.active')).map(el=>el.dataset.id).filter(Boolean);
+  // Collect labels from pill grid
+  const labels=Array.from(document.querySelectorAll('#tm-lb-pills .pill-opt.active')).map(el=>el.dataset.id).filter(Boolean);
   const recurOn=el('recur-sw')?.classList.contains('on');
   const parentVal=el('tm-parent')?.value||defParent||null;
   const oldTask=eid?getTask(eid):null;
-  const task={id:eid||uid(),name,description:el('tm-desc')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:dpVal('tm-s'),endDate:dpVal('tm-e'),kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
+  const task={id:eid||uid(),name,description:el('tm-desc')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
   if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   if(eid){const i=S.tasks.findIndex(t=>t.id===eid);if(i>=0)S.tasks[i]=task;}else S.tasks.push(task);
-  // From template — create subtasks
-  if(!eid&&tmplId){const tmpl=S.taskTemplates.find(t=>t.id===tmplId);if(tmpl?.tasks){tmpl.tasks.forEach(st=>{const sub={id:uid(),name:st.name,description:'',projectId:task.projectId,parentId:task.id,priority:st.priority||'Medium',assignees:[],labels:[],blockedBy:[],startDate:'',endDate:'',kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}};S.tasks.push(sub);if(st.subtasks)st.subtasks.forEach(ss=>{S.tasks.push({...sub,id:uid(),name:ss.name,priority:ss.priority||'Medium',parentId:sub.id});});});}}
+  // From template — create subtasks, applying phase/assignees/labels
+  if(!eid&&tmplId){const tmpl=S.taskTemplates.find(t=>t.id===tmplId);if(tmpl?.tasks){tmpl.tasks.forEach(st=>{const sub={id:uid(),name:st.name,description:'',projectId:task.projectId,parentId:task.id,priority:st.priority||'Medium',phase:st.phase||'',assignees:st.assignees||[],labels:st.labels||[],blockedBy:[],startDate:'',endDate:'',kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}};S.tasks.push(sub);if(st.subtasks)st.subtasks.forEach(ss=>{S.tasks.push({...sub,id:uid(),name:ss.name,priority:ss.priority||'Medium',phase:ss.phase||'',assignees:ss.assignees||[],labels:ss.labels||[],parentId:sub.id});});});}}
   // Auto-sync kStatus for blocked state when dependencies change
   syncBlockedStatus(task.id);
   (task.blockedBy||[]).forEach(bid=>{
@@ -5136,26 +5755,48 @@ function saveTask(eid,defParent,tmplId){
 
 function saveAsTmpl(taskId){
   const t=getTask(taskId);if(!t)return;
-  const mc=el('mc');
-  mc.style.display='flex';
+  const generalTmpls=S.taskTemplates.filter(x=>!x._builtIn&&!x.sponsorType);
+  const mc=el('mc');mc.style.display='flex';
   mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
-  <div class="mo-box" style="max-width:380px;">
-    <div class="mo-hd"><span class="mo-title">Save task as template</span><button class="mo-close" onclick="closeModal()">×</button></div>
-    <div class="mo-body">
-      <div class="field"><label class="flbl">Template name</label><input class="inp" id="tt-quick-name" value="${t.name}" placeholder="Template name"></div>
+  <div class="mo-box" style="max-width:420px;">
+    <div class="mo-hd"><span class="mo-title">Save to template</span><button class="mo-close" onclick="closeModal()">×</button></div>
+    <div class="mo-body" style="display:flex;flex-direction:column;gap:12px;">
+      <div style="font-size:.82rem;color:var(--text2);">Add <strong style="color:var(--text);">${t.name}</strong> to:</div>
+      <!-- New template -->
+      <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;">
+        <div style="font-size:.75rem;font-weight:600;margin-bottom:8px;">Create new template</div>
+        <input class="inp" id="tt-quick-name" value="${t.name}" placeholder="Template name" style="margin-bottom:0;">
+      </div>
+      <button class="btn btn-acc" onclick="_confirmSaveTaskTmpl('${taskId}')">Create new template</button>
+      ${generalTmpls.length>0?`<div style="text-align:center;font-size:.72rem;color:var(--muted);">— or add to existing —</div>
+      <div style="display:flex;flex-direction:column;gap:6px;max-height:180px;overflow-y:auto;">
+        ${generalTmpls.map(tmpl=>`<button class="btn btn-ghost" style="justify-content:flex-start;gap:10px;" onclick="_addTaskToTmpl('${taskId}','${tmpl.id}')">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+          <span style="flex:1;text-align:left;">${tmpl.name}</span>
+          <span style="font-size:.65rem;color:var(--muted);">${tmpl.tasks?.length||0} tasks</span>
+        </button>`).join('')}
+      </div>`:''}
     </div>
-    <div class="mo-ft">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-acc" onclick="_confirmSaveTaskTmpl('${taskId}')">Save</button>
-    </div>
+    <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button></div>
   </div></div>`;
   setTimeout(()=>{const inp=el('tt-quick-name');if(inp){inp.focus();inp.select();}},60);
 }
 function _confirmSaveTaskTmpl(taskId){
   const name=el('tt-quick-name')?.value.trim();if(!name)return;
+  const t=getTask(taskId);if(!t)return;
   const ch=kids(taskId);
-  S.taskTemplates.push({id:uid(),name,description:'',tasks:ch.map(c=>({name:c.name,priority:c.priority,subtasks:[]}))});
-  save();closeModal();showToast('Task template saved');
+  const newTask={name:t.name,phase:t.phase||'',assignees:t.assignees||[],labels:t.labels||[],subtasks:ch.map(c=>({name:c.name,phase:c.phase||'',assignees:c.assignees||[],labels:c.labels||[]}))};
+  S.taskTemplates.push({id:uid(),name,description:'',tasks:[newTask]});
+  save();closeModal();showToast('Saved to new template: '+name);
+}
+function _addTaskToTmpl(taskId,tmplId){
+  const t=getTask(taskId);if(!t)return;
+  const tmpl=S.taskTemplates.find(x=>x.id===tmplId);if(!tmpl)return;
+  const ch=kids(taskId);
+  const newTask={name:t.name,phase:t.phase||'',assignees:t.assignees||[],labels:t.labels||[],subtasks:ch.map(c=>({name:c.name,phase:c.phase||'',assignees:c.assignees||[],labels:c.labels||[]}))};
+  if(!tmpl.tasks)tmpl.tasks=[];
+  tmpl.tasks.push(newTask);
+  save();closeModal();showToast('Added to template: '+tmpl.name);
 }
 
 /* DEPENDENCY MODAL */
@@ -5555,10 +6196,11 @@ function quickLinkModalHtml(){return`<div class="mo-box" style="max-width:370px;
 <div class="mo-body">
   <div class="field"><label class="flbl">Display Name *</label><input class="inp" id="ql-nm" placeholder="Slack, Figma, Notion…"></div>
   <div class="field"><label class="flbl">URL *</label><input class="inp" id="ql-ur" type="url" placeholder="https://..."></div>
+  <div class="field"><label class="flbl">Category</label><input class="inp" id="ql-cat" placeholder="e.g. Design, Admin, Comms (optional)"></div>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveQL()">Add link</button></div>
 </div>`;}
-function saveQL(){const name=el('ql-nm')?.value.trim();const url=el('ql-ur')?.value.trim();if(!name||!url)return;S.quickLinks.push({id:uid(),name,url});save();closeModal();render();}
+function saveQL(){const name=el('ql-nm')?.value.trim();const url=el('ql-ur')?.value.trim();if(!name||!url)return;S.quickLinks.push({id:uid(),name,url,category:el('ql-cat')?.value.trim()||''});save();closeModal();render();}
 function deleteQL(id){S.quickLinks=S.quickLinks.filter(q=>q.id!==id);save();render();}
 
 /* PROJECT QUICK LINK MODAL */
@@ -5570,82 +6212,185 @@ function projQuickLinkModalHtml(projId){
   <p style="font-size:.78rem;color:var(--text2);margin-bottom:13px;">Adding link to: <strong style="color:var(--white);">${p.name}</strong></p>
   <div class="field"><label class="flbl">Display Name *</label><input class="inp" id="pql-nm" placeholder="Google Drive, Figma, Docs…"></div>
   <div class="field"><label class="flbl">URL *</label><input class="inp" id="pql-ur" type="url" placeholder="https://..."></div>
+  <div class="field"><label class="flbl">Category</label><input class="inp" id="pql-cat" placeholder="e.g. Design, Admin, Comms (optional)"></div>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProjQL('${projId}')">Add link</button></div>
 </div>`;}
-function saveProjQL(projId){const p=getProject(projId);if(!p)return;const name=el('pql-nm')?.value.trim();const url=el('pql-ur')?.value.trim();if(!name||!url)return;if(!p.quickLinks)p.quickLinks=[];p.quickLinks.push({id:uid(),name,url});save();closeModal();render();}
+function saveProjQL(projId){const p=getProject(projId);if(!p)return;const name=el('pql-nm')?.value.trim();const url=el('pql-ur')?.value.trim();if(!name||!url)return;if(!p.quickLinks)p.quickLinks=[];p.quickLinks.push({id:uid(),name,url,category:el('pql-cat')?.value.trim()||''});save();closeModal();render();}
 function deleteProjQL(projId,qlId){const p=getProject(projId);if(!p)return;p.quickLinks=(p.quickLinks||[]).filter(q=>q.id!==qlId);save();render();}
 
 /* TASK TEMPLATE MODAL */
+let _ttBuf=[];
+let _ttEditing=-1; // index of task being inline-edited (-1 = none)
+
 function taskTmplModalHtml(id){
   const tmpl=id?S.taskTemplates.find(t=>t.id===id):null;
-  // Always load existing tasks into _ttBuf so they are reorderable
   if(tmpl&&_ttBuf.length===0)_ttBuf=[...(tmpl.tasks||[]).map(t=>({...t,subtasks:[...(t.subtasks||[])]}))];
+  _ttEditing=-1;
   return`<div class="mo-box mo-wide">
 <div class="mo-hd"><span class="mo-title">${tmpl?'Edit Template':'New Template'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
-<div class="mo-body">
-  <div class="field"><label class="flbl">Name *</label><input class="inp" id="tt-name" value="${tmpl?.name||''}" placeholder="e.g. Design Sprint"></div>
-  <div class="field"><label class="flbl">Description</label><input class="inp" id="tt-desc" value="${tmpl?.description||''}" placeholder="What is this template for?"></div>
-  <div class="field"><label class="flbl">Sponsorship Type (optional — links this template to auto-task generation)</label>
-    <select class="sel" id="tt-sp-type">
-      <option value="">— General template —</option>
-      ${Object.entries(SP_TYPES).map(([k,v])=>`<option value="${k}" ${tmpl?.sponsorType===k?'selected':''}>${v.label} Sponsorship</option>`).join('')}
-    </select>
+<div class="mo-body" style="display:flex;flex-direction:column;gap:13px;">
+  <div><input class="inp" id="tt-name" value="${tmpl?.name||''}" placeholder="Template name…" style="font-size:.95rem;font-weight:600;"></div>
+  <div>
+    <button type="button" onclick="const b=el('tt-desc-body');const ico=el('tt-desc-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;width:100%;">
+      <svg id="tt-desc-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${tmpl?.description?'transform:rotate(180deg)':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      <span>Description${tmpl?.description?` · <span style="color:var(--acc);font-size:.65rem;">has notes</span>`:''}</span>
+    </button>
+    <input class="inp" id="tt-desc" id="tt-desc-body" value="${tmpl?.description||''}" placeholder="What is this template for?" style="display:${tmpl?.description?'block':'none'};margin-top:6px;">
   </div>
-  <div style="border-top:1px solid var(--border);padding-top:12px;margin-top:4px;">
+  <div><label class="flbl">Sponsorship Type <span style="font-weight:300;color:var(--muted);">(optional)</span></label>
+    <div class="pill-sel" id="tt-sp-pills">
+      <span class="pill-opt${!tmpl?.sponsorType?' active':''}" onclick="ttPickSponsorType(this,'')" data-val="">General</span>
+      ${Object.entries(SP_TYPES).map(([k,v])=>`<span class="pill-opt${tmpl?.sponsorType===k?' active':''}" style="${tmpl?.sponsorType===k?'background:'+v.color+'22;border-color:'+v.color+';color:'+v.color+';':''}" onclick="ttPickSponsorType(this,'${k}')" data-val="${k}">${v.label}</span>`).join('')}
+    </div>
+    <input type="hidden" id="tt-sp-type" value="${tmpl?.sponsorType||''}">
+  </div>
+  <hr class="div" style="margin:0;">
+  <div>
     <div style="font-size:.72rem;font-weight:700;color:var(--text2);margin-bottom:9px;text-transform:uppercase;letter-spacing:.06em;">Tasks in template</div>
     <div id="tt-task-list"></div>
-    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px;margin-top:8px;">
-      <div style="font-size:.72rem;font-weight:600;margin-bottom:8px;">Add task</div>
-      <div class="inp-row">
-        <input class="inp" id="tt-t-name" placeholder="Task name">
-        <select class="sel" id="tt-t-prio">${PRIOS.map(p=>`<option>${p}</option>`).join('')}</select>
+    <!-- Add task form -->
+    <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-top:8px;" id="tt-add-form">
+      <div style="font-size:.72rem;font-weight:600;margin-bottom:9px;">Add task</div>
+      <input class="inp" id="tt-t-name" placeholder="Task name…" style="margin-bottom:9px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addTmplT();}">
+      ${S.members.length>0?`<div style="margin-bottom:9px;"><label class="flbl">Assignees</label><div class="av-toggle-grid" id="tt-t-av">${S.members.map(m=>`<div class="av-toggle" onclick="this.classList.toggle('active')" data-id="${m.id}">${avHtml(m.id,18)}<span>${m.name.split(' ')[0]}</span></div>`).join('')}</div></div>`:''}
+      ${S.labels.length>0?`<div style="margin-bottom:9px;"><label class="flbl">Labels</label><div class="pill-sel" id="tt-t-lb">${S.labels.map(l=>`<span class="pill-opt" style="border-color:${l.color}44;color:${l.color}88;" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
+      <div style="margin-bottom:9px;"><label class="flbl">Phase</label>
+        <div class="pill-sel" id="tt-t-phase-pills">
+          <span class="pill-opt active" onclick="ttPickAddPhase(this,'')" data-val="">None</span>
+          ${PHASES.map(ph=>`<span class="pill-opt" style="" onclick="ttPickAddPhase(this,'${ph}')" data-val="${ph}">${ph}</span>`).join('')}
+        </div>
+        <input type="hidden" id="tt-t-phase" value="">
       </div>
-      <button class="btn btn-ghost btn-sm" onclick="addTmplT()" style="margin-top:7px;">+ Add task</button>
+      <button class="btn btn-acc btn-sm" onclick="addTmplT()" style="width:100%;">+ Add task</button>
     </div>
   </div>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveTmpl('${tmpl?.id||''}')">
 ${tmpl?'Save':'Create template'}</button></div></div>`;}
 
-let _ttBuf=[];
-function addTmplT(){const n=el('tt-t-name')?.value.trim();if(!n)return;const p=el('tt-t-prio')?.value||'Medium';_ttBuf.push({name:n,priority:p,subtasks:[]});renderTtBuf();const inp=el('tt-t-name');if(inp){inp.value='';inp.focus();}}
-function rmTmplT(i){_ttBuf.splice(i,1);renderTtBuf();}
-function moveTmplT(i,dir){const j=i+dir;if(j<0||j>=_ttBuf.length)return;[_ttBuf[i],_ttBuf[j]]=[_ttBuf[j],_ttBuf[i]];renderTtBuf();}
-function addTmplSub(ti,name,prio){if(!name?.trim())return;if(!_ttBuf[ti].subtasks)_ttBuf[ti].subtasks=[];_ttBuf[ti].subtasks.push({name:name.trim(),priority:prio||'Medium'});renderTtBuf();}
-function commitTmplSub(ti){const n=el('tt-sub-name-'+ti)?.value.trim();const p=el('tt-sub-prio-'+ti)?.value||'Medium';if(!n)return;addTmplSub(ti,n,p);}
+function ttPickSponsorType(el,val){
+  document.querySelectorAll('#tt-sp-pills .pill-opt').forEach(p=>{p.classList.remove('active');p.style.background='';p.style.borderColor='';p.style.color='';});
+  el.classList.add('active');
+  if(val){const col=SP_TYPES[val]?.color||'var(--acc)';el.style.background=col+'22';el.style.borderColor=col;el.style.color=col;}
+  const inp=document.getElementById('tt-sp-type');if(inp)inp.value=val;
+}
+function ttPickAddPhase(el,val){
+  document.querySelectorAll('#tt-t-phase-pills .pill-opt').forEach(p=>{p.classList.remove('active');p.style.background='';p.style.borderColor='';p.style.color='';});
+  el.classList.add('active');
+  if(val){el.style.background=phaseBg(val);el.style.borderColor=phaseColor(val);el.style.color=phaseColor(val);}
+  const inp=document.getElementById('tt-t-phase');if(inp)inp.value=val;
+}
+
+function addTmplT(){
+  const n=el('tt-t-name')?.value.trim();if(!n)return;
+  const phase=el('tt-t-phase')?.value||'';
+  const assignees=Array.from(document.querySelectorAll('#tt-t-av .av-toggle.active')).map(x=>x.dataset.id).filter(Boolean);
+  const labels=Array.from(document.querySelectorAll('#tt-t-lb .pill-opt.active')).map(x=>x.dataset.id).filter(Boolean);
+  _ttBuf.push({name:n,phase,assignees,labels,subtasks:[]});
+  renderTtBuf();
+  // Reset add form
+  const inp=el('tt-t-name');if(inp){inp.value='';inp.focus();}
+  document.querySelectorAll('#tt-t-av .av-toggle').forEach(x=>x.classList.remove('active'));
+  document.querySelectorAll('#tt-t-lb .pill-opt').forEach(x=>{x.classList.remove('active');x.style.background='';});
+  ttPickAddPhase(document.querySelector('#tt-t-phase-pills .pill-opt[data-val=""]'),'');
+}
+function rmTmplT(i){if(_ttEditing===i)_ttEditing=-1;_ttBuf.splice(i,1);renderTtBuf();}
+function moveTmplT(i,dir){const j=i+dir;if(j<0||j>=_ttBuf.length)return;[_ttBuf[i],_ttBuf[j]]=[_ttBuf[j],_ttBuf[i]];if(_ttEditing===i)_ttEditing=j;else if(_ttEditing===j)_ttEditing=i;renderTtBuf();}
+function addTmplSub(ti,name){if(!name?.trim())return;if(!_ttBuf[ti].subtasks)_ttBuf[ti].subtasks=[];_ttBuf[ti].subtasks.push({name:name.trim(),assignees:[],labels:[],phase:''});renderTtBuf();}
+function commitTmplSub(ti){const n=el('tt-sub-name-'+ti)?.value.trim();if(!n)return;addTmplSub(ti,n);}
 function rmTmplSub(ti,si){_ttBuf[ti].subtasks?.splice(si,1);renderTtBuf();}
+
+function editTmplT(i){
+  // Save any existing edit first
+  if(_ttEditing>=0&&_ttEditing!==i)saveTmplTEdit(_ttEditing);
+  _ttEditing=(_ttEditing===i)?-1:i;
+  renderTtBuf();
+  if(_ttEditing===i)setTimeout(()=>el('tt-edit-name-'+i)?.focus(),30);
+}
+function saveTmplTEdit(i){
+  const t=_ttBuf[i];if(!t)return;
+  const name=el('tt-edit-name-'+i)?.value.trim();
+  if(name)t.name=name;
+  t.phase=el('tt-edit-phase-'+i)?.value||'';
+  t.assignees=Array.from(document.querySelectorAll('#tt-edit-av-'+i+' .av-toggle.active')).map(x=>x.dataset.id).filter(Boolean);
+  t.labels=Array.from(document.querySelectorAll('#tt-edit-lb-'+i+' .pill-opt.active')).map(x=>x.dataset.id).filter(Boolean);
+  _ttEditing=-1;
+  renderTtBuf();
+}
+
 function renderTtBuf(){
   const l=el('tt-task-list');if(!l)return;
   if(_ttBuf.length===0){l.innerHTML=`<div style="color:var(--muted);font-size:.75rem;padding:8px 0;">No tasks yet. Add one below.</div>`;return;}
-  l.innerHTML=_ttBuf.map((t,i)=>`<div style="background:var(--surface2);border-radius:7px;padding:9px 11px;margin-bottom:6px;border:1px solid var(--border);">
-<div style="display:flex;align-items:center;gap:6px;margin-bottom:7px;">
+  l.innerHTML=_ttBuf.map((t,i)=>{
+    const isEditing=_ttEditing===i;
+    const chips=[
+      t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;background:${phaseBg(t.phase)};color:${phaseColor(t.phase)};font-weight:700;">${t.phase}</span>`:'',
+      ...(t.assignees||[]).map(id=>{const m=getMember(id);return m?`${avHtml(id,16)}`:'';}).filter(Boolean),
+      ...(t.labels||[]).map(id=>{const lb=getLabel(id);return lb?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;background:${lb.color}22;color:${lb.color};border:1px solid ${lb.color}44;">${lb.name}</span>`:'';}).filter(Boolean),
+    ].filter(Boolean).join('');
+
+    if(isEditing){
+      return`<div style="background:var(--surface2);border:1.5px solid var(--acc);border-radius:9px;padding:12px;margin-bottom:6px;">
+        <div style="font-size:.7rem;font-weight:600;color:var(--acc);margin-bottom:8px;">Editing task</div>
+        <input class="inp" id="tt-edit-name-${i}" value="${t.name}" placeholder="Task name…" style="margin-bottom:9px;">
+        ${S.members.length>0?`<div style="margin-bottom:9px;"><label class="flbl">Assignees</label><div class="av-toggle-grid" id="tt-edit-av-${i}">${S.members.map(m=>`<div class="av-toggle${(t.assignees||[]).includes(m.id)?' active':''}" onclick="this.classList.toggle('active')" data-id="${m.id}">${avHtml(m.id,18)}<span>${m.name.split(' ')[0]}</span></div>`).join('')}</div></div>`:''}
+        ${S.labels.length>0?`<div style="margin-bottom:9px;"><label class="flbl">Labels</label><div class="pill-sel" id="tt-edit-lb-${i}">${S.labels.map(lb=>{const sel=(t.labels||[]).includes(lb.id);return`<span class="pill-opt${sel?' active':''}" style="border-color:${lb.color}${sel?'':44};color:${lb.color}${sel?'':'88'};${sel?'background:'+lb.color+'22;':''}" onclick="this.classList.toggle('active');const on=this.classList.contains('active');this.style.background=on?'${lb.color}22':'';this.style.borderColor=on?'${lb.color}':'${lb.color}44';this.style.color=on?'${lb.color}':'${lb.color}88';" data-id="${lb.id}">${lb.name}</span>`;}).join('')}</div></div>`:''}
+        <div style="margin-bottom:10px;"><label class="flbl">Phase</label>
+          <div class="pill-sel">
+            ${['','...PHASES'].join('')}
+            <span class="pill-opt${!t.phase?' active':''}" style="${!t.phase?'background:var(--surface3);border-color:var(--border2);':''}" onclick="ttEditPickPhase(${i},this,'')" data-val="">None</span>
+            ${PHASES.map(ph=>{const sel=t.phase===ph;return`<span class="pill-opt${sel?' active':''}" style="${sel?'background:'+phaseBg(ph)+';border-color:'+phaseColor(ph)+';color:'+phaseColor(ph)+';':''}" onclick="ttEditPickPhase(${i},this,'${ph}')" data-val="${ph}">${ph}</span>`;}).join('')}
+          </div>
+          <input type="hidden" id="tt-edit-phase-${i}" value="${t.phase||''}">
+        </div>
+        <div style="display:flex;gap:6px;justify-content:flex-end;">
+          <button class="btn btn-ghost btn-sm" onclick="_ttEditing=-1;renderTtBuf()">Cancel</button>
+          <button class="btn btn-acc btn-sm" onclick="saveTmplTEdit(${i})">Save</button>
+        </div>
+      </div>`;
+    }
+
+    return`<div style="background:var(--surface2);border-radius:7px;padding:9px 11px;margin-bottom:6px;border:1px solid var(--border);">
+<div style="display:flex;align-items:center;gap:6px;">
   <div style="display:flex;flex-direction:column;gap:1px;flex-shrink:0;">
-    <button class="reorder-arrow" style="padding:1px 5px;font-size:9px;" onclick="moveTmplT(${i},-1)" ${i===0?'disabled':''} title="Move up">▲</button>
-    <button class="reorder-arrow" style="padding:1px 5px;font-size:9px;" onclick="moveTmplT(${i},1)" ${i===_ttBuf.length-1?'disabled':''} title="Move down">▼</button>
+    <button class="reorder-arrow" style="padding:1px 5px;font-size:9px;" onclick="moveTmplT(${i},-1)" ${i===0?'disabled':''}>▲</button>
+    <button class="reorder-arrow" style="padding:1px 5px;font-size:9px;" onclick="moveTmplT(${i},1)" ${i===_ttBuf.length-1?'disabled':''}>▼</button>
   </div>
-  <span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${t.priority||'Medium'}</span>
   <span style="flex:1;font-size:.82rem;font-weight:500;">${t.name}</span>
-  <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:2px 5px;border-radius:4px;transition:color .14s;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'" onclick="rmTmplT(${i})">×</button>
+  ${chips?`<div style="display:flex;align-items:center;gap:4px;flex-wrap:wrap;">${chips}</div>`:''}
+  <button style="background:none;border:none;cursor:pointer;color:var(--muted);padding:2px 5px;border-radius:4px;font-size:.7rem;" onclick="editTmplT(${i})" title="Edit">✎</button>
+  <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:2px 5px;border-radius:4px;" onmouseover="this.style.color='var(--red)'" onmouseout="this.style.color='var(--muted)'" onclick="rmTmplT(${i})">×</button>
 </div>
-${t.subtasks?.length?`<div style="padding-left:18px;margin-bottom:7px;">${t.subtasks.map((s,si)=>`<div style="display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.74rem;color:var(--text2);">· <span class="badge bd-${(s.priority||'Medium').toLowerCase()}">${s.priority}</span>${s.name}<button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;margin-left:auto;" onclick="rmTmplSub(${i},${si})">×</button></div>`).join('')}</div>`:''}
-<div style="display:flex;gap:6px;align-items:center;margin-top:4px;padding-left:18px;">
-  <input class="inp" id="tt-sub-name-${i}" placeholder="Subtask name…" style="flex:1;padding:5px 8px;font-size:.74rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();commitTmplSub(${i});}">
-  <select class="sel" id="tt-sub-prio-${i}" style="width:90px;padding:5px 22px 5px 7px;font-size:.72rem;">${['High','Medium','Low'].map(p=>`<option>${p}</option>`).join('')}</select>
+${t.subtasks?.length?`<div style="padding-left:28px;margin-top:6px;">${t.subtasks.map((s,si)=>{
+  const sv=(s.assignees||[]).map(id=>avHtml(id,14)).join('');
+  return`<div style="display:flex;align-items:center;gap:5px;padding:2px 0;font-size:.74rem;color:var(--text2);">· <span style="flex:1;">${s.name}</span>${sv}<button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;" onclick="rmTmplSub(${i},${si})">×</button></div>`;
+}).join('')}</div>`:''}
+<div style="display:flex;gap:6px;align-items:center;margin-top:7px;padding-left:28px;">
+  <input class="inp" id="tt-sub-name-${i}" placeholder="Add subtask…" style="flex:1;padding:5px 8px;font-size:.74rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();commitTmplSub(${i});}">
   <button class="btn btn-ghost btn-xs" onclick="commitTmplSub(${i})">+ Sub</button>
 </div>
-</div>`).join('');}
+</div>`;
+  }).join('');}
+
+function ttEditPickPhase(i,el,val){
+  const container=el.closest('.pill-sel');
+  if(container)container.querySelectorAll('.pill-opt').forEach(p=>{p.classList.remove('active');p.style.background='';p.style.borderColor='';p.style.color='';});
+  el.classList.add('active');
+  if(val){el.style.background=phaseBg(val);el.style.borderColor=phaseColor(val);el.style.color=phaseColor(val);}
+  else{el.style.background='var(--surface3)';el.style.borderColor='var(--border2)';}
+  const inp=document.getElementById('tt-edit-phase-'+i);if(inp)inp.value=val;
+}
 
 function saveTmpl(eid){
   const name=el('tt-name')?.value.trim();if(!name)return;
   const sponsorType=el('tt-sp-type')?.value||null;
   const existing=eid?S.taskTemplates.find(t=>t.id===eid):null;
   const tmpl={
-    id:eid||uid(),
-    name,
+    id:eid||uid(),name,
     description:el('tt-desc')?.value.trim()||'',
     sponsorType:sponsorType||null,
-    _builtIn:existing?._builtIn||false, // preserve built-in flag
+    _builtIn:existing?._builtIn||false,
     tasks:[..._ttBuf]
   };
   if(eid){const i=S.taskTemplates.findIndex(t=>t.id===eid);if(i>=0)S.taskTemplates[i]=tmpl;}
@@ -5671,27 +6416,38 @@ function ensureBuiltInSponsorTemplates(){
 }
 
 /* PROJECT EXPENSE MODAL */
-function projExpModalHtml(projId){const p=getProject(projId);if(!p)return'';
-return`<div class="mo-box" style="max-width:420px;">
-<div class="mo-hd"><span class="mo-title">+ Project Expense</span><button class="mo-close" onclick="closeModal()">×</button></div>
+function projExpModalHtml(projId,expId){
+  const p=getProject(projId);if(!p)return'';
+  const exp=expId?(p.expenses||[]).find(e=>e.id===expId):null;
+  return`<div class="mo-box" style="max-width:420px;">
+<div class="mo-hd"><span class="mo-title">${exp?'Edit Expense':'+ Project Expense'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
 <div class="mo-body">
-  <p style="font-size:.78rem;color:var(--text2);margin-bottom:13px;">Adding expense to: <strong style="color:var(--white);">${p.name}</strong></p>
-  <div class="field"><label class="flbl">Expense name *</label><input class="inp" id="pe-name" placeholder="e.g. Logo design"></div>
+  <p style="font-size:.78rem;color:var(--text2);margin-bottom:13px;">${exp?'Editing expense in':'Adding expense to'}: <strong style="color:var(--white);">${p.name}</strong></p>
+  <div class="field"><label class="flbl">Expense name *</label><input class="inp" id="pe-name" placeholder="e.g. Logo design" value="${exp?exp.name:''}"></div>
   <div class="inp-row">
-    <div class="field"><label class="flbl">Amount (£) *</label><input class="inp" type="number" id="pe-amount" min="0" step="0.01" placeholder="0.00"></div>
-    <div class="field"><label class="flbl">Date</label><input class="inp" type="date" id="pe-date" value="${toISO(new Date())}"></div>
+    <div class="field"><label class="flbl">Amount (£) *</label><input class="inp" type="number" id="pe-amount" min="0" step="0.01" placeholder="0.00" value="${exp?exp.amount:''}"></div>
+    <div class="field"><label class="flbl">Date</label><input class="inp" type="date" id="pe-date" value="${exp?exp.date:toISO(new Date())}"></div>
   </div>
-  <div class="field"><label class="flbl">Category</label><select class="sel" id="pe-cat">${FIN_CAT_NAMES.map(c=>`<option>${c}</option>`).join('')}</select></div>
-  <div class="field"><label class="flbl">Note</label><input class="inp" id="pe-note" placeholder="Optional note"></div>
+  <div class="field"><label class="flbl">Category</label><select class="sel" id="pe-cat">${FIN_CAT_NAMES.map(c=>`<option${(exp?exp.category:'')=== c?' selected':''}>${c}</option>`).join('')}</select></div>
+  <div class="field"><label class="flbl">Note</label><input class="inp" id="pe-note" placeholder="Optional note" value="${exp?exp.note||'':''}"></div>
 </div>
-<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProjExp('${projId}')">Add expense</button></div>
+<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProjExp('${projId}','${expId||''}')">${exp?'Save changes':'Add expense'}</button></div>
 </div>`;}
-function saveProjExp(projId){
+function editProjExp(projId,expId){
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${projExpModalHtml(projId,expId)}</div>`;
+}
+function saveProjExp(projId,expId){
   const p=getProject(projId);if(!p)return;
   const name=el('pe-name')?.value.trim();const amt=parseFloat(el('pe-amount')?.value||0);
   if(!name||!amt){alert('Name and amount required.');return;}
   if(!p.expenses)p.expenses=[];
-  p.expenses.push({id:uid(),name,amount:amt,date:el('pe-date')?.value||toISO(new Date()),category:el('pe-cat')?.value||'Projects',note:el('pe-note')?.value.trim()||''});
+  if(expId){
+    const idx=p.expenses.findIndex(e=>e.id===expId);
+    if(idx>=0)p.expenses[idx]={...p.expenses[idx],name,amount:amt,date:el('pe-date')?.value||toISO(new Date()),category:el('pe-cat')?.value||'Projects',note:el('pe-note')?.value.trim()||''};
+  } else {
+    p.expenses.push({id:uid(),name,amount:amt,date:el('pe-date')?.value||toISO(new Date()),category:el('pe-cat')?.value||'Projects',note:el('pe-note')?.value.trim()||''});
+  }
   save();closeModal();render();
 }
 function deleteProjExp(projId,expId){const p=getProject(projId);if(!p)return;p.expenses=(p.expenses||[]).filter(e=>e.id!==expId);save();render();}
@@ -5908,17 +6664,6 @@ function completeProject(id,e){
   p.status='completed';
   save();render();
 }
-function reactivateProject(id){
-  const p=getProject(id);if(!p)return;
-  p.status='active';
-  save();render();
-}
-function reactivateProject(id){
-  const p=getProject(id);if(!p)return;
-  p.status='active';
-  save();render();
-}
-function addProjectTool(projId){_openToolModal(projId,null);}
 function editProjectTool(projId,toolId){_openToolModal(projId,toolId);}
 
 function _openToolModal(projId,toolId){
@@ -6497,6 +7242,8 @@ function importData(input){
         (p.sponsors||[]).forEach(sp=>{
           if(sp.invoiceSent===undefined)sp.invoiceSent=false;
           if(sp.invoicePaid===undefined)sp.invoicePaid=false;
+          if(sp.logisticsAgreed===undefined)sp.logisticsAgreed=false;
+          if(sp.fulfilled===undefined)sp.fulfilled=false;
           if(sp.category===undefined)sp.category="";
           if(!sp.products)sp.products=[];
           (sp.products||[]).forEach(prod=>{
@@ -6556,6 +7303,8 @@ function importData(input){
         (p.sponsors||[]).forEach(sp=>{
           if(sp.invoiceSent===undefined)sp.invoiceSent=false;
           if(sp.invoicePaid===undefined)sp.invoicePaid=false;
+          if(sp.logisticsAgreed===undefined)sp.logisticsAgreed=false;
+          if(sp.fulfilled===undefined)sp.fulfilled=false;
           if(sp.category===undefined)sp.category="";
           (sp.products||[]).forEach(prod=>{
             if(prod.delivered===undefined)prod.delivered=false;
@@ -6655,12 +7404,23 @@ function initPWA(){
 }
 
 if(!window._spExpanded)window._spExpanded={};
+if(!window._ovExpanded)window._ovExpanded={};
 
 function toggleSponsorsExpanded(projId){
   window._spExpanded[projId]=(window._spExpanded[projId]===false)?true:false;
   const body=el(`sp-body-${projId}`);
   const ico=el(`sp-toggle-ico-${projId}`);
   const open=window._spExpanded[projId]!==false;
+  if(body)body.style.display=open?'block':'none';
+  if(ico)ico.style.transform=open?'rotate(0deg)':'rotate(-90deg)';
+}
+
+function toggleOverviewExpanded(projId){
+  if(!window._ovExpanded)window._ovExpanded={};
+  window._ovExpanded[projId]=(window._ovExpanded[projId]===false)?true:false;
+  const body=el(`ov-body-${projId}`);
+  const ico=el(`ov-toggle-ico-${projId}`);
+  const open=window._ovExpanded[projId]!==false;
   if(body)body.style.display=open?'block':'none';
   if(ico)ico.style.transform=open?'rotate(0deg)':'rotate(-90deg)';
 }
@@ -7063,7 +7823,8 @@ const SP_TYPES={
   'cash':      {label:'Cash',       color:'#1fba7a', icon:'<path d="M12 1v22M17 5H9.5a3.5 3.5 0 000 7h5a3.5 3.5 0 010 7H6"/>'},
   'product':   {label:'Product/Prize', color:'#f59e0b', icon:'<path d="M21 16V8a2 2 0 00-1-1.73l-7-4a2 2 0 00-2 0l-7 4A2 2 0 003 8v8a2 2 0 001 1.73l7 4a2 2 0 002 0l7-4A2 2 0 0021 16z"/>'},
   'both':      {label:'Cash + Product', color:'#3d82f0', icon:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="16"/><line x1="8" y1="12" x2="16" y2="12"/>'},
-  'partnership':{label:'Partnership', color:'#a78bfa', icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'}
+  'partnership':{label:'Partnership', color:'#a78bfa', icon:'<path d="M17 21v-2a4 4 0 00-4-4H5a4 4 0 00-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 00-3-3.87"/><path d="M16 3.13a4 4 0 010 7.75"/>'},
+  'venue':     {label:'Venue',       color:'#f97316', icon:'<path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/>'}
 };
 
 /* Default task subtasks to auto-generate per sponsorship type */
@@ -8202,8 +8963,14 @@ function _setFavicon(dataUrl){
 <div class="bulk-bar" id="bulk-bar">
   <span class="bulk-count" id="bulk-count">0</span>
   <span style="font-size:.74rem;color:var(--muted);">selected</span>
-  <button class="bulk-btn" onclick="bulkMarkDone(true)">✓ Mark done</button>
-  <button class="bulk-btn" onclick="bulkMarkDone(false)">↩ Mark undone</button>
+  <button class="bulk-btn" onclick="bulkMarkDone(true)">✓ Done</button>
+  <button class="bulk-btn" onclick="bulkMarkDone(false)">↩ Undone</button>
+  <div style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
+  <button class="bulk-btn" onclick="bulkSetPhasePrompt()">⚑ Phase</button>
+  <button class="bulk-btn" onclick="bulkAssignPrompt()">👤 Assign</button>
+  <button class="bulk-btn" onclick="bulkLabelPrompt()">🏷 Label</button>
+  <button class="bulk-btn" onclick="bulkMovePrompt()">→ Move</button>
+  <div style="width:1px;height:18px;background:var(--border);flex-shrink:0;"></div>
   <button class="bulk-btn danger" onclick="bulkDelete()">🗑 Delete</button>
   <button class="bulk-btn clear" onclick="clearBulk()" title="Clear selection">✕</button>
 </div>
