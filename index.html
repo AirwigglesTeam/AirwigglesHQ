@@ -11,6 +11,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -1149,9 +1150,25 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
     </div>
     <div class="pw-h" id="pw-brand-name">airwiggles</div>
     <div class="pw-sub">ProjectFlow — Team workspace</div>
-    <input class="pw-inp" type="password" id="pw-inp" placeholder="Enter team password" autocomplete="current-password">
-    <button class="pw-btn" onclick="checkPw()">Unlock workspace →</button>
-    <div class="pw-err" id="pw-err">Incorrect password.</div>
+
+    <!-- Sign in panel -->
+    <div id="auth-signin-panel">
+      <input class="pw-inp" type="email" id="auth-email" placeholder="Email address" autocomplete="email" style="margin-bottom:8px;">
+      <input class="pw-inp" type="password" id="auth-password" placeholder="Password" autocomplete="current-password" style="margin-bottom:10px;">
+      <button class="pw-btn" id="auth-signin-btn" onclick="authSignIn()">Sign in →</button>
+      <div class="pw-err" id="auth-error"></div>
+      <button onclick="showForgotPanel()" style="background:none;border:none;color:var(--muted);font-size:.72rem;cursor:pointer;margin-top:12px;text-decoration:underline;">Forgot password?</button>
+    </div>
+
+    <!-- Forgot password panel -->
+    <div id="auth-forgot-panel" style="display:none;">
+      <div style="font-size:.8rem;color:var(--text2);margin-bottom:14px;">Enter your email and we'll send a reset link.</div>
+      <input class="pw-inp" type="email" id="auth-reset-email" placeholder="Email address" autocomplete="email" style="margin-bottom:10px;">
+      <button class="pw-btn" onclick="authResetPassword()">Send reset link</button>
+      <div class="pw-err" id="auth-reset-error"></div>
+      <div id="auth-reset-success" style="display:none;color:var(--green);font-size:.72rem;margin-top:8px;">Check your email for a reset link.</div>
+      <button onclick="showSignInPanel()" style="background:none;border:none;color:var(--muted);font-size:.72rem;cursor:pointer;margin-top:12px;text-decoration:underline;">Back to sign in</button>
+    </div>
   </div>
 </div>
 
@@ -1198,6 +1215,9 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
   <div class="sync-strip" id="sync-indicator" title="Sync status">
     <span style="color:var(--muted);font-size:.65rem;font-family:'DM Mono',monospace;">Connecting…</span>
   </div>
+  <div id="rail-user" style="padding:5px 0;display:flex;align-items:center;justify-content:center;flex-shrink:0;" title="Signed in user">
+    <div style="width:26px;height:26px;border-radius:50%;background:var(--acc);display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:var(--black);" id="rail-user-avatar">?</div>
+  </div>
   <div class="rail-foot" onclick="handleLogout()" data-tip="Sign out">
     <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M9 21H5a2 2 0 01-2-2V5a2 2 0 012-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
   </div>
@@ -1242,33 +1262,45 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 
 <script>
 /* ════ CONSTANTS ════ */
-const PASS='AirwigglesSecurity';
-
-/* ════════════════════════════════════════════════════════
-   SUPABASE CONFIGURATION
-   These are your project credentials — safe to be in the
-   client for a read/write anon key setup with RLS.
-════════════════════════════════════════════════════════ */
+/* ════ SUPABASE AUTH + CONFIG ════ */
 const SB_URL='https://ozsoadqugrrqufuhlyaz.supabase.co';
 const SB_KEY='sb_publishable_xP5lkE6IzTPjDym__9zmFg_PQBFusKo';
-const SB_WORKSPACE='airwiggles'; // unique workspace ID — change if you run multiple instances
+const SB_WORKSPACE='airwiggles';
+
+// Initialise the Supabase JS client — handles Auth session management
+const _sb=supabase.createClient(SB_URL,SB_KEY);
+
+// Get the current user's JWT for authenticated requests
+async function _getAuthHeader(){
+  const {data:{session}}=await _sb.auth.getSession();
+  if(!session)return null;
+  return{'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'};
+}
 
 /* ── Supabase REST helpers ── */
 async function sbGet(){
   try{
-    const r=await fetch(`${SB_URL}/rest/v1/projectflow_state?workspace=eq.${SB_WORKSPACE}&select=*`,{
-      headers:{'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,'Content-Type':'application/json'}
-    });
-    if(r.status===404||r.status===400){
-      // Table doesn't exist yet — show setup instructions
-      console.error('ProjectFlow: Supabase table missing. Run the setup SQL in your Supabase dashboard.');
-      _showSetupBanner();
-      return null;
-    }
+    const headers=await _getAuthHeader();
+    if(!headers)return null;
+    const r=await fetch(SB_URL+'/rest/v1/projectflow_state?workspace=eq.'+SB_WORKSPACE+'&select=*',{headers});
+    if(r.status===404||r.status===400){console.error('ProjectFlow: Supabase table missing.');_showSetupBanner();return null;}
     if(!r.ok)return null;
     const rows=await r.json();
     return rows.length>0?rows[0]:null;
   }catch(e){console.warn('Supabase load error:',e);return null;}
+}
+
+async function sbUpsert(data,updatedAt){
+  try{
+    const headers=await _getAuthHeader();
+    if(!headers)return false;
+    const r=await fetch(SB_URL+'/rest/v1/projectflow_state',{
+      method:'POST',
+      headers:Object.assign({},headers,{'Prefer':'resolution=merge-duplicates'}),
+      body:JSON.stringify({workspace:SB_WORKSPACE,data,updated_at:updatedAt})
+    });
+    return r.ok;
+  }catch(e){console.warn('Supabase save error:',e);return false;}
 }
 
 function _showSetupBanner(){
@@ -1288,16 +1320,21 @@ function _showSetupBanner(){
   m.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:560px;width:100%;">
     <div style="font-size:1rem;font-weight:700;margin-bottom:12px;">Supabase Setup — Run this SQL once</div>
     <div style="font-size:.72rem;color:var(--text2);margin-bottom:12px;">Go to your Supabase project → SQL Editor → New query → paste and run:</div>
-    <pre id="setup-sql-text" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:.72rem;font-family:'DM Mono',monospace;overflow-x:auto;white-space:pre;color:var(--acc);">CREATE TABLE IF NOT EXISTS projectflow_state (
+    <pre id="setup-sql-text" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:.72rem;font-family:'DM Mono',monospace;overflow-x:auto;white-space:pre;color:var(--acc);">-- 1. Create the table
+CREATE TABLE IF NOT EXISTS projectflow_state (
   workspace TEXT PRIMARY KEY,
   data TEXT NOT NULL,
   updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
--- Allow anonymous read/write (secured by your app password)
+-- 2. Enable Row Level Security
 ALTER TABLE projectflow_state ENABLE ROW LEVEL SECURITY;
-CREATE POLICY "allow_all" ON projectflow_state
-  FOR ALL USING (true) WITH CHECK (true);</pre>
+
+-- 3. Only authenticated users can read/write
+CREATE POLICY "auth_users_only" ON projectflow_state
+  FOR ALL
+  USING (auth.role() = 'authenticated')
+  WITH CHECK (auth.role() = 'authenticated');</pre>
     <div style="display:flex;gap:8px;margin-top:14px;">
       <button onclick="navigator.clipboard.writeText(document.getElementById('setup-sql-text').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy SQL',1500);" style="background:var(--acc);color:var(--black);border:none;border-radius:7px;padding:8px 16px;font-size:.78rem;font-weight:700;cursor:pointer;">Copy SQL</button>
       <button onclick="document.getElementById('setup-sql-modal').style.display='none';" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px 16px;font-size:.78rem;cursor:pointer;">Close</button>
@@ -1305,21 +1342,6 @@ CREATE POLICY "allow_all" ON projectflow_state
   </div>`;
   document.body.appendChild(m);
   m.addEventListener('click',e=>{if(e.target===m)m.style.display='none';});
-}
-
-async function sbUpsert(data,updatedAt){
-  try{
-    const r=await fetch(`${SB_URL}/rest/v1/projectflow_state`,{
-      method:'POST',
-      headers:{
-        'apikey':SB_KEY,'Authorization':`Bearer ${SB_KEY}`,
-        'Content-Type':'application/json',
-        'Prefer':'resolution=merge-duplicates'
-      },
-      body:JSON.stringify({workspace:SB_WORKSPACE,data,updated_at:updatedAt})
-    });
-    return r.ok;
-  }catch(e){console.warn('Supabase save error:',e);return false;}
 }
 
 /* ── Sync state ── */
@@ -2078,9 +2100,135 @@ function corpTax(p){
 }
 
 /* ════ AUTH ════ */
-function checkPw(){const v=el('pw-inp').value;if(v===PASS){sessionStorage.setItem('pfa','1');el('pw-screen').style.display='none';el('app').style.display='flex';init();}else{el('pw-err').style.display='block';el('pw-inp').style.borderColor='var(--red)';setTimeout(()=>{if(el('pw-inp'))el('pw-inp').style.borderColor='';},1400);}}
-function handleLogout(){sessionStorage.removeItem('pfa');location.reload();}
-el('pw-inp').addEventListener('keydown',e=>{if(e.key==='Enter')checkPw();});
+function showSignInPanel(){
+  el('auth-signin-panel').style.display='';
+  el('auth-forgot-panel').style.display='none';
+  el('auth-error').style.display='none';
+  setTimeout(()=>el('auth-email')?.focus(),30);
+}
+function showForgotPanel(){
+  el('auth-signin-panel').style.display='none';
+  el('auth-forgot-panel').style.display='';
+  setTimeout(()=>el('auth-reset-email')?.focus(),30);
+}
+
+async function authSignIn(){
+  const btn=el('auth-signin-btn');
+  const email=(el('auth-email')?.value||'').trim();
+  const password=el('auth-password')?.value||'';
+  const errEl=el('auth-error');
+  if(!email||!password){errEl.textContent='Please enter your email and password.';errEl.style.display='block';return;}
+  btn.textContent='Signing in…';btn.disabled=true;
+  try{
+    const {error}=await _sb.auth.signInWithPassword({email,password});
+    btn.textContent='Sign in →';btn.disabled=false;
+    if(error){errEl.textContent=error.message||'Sign in failed.';errEl.style.display='block';el('auth-password').value='';return;}
+    errEl.style.display='none';
+    // onAuthStateChange will fire and call _onSignedIn
+  }catch(e){
+    btn.textContent='Sign in →';btn.disabled=false;
+    if(window.location.protocol==='file:'){
+      errEl.textContent='Cannot sign in from a local file. Please host this file on a web server first.';
+    } else {
+      errEl.textContent='Network error — check your internet connection and try again.';
+    }
+    errEl.style.display='block';
+    console.error('Sign in error:',e);
+  }
+}
+
+async function authResetPassword(){
+  const email=(el('auth-reset-email')?.value||'').trim();
+  const errEl=el('auth-reset-error');
+  if(!email){errEl.textContent='Please enter your email address.';errEl.style.display='block';return;}
+  const {error}=await _sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});
+  if(error){errEl.textContent=error.message||'Failed to send reset email.';errEl.style.display='block';return;}
+  errEl.style.display='none';
+  el('auth-reset-success').style.display='block';
+}
+
+async function handleLogout(){
+  await _sb.auth.signOut();
+  // onAuthStateChange fires SIGNED_OUT → reloads
+}
+
+function _onSignedIn(user){
+  el('pw-screen').style.display='none';
+  el('app').style.display='flex';
+  // Show user initials in rail
+  const avatar=el('rail-user-avatar');
+  if(avatar){
+    const initials=(user.email||'?').substring(0,2).toUpperCase();
+    avatar.textContent=initials;
+    avatar.title=user.email;
+    const railUser=el('rail-user');
+    if(railUser)railUser.setAttribute('data-tip',user.email);
+  }
+  init();
+}
+
+// Listen for auth state changes — handles sign in, sign out, token refresh
+_sb.auth.onAuthStateChange((event,session)=>{
+  if(event==='SIGNED_IN'||event==='INITIAL_SESSION'){
+    if(session?.user&&el('pw-screen').style.display!=='none'){
+      _onSignedIn(session.user);
+    } else if(session?.user){
+      // Token refreshed silently — update avatar if needed
+      const avatar=el('rail-user-avatar');
+      if(avatar){avatar.textContent=(session.user.email||'?').substring(0,2).toUpperCase();avatar.title=session.user.email;}
+    }
+  } else if(event==='SIGNED_OUT'){
+    el('app').style.display='none';
+    el('pw-screen').style.display='flex';
+    showSignInPanel();
+  } else if(event==='PASSWORD_RECOVERY'){
+    // User clicked a reset link — show a password update form
+    el('pw-screen').style.display='flex';
+    el('auth-signin-panel').innerHTML='<div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">Enter your new password:</div><input class="pw-inp" type="password" id="auth-new-pw" placeholder="New password" style="margin-bottom:10px;"><button class="pw-btn" onclick="authUpdatePassword()">Set new password</button><div class="pw-err" id="auth-new-pw-err"></div>';
+    el('auth-forgot-panel').style.display='none';
+  }
+});
+
+async function authUpdatePassword(){
+  const pw=el('auth-new-pw')?.value||'';
+  const errEl=el('auth-new-pw-err');
+  if(pw.length<8){errEl.textContent='Password must be at least 8 characters.';errEl.style.display='block';return;}
+  const {error}=await _sb.auth.updateUser({password:pw});
+  if(error){errEl.textContent=error.message||'Update failed.';errEl.style.display='block';return;}
+  // Signed in automatically after password update
+}
+
+// Keyboard shortcut — Enter on password field submits
+document.addEventListener('keydown',function(e){
+  if(e.key==='Enter'&&el('pw-screen').style.display!=='none'){
+    if(document.activeElement===el('auth-email')){el('auth-password')?.focus();}
+    else if(document.activeElement===el('auth-password')){authSignIn();}
+    else if(document.activeElement===el('auth-reset-email')){authResetPassword();}
+  }
+});
+
+// On page load — check for existing session
+(async function(){
+  try{
+    const {data:{session},error}=await _sb.auth.getSession();
+    if(error)throw error;
+    if(session?.user){
+      _onSignedIn(session.user);
+    } else {
+      el('pw-screen').style.display='flex';
+      showSignInPanel();
+    }
+  }catch(e){
+    console.warn('Auth session check failed:',e);
+    el('pw-screen').style.display='flex';
+    showSignInPanel();
+    // Show a helpful message if running from file://
+    if(window.location.protocol==='file:'){
+      const sub=el('pw-screen').querySelector('.pw-sub');
+      if(sub)sub.innerHTML='⚠️ Open this file from a web server, not directly from your Downloads folder.<br><span style="font-size:.68rem;color:var(--muted);">Try: drag it into VS Code and use Live Server, or upload it to your hosting.</span>';
+    }
+  }
+})();
 
 /* ════ TOOLTIP ════ */
 const TT=el('tooltip');
@@ -5442,11 +5590,7 @@ function addFinOO(){S.finance.oneoff.push({id:'o'+uid(),name:'New expense',to:''
 function renderSettings(){
   const nv=S.settings.navVisible||{};
   const _devTodayStr=new Date().toLocaleDateString('en-GB');
-  const _devTodos=S.settings.devTodos||(()=>{
-    const defaults=[{id:'dt1',text:'🔐 Implement proper authentication — replace the hardcoded JS password with Supabase Auth. Each team member should have their own email+password login. This properly secures both the app and the database, and lets you revoke access if someone leaves. Ask Claude to "implement Supabase Auth for ProjectFlow" to continue.',done:false,date:_devTodayStr}];
-    if(!S.settings.devTodos){S.settings.devTodos=defaults;}
-    return defaults;
-  })();
+  const _devTodos=S.settings.devTodos||[];
   return`<div class="fu"><div class="page-hd"><div class="page-title">Settings</div></div>
 
 <div class="settings-sec">
@@ -9972,12 +10116,6 @@ async function init(){
   updateFavicon();
   startPolling();
   _setSyncStatus('synced','Connected');
-}
-
-if(sessionStorage.getItem('pfa')){
-  el('pw-screen').style.display='none';
-  el('app').style.display='flex';
-  init();
 }
 
 /* ════ FAVICON ════ */
