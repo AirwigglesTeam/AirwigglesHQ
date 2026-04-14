@@ -1330,7 +1330,10 @@ CREATE TABLE IF NOT EXISTS projectflow_state (
 -- 2. Enable Row Level Security
 ALTER TABLE projectflow_state ENABLE ROW LEVEL SECURITY;
 
--- 3. Only authenticated users can read/write
+-- 3. Drop any old open-access policy (safe to run even if it doesn't exist)
+DROP POLICY IF EXISTS "allow_all" ON projectflow_state;
+
+-- 4. Only authenticated users can read/write
 CREATE POLICY "auth_users_only" ON projectflow_state
   FOR ALL
   USING (auth.role() = 'authenticated')
@@ -2780,6 +2783,19 @@ function _posCoworkTip(e,tip){
 }
 function hideCoworkTip(){const tip=el('cowork-tooltip');if(tip)tip.classList.remove('visible');}
 
+function showPhaseTip(e,phase,status,daysLine,dateRange){
+  const tip=el('cowork-tooltip');if(!tip)return;
+  const col=phaseColor(phase);
+  let html='<div class="cwtt-title" style="color:'+col+';">'+phase+'</div>';
+  html+='<div class="cwtt-row"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>'+status+'</div>';
+  html+='<div class="cwtt-row" style="font-family:\'DM Mono\',monospace;font-weight:700;color:'+col+';">'+daysLine+'</div>';
+  html+='<div class="cwtt-row" style="color:var(--muted);font-size:.65rem;">'+dateRange+'</div>';
+  tip.innerHTML=html;
+  tip.classList.add('visible');
+  _posCoworkTip(e,tip);
+}
+function hidePhaseTip(){const tip=el('cowork-tooltip');if(tip)tip.classList.remove('visible');}
+
 function initCoworkTooltips(){
   const tt=el('tooltip');
   document.querySelectorAll('[data-cowork-tip]').forEach(pin=>{
@@ -3278,30 +3294,28 @@ function renderDetail(id){
   return`<div class="fu">
 <div style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" onclick="S.detailId=null;render();">← Back</button></div>
 <div style="margin-bottom:20px;">
-  <!-- Title row: dot + name + badge + action buttons all in one flex row -->
-  <div style="display:flex;align-items:flex-start;gap:10px;margin-bottom:8px;flex-wrap:nowrap;">
-    <div style="display:flex;align-items:center;gap:8px;flex:1;min-width:0;">
-      <div style="width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0;margin-top:4px;"></div>
-      <div style="flex:1;min-width:0;">
-        <h1 class="detail-title" style="margin:0 0 4px 0;">${p.name}</h1>
-        <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${p.priority||'Medium'}</span>
-      </div>
-    </div>
-    <!-- Action buttons: always top-right, never wrap off screen -->
-    <div style="display:flex;gap:5px;flex-shrink:0;align-items:center;flex-wrap:wrap;justify-content:flex-end;">
-      ${p.status==='completed'?
-        `<button class="btn btn-ghost btn-sm" onclick="reactivateProject('${p.id}')" title="Reactivate">↩</button>`
-      :
-        `<button class="proj-complete-btn${comp===100?' ready':''}" onclick="completeProject('${p.id}',event)" title="${comp===100?'Mark complete':'Complete all tasks first'}" style="width:32px;height:32px;">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-        </button>`
-      }
-      <button class="btn btn-ghost btn-sm" onclick="toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Unpin':'Pin to sidebar'}" style="padding:0 7px;">
-        <svg width="13" height="13" viewBox="0 0 24 24" fill="${isBookmarked(p.id)?'var(--acc)':'none'}" stroke="${isBookmarked(p.id)?'var(--acc)':'currentColor'}" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-      </button>
-      <button class="btn btn-ghost btn-sm" onclick="openModal('project','${p.id}')">Edit</button>
-      <button class="btn btn-ghost btn-sm" onclick="saveProjectAsTemplate('${p.id}')" title="Save this event as a reusable template">Save as template</button>
-      <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">Delete</button>
+  <!-- Action buttons row — sits above title, wraps naturally on mobile -->
+  <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+    ${p.status==='completed'?
+      `<button class="btn btn-ghost btn-sm" onclick="reactivateProject('${p.id}')" title="Reactivate">↩ Reactivate</button>`
+    :
+      `<button class="proj-complete-btn${comp===100?' ready':''}" onclick="completeProject('${p.id}',event)" title="${comp===100?'Mark complete':'Complete all tasks first'}" style="width:32px;height:32px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>`
+    }
+    <button class="btn btn-ghost btn-sm" onclick="toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Unpin':'Pin to sidebar'}" style="padding:0 7px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="${isBookmarked(p.id)?'var(--acc)':'none'}" stroke="${isBookmarked(p.id)?'var(--acc)':'currentColor'}" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="openModal('project','${p.id}')">Edit</button>
+    <button class="btn btn-ghost btn-sm" onclick="saveProjectAsTemplate('${p.id}')" title="Save this event as a reusable template">Save as template</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">Delete</button>
+  </div>
+  <!-- Title row: dot + name + badge -->
+  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;min-width:0;">
+    <div style="width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
+    <div style="flex:1;min-width:0;">
+      <h1 class="detail-title" style="margin:0 0 4px 0;">${p.name}</h1>
+      <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${p.priority||'Medium'}</span>
     </div>
   </div>
   <!-- Description -->
@@ -3835,11 +3849,37 @@ function renderGantt(projects,fullPage=false){
     const bHtml=bp?`<div class="gbar" style="left:${bp.l}px;width:${bp.w}px;background:${p.color}22;border:1px solid ${p.color}55;" onclick="openDetail('${p.id}')"><div class="gbar-fill" style="width:${comp}%;background:${p.color};"></div><div class="gbar-txt">${p.name} · ${comp}%</div></div>`:'';
     // Phase segments rendered as a separate row below the project bar
     const phaseBars=getPhaseBars(p);
+    const today=new Date();today.setHours(0,0,0,0);
     const phaseHtml=phaseBars.length>0?phaseBars.map(seg=>{
       const col=phaseColor(seg.phase);
       const bg=phaseBg(seg.phase);
-      const label=seg.w>40?`<span style="font-size:.55rem;font-weight:700;color:${col};white-space:nowrap;overflow:hidden;padding:0 4px;line-height:1;">${seg.phase}</span>`:'';
-      return`<div style="position:absolute;left:${seg.l}px;width:${seg.w}px;height:14px;background:${bg};border:1px solid ${col}44;border-radius:3px;display:flex;align-items:center;overflow:hidden;" title="${seg.phase}">${label}</div>`;
+      const label=seg.w>40?'<span style="font-size:.55rem;font-weight:700;color:'+col+';white-space:nowrap;overflow:hidden;padding:0 4px;line-height:1;">'+seg.phase+'</span>':'';
+      // Compute days remaining / elapsed for this phase
+      const end=new Date(seg.endDate);end.setHours(0,0,0,0);
+      const start=new Date(seg.startDate);start.setHours(0,0,0,0);
+      const daysToEnd=Math.round((end-today)/86400000);
+      const daysFromStart=Math.round((today-start)/86400000);
+      let statusLine='';
+      let daysLine='';
+      if(today<start){
+        const daysUntil=Math.round((start-today)/86400000);
+        statusLine='Upcoming';
+        daysLine='Starts in '+daysUntil+' day'+(daysUntil!==1?'s':'');
+      } else if(today>=end){
+        const daysAgo=Math.round((today-end)/86400000);
+        statusLine='Completed';
+        daysLine='Ended '+(daysAgo===0?'today':daysAgo+' day'+(daysAgo!==1?'s':'')+' ago');
+      } else {
+        statusLine='In progress';
+        daysLine=Math.max(0,daysToEnd)+' day'+(daysToEnd!==1?'s':'')+' remaining';
+      }
+      const dateRange=fmtD(seg.startDate)+' – '+fmtD(seg.endDate);
+      // Escape for inline event handler attributes
+      const safeTip=seg.phase.replace(/'/g,"\\'");
+      const safeStatus=statusLine.replace(/'/g,"\\'");
+      const safeDays=daysLine.replace(/'/g,"\\'");
+      const safeRange=dateRange.replace(/'/g,"\\'");
+      return'<div style="position:absolute;left:'+seg.l+'px;width:'+seg.w+'px;height:14px;background:'+bg+';border:1px solid '+col+'44;border-radius:3px;display:flex;align-items:center;overflow:hidden;cursor:default;" onmouseenter="showPhaseTip(event,\''+safeTip+'\',\''+safeStatus+'\',\''+safeDays+'\',\''+safeRange+'\')" onmouseleave="hidePhaseTip()">'+label+'</div>';
     }).join(''):'';
     const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);
     rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')"><button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button><div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${p.name}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
@@ -3858,7 +3898,7 @@ function barP(s,e){
 }
 
 function getPhaseBars(p){
-  // Returns array of {phase, l, w} for rendering on the Gantt
+  // Returns array of {phase, l, w, startDate, endDate} for rendering on the Gantt
   if(!p.startDate||!p.endDate)return[];
   const defs=S.settings.phaseDefaults||{planning:2,prelaunch:6,postEvent:2};
   const pw=p.phaseWeeks||{};
@@ -3869,30 +3909,27 @@ function getPhaseBars(p){
   const liveStart=new Date(p.startDate);
   const liveEnd=new Date(p.endDate);
 
-  // Pre-launch start: liveStart - prelaunch weeks
   const preLaunchStart=new Date(liveStart);preLaunchStart.setDate(preLaunchStart.getDate()-preWks*7);
-  // Planning start: preLaunch start - planning weeks
   const planningStart=new Date(preLaunchStart);planningStart.setDate(planningStart.getDate()-planWks*7);
-  // Post-event end: liveEnd + postEvent weeks
   const postEnd=new Date(liveEnd);postEnd.setDate(postEnd.getDate()+postWks*7);
 
   function iso(d){return d.toISOString().slice(0,10);}
   const segments=[];
   if(planWks>0){
     const b=barP(iso(planningStart),iso(preLaunchStart));
-    if(b)segments.push({phase:'Planning',l:b.l,w:b.w});
+    if(b)segments.push({phase:'Planning',l:b.l,w:b.w,startDate:iso(planningStart),endDate:iso(preLaunchStart)});
   }
   if(preWks>0){
     const b=barP(iso(preLaunchStart),iso(liveStart));
-    if(b)segments.push({phase:'Pre-launch',l:b.l,w:b.w});
+    if(b)segments.push({phase:'Pre-launch',l:b.l,w:b.w,startDate:iso(preLaunchStart),endDate:iso(liveStart)});
   }
   {
     const b=barP(p.startDate,p.endDate);
-    if(b)segments.push({phase:'Live',l:b.l,w:b.w});
+    if(b)segments.push({phase:'Live',l:b.l,w:b.w,startDate:p.startDate,endDate:p.endDate});
   }
   if(postWks>0){
     const b=barP(iso(liveEnd),iso(postEnd));
-    if(b)segments.push({phase:'Post-event',l:b.l,w:b.w});
+    if(b)segments.push({phase:'Post-event',l:b.l,w:b.w,startDate:iso(liveEnd),endDate:iso(postEnd)});
   }
   return segments;
 }
