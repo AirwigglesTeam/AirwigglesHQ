@@ -7219,6 +7219,19 @@ function sponsorEditModalHtml(s,activeTab){
 
   ${tab==='products'?`
   <div style="font-size:.75rem;color:var(--text2);margin-bottom:12px;">Catalogue all products this sponsor makes. This helps with prize selection and integration ideas.</div>
+
+  <!-- HTML shop import -->
+  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:9px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;margin-bottom:12px;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+    <span style="font-size:.75rem;font-weight:600;flex:1;">Import from shop page</span>
+    <span id="sp-html-import-status" style="font-size:.68rem;color:var(--muted);"></span>
+    <label style="display:inline-flex;align-items:center;gap:5px;padding:5px 11px;background:var(--surface);border:1.5px solid var(--border);border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .15s;white-space:nowrap;" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'">
+      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+      Choose HTML file
+      <input type="file" accept=".html,.htm" style="display:none;" onchange="importProductsFromHtml(this)">
+    </label>
+  </div>
+
   <div id="sp-products-list">${renderProductsEdit(s?.products||[])}</div>
   <button class="add-row-btn" onclick="addProductRow()">+ Add product</button>
   `:''}
