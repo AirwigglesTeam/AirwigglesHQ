@@ -34,7 +34,7 @@ button,input,select,textarea,a{font-family:'Lexend',sans-serif;}
 #pw-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;}
 .pw-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:44px 36px;width:100%;max-width:360px;text-align:center;}
 .pw-logo-wrap{width:52px;height:52px;background:var(--acc);border-radius:14px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;margin:0 auto 26px;box-shadow:0 0 28px rgba(98,208,170,.3);}
-.pw-logo-wrap img,.pw-logo-wrap svg{transform:rotate(-45deg);width:28px;height:28px;object-fit:contain;}
+.pw-logo-wrap:not(.custom-logo) img,.pw-logo-wrap svg{transform:rotate(-45deg);width:28px;height:28px;object-fit:contain;}
 .pw-h{font-size:1.3rem;font-weight:800;letter-spacing:-.03em;margin-bottom:4px;}
 .pw-sub{font-size:.75rem;color:var(--muted);margin-bottom:26px;}
 .pw-inp{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:11px 14px;color:var(--text);font-size:.9rem;outline:none;margin-bottom:10px;transition:border-color .15s;}
@@ -9300,6 +9300,75 @@ function applyNavVis(){
     if(row)row.style.display=vis?'':'none';
     else item.style.display=vis?'':'none';
   });
+}
+
+/* ════ APPLY BRANDING ════ */
+function applyBranding(){
+  const name   = S.settings?.brandName  || 'airwiggles — ProjectFlow';
+  const logo   = S.settings?.logoUrl    || null;
+  const accent = S.settings?.accentColor|| '#62D0AA';
+
+  /* ── Accent colour ── */
+  document.documentElement.style.setProperty('--acc', accent);
+
+  /* ── Brand name ── */
+  const panelBrand = document.getElementById('panel-brand-name');
+  if(panelBrand) panelBrand.textContent = name;
+
+  /* ── Rail logo (top-left diamond) ── */
+  const railInner = document.getElementById('rail-logo-inner');
+  if(railInner){
+    if(logo){
+      // Logo fills the diamond — no background, no counter-rotation
+      railInner.innerHTML = `<img src="${logo}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;display:block;" alt="">`;
+      railInner.style.background = 'transparent';
+      railInner.style.transform  = 'rotate(45deg)';
+      railInner.style.boxShadow  = '0 0 14px rgba(0,0,0,.3)';
+      railInner.style.overflow   = 'hidden';
+    } else {
+      railInner.style.background = 'var(--acc)';
+      railInner.style.transform  = 'rotate(45deg)';
+      railInner.style.boxShadow  = '0 0 14px rgba(98,208,170,.22)';
+      railInner.innerHTML = `<svg width="18" height="10" viewBox="0 0 22 12" fill="none"><path d="M1 6 Q5 1 8 6 Q11 11 14 6 Q17 1 21 6" stroke="#141414" stroke-width="2.3" stroke-linecap="round" fill="none"/></svg>`;
+    }
+  }
+
+  /* ── Panel logo (sidebar header) ── */
+  const panelLogo = document.getElementById('panel-logo');
+  if(panelLogo){
+    if(logo){
+      panelLogo.innerHTML = `<img src="${logo}" style="width:20px;height:20px;object-fit:contain;border-radius:4px;" alt="">`;
+      panelLogo.style.background = 'transparent';
+    } else {
+      panelLogo.style.background = 'var(--acc)';
+      panelLogo.innerHTML = `<svg width="14" height="8" viewBox="0 0 22 12" fill="none"><path d="M1 6 Q5 1 8 6 Q11 11 14 6 Q17 1 21 6" stroke="#141414" stroke-width="2.3" stroke-linecap="round" fill="none"/></svg>`;
+    }
+  }
+
+  /* ── Password screen logo ── */
+  const pwLogo = document.getElementById('pw-logo');
+  if(pwLogo){
+    if(logo){
+      // Add custom-logo class: scopes out the CSS counter-rotation rule entirely
+      // so the img simply rotates with the container → diamond shape
+      pwLogo.classList.add('custom-logo');
+      pwLogo.style.background = 'transparent';
+      pwLogo.style.overflow   = 'hidden';
+      pwLogo.style.padding    = '0';
+      // Use 52×52 explicit size matching the container, no transform needed
+      pwLogo.innerHTML = `<img src="${logo}" style="width:52px;height:52px;object-fit:cover;display:block;flex-shrink:0;" alt="">`;
+    } else {
+      pwLogo.classList.remove('custom-logo');
+      pwLogo.style.background = 'var(--acc)';
+      pwLogo.style.overflow   = '';
+      pwLogo.style.padding    = '';
+      pwLogo.innerHTML = `<svg width="22" height="12" viewBox="0 0 22 12" fill="none"><path d="M1 6 Q5 1 8 6 Q11 11 14 6 Q17 1 21 6" stroke="#141414" stroke-width="2.3" stroke-linecap="round" fill="none"/></svg>`;
+    }
+  }
+
+  /* ── Password screen brand name ── */
+  const pwBrand = document.getElementById('pw-brand-name');
+  if(pwBrand) pwBrand.textContent = name.split('—')[0].trim() || name;
 }
 </script>
 
