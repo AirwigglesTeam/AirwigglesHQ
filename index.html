@@ -2154,6 +2154,11 @@ function scNewTask(){
 
 // Ctrl+Z (Windows/Linux) and Cmd+Z (Mac) — undo
 document.addEventListener('keydown',function(e){
+  if((e.ctrlKey||e.metaKey)&&e.shiftKey&&e.key.toLowerCase()==='z'){
+    const tag=document.activeElement?.tagName;
+    if(tag==='INPUT'||tag==='TEXTAREA'||document.activeElement?.contentEditable==='true')return;
+    e.preventDefault();redo();return;
+  }
   if((e.ctrlKey||e.metaKey)&&!e.shiftKey&&e.key.toLowerCase()==='z'){
     const tag=document.activeElement?.tagName;
     // Allow native undo in text fields
@@ -2178,7 +2183,7 @@ document.addEventListener('keydown',function(e){
   // Undo (always Z, not remappable)
   if(k==='z'){e.preventDefault();undo();return;}
 
-  if(k===sc.search){e.preventDefault();gsOpen();return;}
+  if(k===sc.search||k==='f'){e.preventDefault();gsOpen();return;}
   if(k===sc.shortcuts||k==='?'){e.preventDefault();scHelpOpen();return;}
   if(k===sc.newProject){e.preventDefault();openModal('project',null);return;}
   if(k===sc.newTask){e.preventDefault();scNewTask();return;}
@@ -2214,6 +2219,7 @@ function scHelpOpen(){
       {action:'newTask',label:'New Task'},
       {action:'newSponsor',label:'New Sponsor'},
       {action:'undo',label:'Undo',fixed:true},
+      {action:'redo',label:'Redo',fixed:true},
       {action:'shortcuts',label:'This help screen'},
     ]},
     {label:'Navigate',items:[
@@ -2242,11 +2248,16 @@ function scHelpOpen(){
     html+='<div>';
     html+='<div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;">'+g.label+'</div>';
     g.items.forEach(function(item){
-      const key=(sc[item.action]||_shortcutDefaults[item.action]||'').toUpperCase();
+      const isMac=navigator.platform.toUpperCase().includes('MAC');
+      const mod=isMac?'⌘':'Ctrl';
+      let displayKey;
+      if(item.action==='undo')displayKey=mod+'+Z';
+      else if(item.action==='redo')displayKey=mod+'+⇧+Z';
+      else displayKey=(sc[item.action]||_shortcutDefaults[item.action]||'').toUpperCase();
       const isCustom=!item.fixed&&!!(S.settings?.shortcuts?.[item.action]);
       html+='<div style="display:flex;align-items:center;padding:5px 0;border-bottom:1px solid rgba(255,255,255,.04);">';
       html+='<span style="flex:1;font-size:.8rem;color:var(--text2);">'+item.label+'</span>';
-      html+='<kbd style="font-family:\'DM Mono\',monospace;font-size:.72rem;font-weight:700;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-bottom:2px solid var(--border2);border-radius:5px;color:'+(isCustom?'var(--acc)':'var(--text)')+';">'+key+'</kbd>';
+      html+='<kbd style="font-family:\'DM Mono\',monospace;font-size:.72rem;font-weight:700;padding:3px 8px;background:var(--surface2);border:1px solid var(--border);border-bottom:2px solid var(--border2);border-radius:5px;color:'+(isCustom?'var(--acc)':'var(--text)')+';">'+displayKey+'</kbd>';
       html+='</div>';
     });
     html+='</div>';
@@ -2308,7 +2319,7 @@ document.addEventListener('keydown',function(e){
 
 function _scLabel(action){
   return{
-    search:'Search',shortcuts:'Shortcuts Help',newProject:'New Project',newTask:'New Task',
+    search:'Search',shortcuts:'Shortcuts Help',newProject:'New Project',newTask:'New Task',redo:'Redo',
     newSponsor:'New Sponsor',undo:'Undo',dashboard:'Dashboard',kanban:'Kanban',
     campaign:'Campaign',finance:'Finance',sponsors:'Sponsors',templates:'Templates',
     settings:'Settings',toggleDone:'Toggle Done',clearFilters:'Clear Filters',
@@ -6105,6 +6116,7 @@ function renderSettings(){
         {action:'newSponsor',label:'New Sponsor'},
         {action:'shortcuts',label:'Show shortcut help'},
         {action:'undo',label:'Undo',fixed:true},
+        {action:'redo',label:'Redo',fixed:true},
       ]},
       {label:'Navigate',items:[
         {action:'dashboard',label:'Dashboard'},
@@ -6132,7 +6144,7 @@ function renderSettings(){
           <span style="flex:1;font-size:.8rem;">${label}</span>
           <div style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
             ${fixed
-              ?`<kbd style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-bottom:2px solid var(--border2);border-radius:5px;color:var(--muted);cursor:default;">${key.toUpperCase()}</kbd><span style="font-size:.6rem;color:var(--muted);">fixed</span>`
+              ?`<kbd style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;padding:3px 10px;background:var(--surface2);border:1px solid var(--border);border-bottom:2px solid var(--border2);border-radius:5px;color:var(--muted);cursor:default;">${action==='undo'?'⌘/Ctrl+Z':action==='redo'?'⌘/Ctrl+⇧+Z':key.toUpperCase()}</kbd><span style="font-size:.6rem;color:var(--muted);">fixed</span>` 
               :`<button id="sc-btn-${action}" onclick="scStartCapture('${action}',this)" style="min-width:36px;height:30px;padding:0 10px;background:var(--surface2);border:1.5px solid ${isCustom?'var(--acc)':'var(--border)'};border-bottom:2px solid var(--border2);border-radius:5px;font-family:'DM Mono',monospace;font-size:.75rem;font-weight:700;color:${isCustom?'var(--acc)':'var(--text)'};cursor:pointer;transition:all .15s;" title="Click to remap">${key.toUpperCase()}</button>${isCustom?`<button onclick="scReset('${action}')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:.62rem;text-decoration:underline;padding:0;">reset</button>`:'<span style="font-size:.62rem;color:var(--muted);opacity:.4;width:28px;"></span>'}`
             }
           </div>
@@ -9242,6 +9254,39 @@ function _dndDrop(e){
       }
       save();render();break;}
   }
+}
+
+/* ════ NAVIGATION VISIBILITY ════ */
+function toggleNavVis(view, btn){
+  if(!S.settings.navVisible)S.settings.navVisible={};
+  // Default all views to visible (true), so toggle means: if undefined/true → false, if false → true
+  const cur=S.settings.navVisible[view]===false?false:true;
+  S.settings.navVisible[view]=!cur;
+  save();
+  // Update toggle UI immediately (no full re-render needed)
+  if(btn){
+    if(S.settings.navVisible[view])btn.classList.add('on');
+    else btn.classList.remove('on');
+  }
+  applyNavVis();
+}
+
+function applyNavVis(){
+  const nv=S.settings?.navVisible||{};
+  // Top rail buttons (.rbtn[data-v])
+  document.querySelectorAll('.rbtn[data-v]').forEach(btn=>{
+    const view=btn.dataset.v;
+    const vis=nv[view]===false?false:true;
+    btn.style.display=vis?'':'none';
+  });
+  // Side nav items (.nitem[data-v] and their .nav-row parents)
+  document.querySelectorAll('.nitem[data-v]').forEach(item=>{
+    const view=item.dataset.v;
+    const vis=nv[view]===false?false:true;
+    const row=item.closest('.nav-row');
+    if(row)row.style.display=vis?'':'none';
+    else item.style.display=vis?'':'none';
+  });
 }
 </script>
 
