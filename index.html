@@ -33,8 +33,9 @@ button,input,select,textarea,a{font-family:'Lexend',sans-serif;}
 /* ── PASSWORD ── */
 #pw-screen{position:fixed;inset:0;background:var(--bg);display:flex;align-items:center;justify-content:center;z-index:9999;padding:16px;}
 .pw-card{background:var(--surface);border:1px solid var(--border);border-radius:20px;padding:44px 36px;width:100%;max-width:360px;text-align:center;}
-.pw-logo-wrap{width:52px;height:52px;background:var(--acc);border-radius:14px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;margin:0 auto 26px;box-shadow:0 0 28px rgba(98,208,170,.3);}
+.pw-logo-wrap{width:52px;height:52px;background:var(--acc);border-radius:14px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;margin:0 auto 26px;box-shadow:0 0 28px rgba(98,208,170,.3);overflow:hidden;}
 .pw-logo-wrap:not(.custom-logo) img,.pw-logo-wrap svg{transform:rotate(-45deg);width:28px;height:28px;object-fit:contain;}
+.pw-logo-wrap.custom-logo img{width:142%;height:142%;object-fit:cover;transform:rotate(-45deg);flex-shrink:0;display:block;}
 .pw-h{font-size:1.3rem;font-weight:800;letter-spacing:-.03em;margin-bottom:4px;}
 .pw-sub{font-size:.75rem;color:var(--muted);margin-bottom:26px;}
 .pw-inp{width:100%;background:var(--bg);border:1.5px solid var(--border);border-radius:9px;padding:11px 14px;color:var(--text);font-size:.9rem;outline:none;margin-bottom:10px;transition:border-color .15s;}
@@ -74,8 +75,8 @@ button,input,select,textarea,a{font-family:'Lexend',sans-serif;}
 /* ── RAIL ── */
 .rail{position:fixed;top:0;left:0;width:var(--rail-w);height:100%;background:var(--surface);border-right:1px solid var(--border);z-index:101;display:flex;flex-direction:column;align-items:stretch;padding-bottom:env(safe-area-inset-bottom,0);}
 .rail-logo{height:var(--hdr);display:flex;align-items:center;justify-content:center;border-bottom:1px solid var(--border);cursor:pointer;flex-shrink:0;overflow:hidden;}
-.rail-logo-inner{width:30px;height:30px;background:var(--acc);border-radius:7px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(98,208,170,.22);}
-.rail-logo-inner img{width:22px;height:22px;object-fit:contain;transform:rotate(-45deg);}
+.rail-logo-inner{width:30px;height:30px;background:var(--acc);border-radius:7px;transform:rotate(45deg);display:flex;align-items:center;justify-content:center;box-shadow:0 0 14px rgba(98,208,170,.22);overflow:hidden;}
+.rail-logo-inner img{width:150%;height:150%;object-fit:cover;transform:rotate(-45deg);flex-shrink:0;min-width:150%;min-height:150%;}
 .rail-logo-inner svg{transform:rotate(-45deg);}
 .rail-logo-custom{width:36px;height:36px;border-radius:8px;object-fit:contain;}
 .rail-nav{flex:1;display:flex;flex-direction:column;overflow-y:auto;overflow-x:hidden;padding-top:5px;}
@@ -4030,6 +4031,28 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
             <span style="font-weight:600;color:${sp.fulfilled?'var(--green)':'var(--text2)'};">Sponsorship fulfilled</span>
           </label>
         </div>
+        ${p.isAirCon?`<div style="padding:8px 13px;border-top:1px solid var(--border2);">
+          <div style="font-size:.62rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">AirCon checklist</div>
+          <div style="display:flex;flex-direction:column;gap:6px;">
+            ${[
+              {flag:'airconLogoAssets',label:'Sponsor logo and assets received/confirmed'},
+              {flag:'airconPostContent',label:'Sponsored post content confirmed'},
+              {flag:'airconPostPosted',label:'Sponsored post posted'},
+            ].map(item=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
+              <div class="ti-check${sp[item.flag]?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','${item.flag}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${sp[item.flag]?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp[item.flag]?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
+              <span style="color:${sp[item.flag]?'var(--acc)':'var(--text2)'};">${item.label}</span>
+            </label>`).join('')}
+            ${(sp.category==='headline')?[
+              {flag:'airconWorkshop',label:'Workshop confirmed'},
+              {flag:'airconDigitalBooth',label:'Digital booth signed off'},
+              {flag:'airconBannerLogo',label:'Logo on banner above Airwiggles feed'},
+              {flag:'airconAdLogo',label:'Logo on targeted AirCon26 ads'},
+            ].map(item=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
+              <div class="ti-check${sp[item.flag]?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','${item.flag}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${sp[item.flag]?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp[item.flag]?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
+              <span style="color:${sp[item.flag]?'var(--acc)':'var(--text2)'};">${item.label}</span>
+            </label>`).join(''):''}
+          </div>
+        </div>`:''}
         ${allocatedProducts.length>0?`<div style="border-top:1px solid var(--border2);">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px;cursor:pointer;" onclick="var d=this.nextElementSibling;var open=d.style.display!=='none';d.style.display=open?'none':'';this.querySelector('.sp-prod-chevron').textContent=open?'\u25be':'\u25b4';">
             <div style="font-size:.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">${allocatedProducts.length} Product Allocation${allocatedProducts.length!==1?'s':''}</div>
@@ -6410,7 +6433,8 @@ function saveNavIcon(view,iconId){
 function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
   const newSponsors=readProjSponsorRows();
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
+  const isAirCon=!!el('pm-aircon')?.value;
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -6504,7 +6528,14 @@ function projectModalHtml(id){
 
   <!-- SPONSOR ASSIGNMENT -->
   <hr class="div" style="margin:10px 0;">
-  <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:10px;">Sponsors</div>
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Sponsors</div>
+    <label style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;font-size:.76rem;font-weight:500;color:var(--text2);">
+      <div class="ti-check${p?.isAirCon?' done':''}" id="pm-aircon-check" onclick="this.classList.toggle('done');const v=this.classList.contains('done');this.style.background=v?'var(--acc)':'transparent';this.style.borderColor=v?'var(--acc)':'rgba(255,255,255,.18)';document.getElementById('pm-aircon').value=v?'1':'';" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${p?.isAirCon?'var(--acc)':'rgba(255,255,255,.18)'};background:${p?.isAirCon?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
+      <input type="hidden" id="pm-aircon" value="${p?.isAirCon?'1':''}">
+      Is AirCon sponsorship
+    </label>
+  </div>
   <div id="pm-sponsors-list">${renderProjSponsorsEdit(p?.sponsors||[],p?.id||'')}</div>
   ${S.sponsors.length>0?`<button class="add-row-btn" onclick="addProjSponsorRow()">+ Add sponsor</button>`:`<div style="font-size:.73rem;color:var(--muted);">No sponsors yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('sponsors')">Add sponsors \u2192</span></div>`}
 
@@ -6780,67 +6811,78 @@ function taskModalHtml(data){
   }
   const activeProjs=S.projects.filter(p=>p.status==='active');
   const parentOpts=(defProj||task?.projectId)?S.tasks.filter(t=>t.projectId===(defProj||task?.projectId)&&!t.parentId&&t.id!==task?.id).map(t=>`<option value="${t.id}" ${defParent===t.id?'selected':''}>${t.name}</option>`).join(''):'';
-  const depOpts=S.tasks.filter(t=>t.id!==task?.id&&!t.parentId).map(t=>{const p=getProject(t.projectId);return`<option value="${t.id}" ${(task?.blockedBy||[]).includes(t.id)?'selected':''}>${p?p.name+' / ':''}${t.name}</option>`;}).join('');
   const recurOn=task?.recur?.enabled;
   const tName=defFromTmpl?defFromTmpl.name:'';
 
   return`<div class="mo-box mo-wide">
 <div class="mo-hd"><span class="mo-title">${task?'Edit Task':isQuickSub?'Add Subtask':'New Task'}</span><button class="mo-close" onclick="closeModal()">\u00d7</button></div>
-<div class="mo-body">
-  ${defFromTmpl?`<div class="info-box" style="margin-bottom:12px;width:100%;display:flex;align-items:center;gap:7px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> From template: <strong>${defFromTmpl.name}</strong></div>`:''}
-  <div class="field"><label class="flbl">Task name *</label><input class="inp" id="tm-name" value="${task?.name||tName||''}" placeholder="What needs to be done?"></div>
-  <div class="field"><label class="flbl">Description</label><textarea class="txta" id="tm-desc" style="min-height:50px;">${task?.description||''}</textarea></div>
+<div class="mo-body" style="display:flex;flex-direction:column;gap:13px;">
+
+  ${defFromTmpl?`<div class="info-box" style="width:100%;display:flex;align-items:center;gap:7px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="9" y="9" width="13" height="13" rx="2"/><path d="M5 15H4a2 2 0 01-2-2V4a2 2 0 012-2h9a2 2 0 012 2v1"/></svg> From template: <strong>${defFromTmpl.name}</strong></div>`:''}
+
+  <input class="inp" id="tm-name" value="${task?.name||tName||''}" placeholder="Task name\u2026" style="font-size:.95rem;font-weight:600;">
+
+  <div>
+    <button type="button" onclick="const b=el('tm-desc-body');const ico=el('tm-desc-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;width:100%;">
+      <svg id="tm-desc-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${task?.description?'transform:rotate(180deg)':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      <span>Description${task?.description?` \u00b7 <span style="color:var(--acc);font-size:.65rem;">has notes</span>`:''}</span>
+    </button>
+    <textarea class="txta" id="tm-desc-body" style="display:${task?.description?'block':'none'};margin-top:6px;min-height:54px;">${task?.description||''}</textarea>
+  </div>
+
+  <hr class="div" style="margin:0;">
+
   <div class="inp-row">
     <div class="field"><label class="flbl">Project</label><select class="sel" id="tm-proj" onchange="updParentOpts(this.value)">${activeProjs.map(p=>`<option value="${p.id}" ${(task?.projectId||defProj)===p.id?'selected':''}>${p.name}</option>`).join('')}<option value="" ${!defProj&&!task?.projectId?'selected':''}>— none —</option></select></div>
-    <div class="field"><label class="flbl">Priority</label><select class="sel" id="tm-prio">${PRIOS.map(pr=>`<option ${(task?.priority||'Medium')===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
+    <div class="field"><label class="flbl">Priority</label>
+      <div class="pill-sel" id="tm-prio-pills">${PRIOS.map(pr=>`<span class="pill-opt${(task?.priority||'Medium')===pr?' active':''}" onclick="tmPickPrio(this,'${pr}')" data-val="${pr}">${pr}</span>`).join('')}</div>
+      <input type="hidden" id="tm-prio" value="${task?.priority||'Medium'}">
+    </div>
   </div>
-  <div class="field"><label class="flbl">Phase</label><select class="sel" id="tm-phase"><option value="" ${!task?.phase?'selected':''}>— no phase —</option>${PHASES.map(ph=>`<option value="${ph}" ${task?.phase===ph?'selected':''}>${ph}</option>`).join('')}</select></div>
-  <div class="field"><label class="flbl">Parent task</label><select class="sel" id="tm-parent"><option value="">— top-level task —</option>${parentOpts}</select></div>
 
-  <!-- Advanced toggle -->
-  <div style="margin:10px 0 4px;">
-    <button type="button" onclick="const s=el('tm-advanced');const ico=el('tm-adv-ico');if(s){const open=s.style.display!=='none';s.style.display=open?'none':'block';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;">
-      <svg id="tm-adv-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
-      Advanced options
-    </button>
+  <div class="field"><label class="flbl">Phase</label>
+    <div class="pill-sel" id="tm-phase-pills">
+      <span class="pill-opt${!task?.phase?' active':''}" onclick="tmPickPhase(this,'')" data-val="">None</span>
+      ${PHASES.map(ph=>`<span class="pill-opt${task?.phase===ph?' active':''}" onclick="tmPickPhase(this,'${ph}')" data-val="${ph}">${ph}</span>`).join('')}
+    </div>
+    <input type="hidden" id="tm-phase" value="${task?.phase||''}">
   </div>
-  <div id="tm-advanced" style="display:${task?'block':'none'};">
-  <div class="field"><label class="flbl">Assigned to</label>
-  <div style="position:relative;">
-    <div class="sel-dropdown" id="tm-av-btn" onclick="toggleMs('tm-av')">
-      <div id="tm-av-tags" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;">${defAssignees.length?defAssignees.map(id=>{const m=getMember(id);return m?`<span class="ms-tag" data-id="${id}">${m.name}<span class="ms-rm" onclick="event.stopPropagation();rmMs('tm-av','${id}')">\u00d7</span></span>`:''}).join(''):`<span style="color:var(--muted);font-size:.82rem;">Select members\u2026</span>`}</div>
-      <svg width="11" height="7" viewBox="0 0 11 7" fill="none" style="flex-shrink:0;margin-left:6px;"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    </div>
-    <div class="ms-dd" id="tm-av-dd" style="display:none;">${S.members.length?S.members.map(m=>`<div class="ms-opt${defAssignees.includes(m.id)?' sel':''}" data-id="${m.id}" onclick="toggleMsOpt('tm-av','${m.id}')">${avHtml(m.id,18)}${m.name}</div>`).join(''):`<div style="padding:10px;font-size:.78rem;color:var(--muted);">No members yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();openModal('member',null)">Add team \u2192</span></div>`}</div>
-  </div></div>
-  <div class="field"><label class="flbl">Labels</label>
-  <div style="position:relative;">
-    <div class="sel-dropdown" id="tm-lb-btn" onclick="toggleMs('tm-lb')">
-      <div id="tm-lb-tags" style="display:flex;flex-wrap:wrap;gap:4px;flex:1;">${defLabels.length?defLabels.map(id=>{const l=getLabel(id);return l?`<span class="ms-tag" data-id="${id}" style="background:${l.color}22;border-color:${l.color}44;color:${l.color};">${l.name}<span class="ms-rm" onclick="event.stopPropagation();rmMs('tm-lb','${id}')">\u00d7</span></span>`:''}).join(''):`<span style="color:var(--muted);font-size:.82rem;">Select labels\u2026</span>`}</div>
-      <svg width="11" height="7" viewBox="0 0 11 7" fill="none" style="flex-shrink:0;margin-left:6px;"><path d="M1 1l4.5 4.5L10 1" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg>
-    </div>
-    <div class="ms-dd" id="tm-lb-dd" style="display:none;">${S.labels.length?S.labels.map(l=>`<div class="ms-opt${defLabels.includes(l.id)?' sel':''}" data-id="${l.id}" onclick="toggleMsOpt('tm-lb','${l.id}')"><div style="width:9px;height:9px;border-radius:2px;background:${l.color};margin-right:2px;"></div>${l.name}</div>`).join(''):`<div style="padding:10px;font-size:.78rem;color:var(--muted);">No labels yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('settings')">Create \u2192</span></div>`}</div>
-  </div></div>
+
   <div class="inp-row">
-    <div class="field"><label class="flbl">Start</label><div class="date-wrap" id="tm-s-w">${dpHtml('tm-s',task?.startDate||'')}</div></div>
-    <div class="field"><label class="flbl">End</label><div class="date-wrap" id="tm-e-w">${dpHtml('tm-e',task?.endDate||'')}</div></div>
+    <div class="field"><label class="flbl">Start date</label><div class="date-wrap" id="tm-s-w">${dpHtml('tm-s',task?.startDate||'')}</div></div>
+    <div class="field"><label class="flbl">Due date</label><div class="date-wrap" id="tm-e-w">${dpHtml('tm-e',task?.endDate||'')}</div></div>
   </div>
 
-  <!-- RECURRENCE -->
-  <div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:12px;margin-top:2px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;">
-      <span style="font-size:.82rem;font-weight:500;display:flex;align-items:center;gap:5px;"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg> Recurring task</span>
-      <button class="toggle-sw${recurOn?' on':''}" id="recur-sw" onclick="this.classList.toggle('on');const _c=document.getElementById('recur-cfg');if(_c)_c.style.display=this.classList.contains('on')?'flex':'none';"></button>
+  ${S.members.length>0?`<div class="field"><label class="flbl">Assignees</label><div class="av-toggle-grid" id="tm-av-grid">${S.members.map(m=>`<div class="av-toggle${defAssignees.includes(m.id)?' active':''}" onclick="this.classList.toggle('active')" data-id="${m.id}">${avHtml(m.id,18)}<span>${m.name.split(' ')[0]}</span></div>`).join('')}</div></div>`:''}
+
+  ${S.labels.length>0?`<div class="field"><label class="flbl">Labels</label><div class="pill-sel" id="tm-lb-pills">${S.labels.map(l=>`<span class="pill-opt${defLabels.includes(l.id)?' active':''}" style="border-color:${l.color}44;color:${l.color}88;${defLabels.includes(l.id)?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':''}" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
+
+  ${parentOpts?`<div>
+    <button type="button" onclick="const b=el('tm-parent-body');const ico=el('tm-parent-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'flex';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;">
+      <svg id="tm-parent-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${defParent?'transform:rotate(180deg)':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      Parent task${defParent?` \u00b7 <span style="color:var(--acc);font-size:.65rem;">set</span>`:''}
+    </button>
+    <div id="tm-parent-body" style="display:${defParent?'flex':'none'};margin-top:6px;">
+      <select class="sel" id="tm-parent" style="flex:1;"><option value="">— top-level —</option>${parentOpts}</select>
     </div>
-    <div id="recur-cfg" style="display:${recurOn?'flex':'none'};gap:8px;margin-top:10px;flex-wrap:wrap;align-items:center;">
+  </div>`:`<input type="hidden" id="tm-parent" value="${defParent||''}">`}
+
+  <div>
+    <button type="button" onclick="const b=el('tm-recur-body');const ico=el('tm-recur-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'flex';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;">
+      <svg id="tm-recur-ico" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="transition:transform .2s;${recurOn?'transform:rotate(180deg)':''}"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg>
+      Recurring${recurOn?` \u00b7 <span style="color:var(--acc);font-size:.65rem;">every ${task?.recur?.interval||1} ${task?.recur?.type||'week'}</span>`:''}
+    </button>
+    <div id="tm-recur-body" style="display:${recurOn?'flex':'none'};gap:8px;margin-top:8px;flex-wrap:wrap;align-items:center;">
       <span style="font-size:.76rem;color:var(--text2);">Repeat every</span>
       <input class="inp" type="number" id="recur-n" value="${task?.recur?.interval||1}" min="1" style="width:60px;">
       <select class="sel" id="recur-type" style="width:110px;">${['daily','weekly','monthly','yearly'].map(t=>`<option ${(task?.recur?.type||'weekly')===t?'selected':''}>${t}</option>`).join('')}</select>
     </div>
+    <input type="hidden" id="recur-sw" data-on="${recurOn?'1':'0'}">
   </div>
 
-  ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="margin-top:12px;background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${st.priority}</span>${st.name}${st.subtasks?.length?`<span style="color:var(--muted);font-size:.65rem;">(${st.subtasks.length} sub)</span>`:''}</div>`).join('')}</div>`:''}
-  </div><!-- /tm-advanced -->
+  ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${st.priority}</span>${st.name}${st.subtasks?.length?`<span style="color:var(--muted);font-size:.65rem;">(${st.subtasks.length} sub)</span>`:''}</div>`).join('')}</div>`:''}
+
+</div>
 <div class="mo-ft">
   ${task?`<button class="btn btn-ghost btn-sm" onclick="saveAsTmpl('${task.id}')">Save as template</button>`:''}
   <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
@@ -6850,16 +6892,26 @@ function taskModalHtml(data){
 </div></div>`;
 }
 
+function tmPickPrio(el,val){
+  el.closest('.pill-sel').querySelectorAll('.pill-opt').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tm-prio').value=val;
+}
+
+function tmPickPhase(el,val){
+  el.closest('.pill-sel').querySelectorAll('.pill-opt').forEach(p=>p.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('tm-phase').value=val;
+}
+
 function saveTask(eid,defParent,tmplId){
   const name=el('tm-name')?.value.trim();if(!name){if(el('tm-name'))el('tm-name').style.borderColor='var(--red)';return;}
-  // Collect assignees from avatar toggle grid
-  const assignees=Array.from(document.querySelectorAll('#tm-av-grid .av-toggle.active')).map(el=>el.dataset.id).filter(Boolean);
-  // Collect labels from pill grid
-  const labels=Array.from(document.querySelectorAll('#tm-lb-pills .pill-opt.active')).map(el=>el.dataset.id).filter(Boolean);
-  const recurOn=el('recur-sw')?.classList.contains('on');
+  const assignees=Array.from(document.querySelectorAll('#tm-av-grid .av-toggle.active')).map(e=>e.dataset.id).filter(Boolean);
+  const labels=Array.from(document.querySelectorAll('#tm-lb-pills .pill-opt.active')).map(e=>e.dataset.id).filter(Boolean);
+  const recurOn=el('recur-sw')?.dataset.on==='1'||el('tm-recur-body')?.style.display!=='none';
   const parentVal=el('tm-parent')?.value||defParent||null;
   const oldTask=eid?getTask(eid):null;
-  const task={id:eid||uid(),name,description:el('tm-desc')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
+  const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
   if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   if(eid){const i=S.tasks.findIndex(t=>t.id===eid);if(i>=0)S.tasks[i]=task;}else S.tasks.push(task);
   save();
@@ -7262,20 +7314,6 @@ function sponsorEditModalHtml(s,activeTab){
   <button class="mo-close" onclick="closeModal()">\u00d7</button>
 </div>
 <div class="mo-body">
-
-  ${!s?`<!-- AI Prefill for new sponsors -->
-  <div style="background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:10px;padding:12px 14px;margin-bottom:16px;">
-    <div style="font-size:.78rem;font-weight:600;margin-bottom:8px;display:flex;align-items:center;gap:6px;">
-      <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
-      AI Profile Prefill
-    </div>
-    <div style="display:flex;gap:8px;align-items:flex-end;">
-      <div class="field" style="flex:1;margin-bottom:0;"><label class="flbl">Company website URL</label><input class="inp" id="sp-ai-url" placeholder="https://kilohearts.com" style="font-size:.78rem;"></div>
-      <button class="btn btn-acc btn-sm" onclick="runSpAIPrefill()">Generate Profile</button>
-    </div>
-    <div style="font-size:.67rem;color:var(--text2);margin-top:6px;">AI will fetch the website and prefill products, audience, and integration ideas. Review before saving.</div>
-    <div id="sp-ai-status" style="display:none;margin-top:8px;"></div>
-  </div>`:``}
 
   <!-- Hidden name mirror — always in DOM regardless of active tab -->
   <input type="hidden" id="sp-nm-mirror" value="${s?.name||''}">
@@ -9515,7 +9553,7 @@ function applyBranding(){
   if(railInner){
     if(logo){
       // Logo fills the diamond — no background, no counter-rotation
-      railInner.innerHTML = `<img src="${logo}" style="width:100%;height:100%;object-fit:cover;border-radius:7px;display:block;" alt="">`;
+      railInner.innerHTML = `<img src="${logo}" style="width:150%;height:150%;min-width:150%;min-height:150%;object-fit:cover;transform:rotate(-45deg);flex-shrink:0;display:block;" alt="">`;
       railInner.style.background = 'transparent';
       railInner.style.transform  = 'rotate(45deg)';
       railInner.style.boxShadow  = '0 0 14px rgba(0,0,0,.3)';
@@ -9544,19 +9582,15 @@ function applyBranding(){
   const pwLogo = document.getElementById('pw-logo');
   if(pwLogo){
     if(logo){
-      // Add custom-logo class: scopes out the CSS counter-rotation rule entirely
-      // so the img simply rotates with the container → diamond shape
+      // Add .custom-logo → disables the CSS :not(.custom-logo) counter-rotation rule
+      // Image fills 100%×100% of the container with NO transform (rotates with container)
+      // overflow:hidden (set in CSS) clips it to the rounded diamond
       pwLogo.classList.add('custom-logo');
       pwLogo.style.background = 'transparent';
-      pwLogo.style.overflow   = 'hidden';
-      pwLogo.style.padding    = '0';
-      // Use 52×52 explicit size matching the container, no transform needed
-      pwLogo.innerHTML = `<img src="${logo}" style="width:52px;height:52px;object-fit:cover;display:block;flex-shrink:0;" alt="">`;
+      pwLogo.innerHTML = `<img src="${logo}" style="width:142%;height:142%;object-fit:cover;transform:rotate(-45deg);flex-shrink:0;display:block;" alt="">`;
     } else {
       pwLogo.classList.remove('custom-logo');
-      pwLogo.style.background = 'var(--acc)';
-      pwLogo.style.overflow   = '';
-      pwLogo.style.padding    = '';
+      pwLogo.style.background = '';
       pwLogo.innerHTML = `<svg width="22" height="12" viewBox="0 0 22 12" fill="none"><path d="M1 6 Q5 1 8 6 Q11 11 14 6 Q17 1 21 6" stroke="#141414" stroke-width="2.3" stroke-linecap="round" fill="none"/></svg>`;
     }
   }
