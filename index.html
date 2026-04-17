@@ -1458,6 +1458,16 @@ function save(){
   _setSyncStatus('saving');
 }
 
+
+/* Immediate save — bypasses debounce. Use for destructive actions like deletions
+   so Supabase is updated before the user can refresh and get stale data. */
+function saveNow(){
+  try{localStorage.setItem('pf4',JSON.stringify(S));}catch(e){}
+  if(_saveDebounce){clearTimeout(_saveDebounce);_saveDebounce=null;}
+  _setSyncStatus('saving');
+  _doSave();
+}
+
 async function _doSave(){
   if(_saving){_saveQueue=true;return;}
   _saving=true;
@@ -2770,9 +2780,6 @@ function renderDash(){
   return`<div class="fu">
 <div class="page-hd">
   <div class="page-title"><em>Dashboard</em>${mf?`<span style="font-size:.75rem;font-weight:400;color:var(--acc);margin-left:8px;">· ${getMember(mf)?.name||''} <button class="btn btn-ghost btn-xs" style="margin-left:4px;" onclick="S.activeMember=null;save();render()">✕</button></span>`:''}</div>
-  <div class="page-acts">
-    <button class="btn btn-acc btn-sm" onclick="openModal('project',null)">+ Event</button>
-  </div>
 </div>
 
 <!-- TIMELINE (collapsible) -->
@@ -5045,7 +5052,7 @@ function renderFinance(){
     </div>
     <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:9px;padding:11px 14px;margin-top:12px;font-family:'DM Mono',monospace;">
       <span style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">TOTAL ONE-OFF</span>
-      <span style="font-size:1rem;font-weight:500;color:var(--orange);">${fmtGBP(oo)}</span>
+      <span id="fin-oo-total" style="font-size:1rem;font-weight:500;color:var(--orange);">${fmtGBP(oo)}</span>
     </div>
   </div>
 </div>
@@ -5995,8 +6002,37 @@ function renderFinOneoff(){
 </div>`).join('');
 }
 
-function updFinField(t,id,f,v){const list=t==='r'?S.finance.recurring:S.finance.oneoff;const e=list.find(x=>x.id===id);if(e){e[f]=v;save();}}
-function updFinAmt(t,id,v){const list=t==='r'?S.finance.recurring:S.finance.oneoff;const e=list.find(x=>x.id===id);if(e){e.amount=parseFloat(v)||0;save();}}
+function updFinField(t,id,f,v){const list=t==='r'?S.finance.recurring:S.finance.oneoff;const e=list.find(x=>x.id===id);if(e){e[f]=v;save();if(f==='freq')renderFinRecurring();else if(f==='cat'&&t==='r')renderFinRecurring();else if(f==='cat'&&t==='o')renderFinOneoff();}}
+function updFinAmt(t,id,v){
+  const list=t==='r'?S.finance.recurring:S.finance.oneoff;
+  const e=list.find(x=>x.id===id);
+  if(!e)return;
+  e.amount=parseFloat(v)||0;
+  save();
+  // Update group subtotal and footer total in-place without destroying focused inputs
+  if(t==='r'){
+    // Find which freq group this belongs to and update its subtotal
+    const grps=document.querySelectorAll('.freq-grp');
+    grps.forEach(grp=>{
+      const hd=grp.querySelector('.freq-hd');
+      if(!hd)return;
+      const freqTxt=hd.querySelector('span')?.textContent||'';
+      const freq=['Monthly','Quarterly','Annual'].find(f=>freqTxt.startsWith(f));
+      if(!freq)return;
+      const sub=S.finance.recurring.filter(x=>x.freq===freq).reduce((a,x)=>a+finAnn(x),0);
+      const valSpan=hd.querySelectorAll('span')[1];
+      if(valSpan)valSpan.textContent=fmtGBP(sub)+'/yr';
+    });
+  }
+  // Update one-off total footer if visible
+  _updFinTotals();
+}
+
+function _updFinTotals(){
+  const oo=totalOO();
+  // One-off total footer (has an ID)
+  const ooEl=el('fin-oo-total');if(ooEl)ooEl.textContent=fmtGBP(oo);
+}
 function delFin(t,id){if(t==='r')S.finance.recurring=S.finance.recurring.filter(x=>x.id!==id);else S.finance.oneoff=S.finance.oneoff.filter(x=>x.id!==id);save();reCalcFin();}
 function addFinRec(){S.finance.recurring.push({id:'r'+uid(),name:'New expense',to:'',freq:'Monthly',amount:0,cat:'IT Infrastructure'});save();reCalcFin();}
 function addFinOO(){S.finance.oneoff.push({id:'o'+uid(),name:'New expense',to:'',amount:0,cat:'IT Infrastructure'});save();reCalcFin();}
@@ -6404,9 +6440,17 @@ function saveProject(eid){
   render();
 }
 
+function deleteProjectConfirmed(id){
+  saveWithUndo('Delete project');
+  S.projects=S.projects.filter(p=>p.id!==id);
+  S.tasks=S.tasks.filter(t=>t.projectId!==id);
+  S.detailId=null;
+  save();closeModal();render();
+}
+
 function deleteProject(id){
   const mc=el('mc');mc.style.display='flex';
-  mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:320px;"><div class="mo-hd"><span class="mo-title">Delete project</span><button class="mo-close" onclick="closeModal()">&#215;</button></div><div class="mo-body"><div style="font-size:.84rem;">Delete this project and all its tasks? This cannot be undone.</div></div><div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="S.projects=S.projects.filter(p=>p.id!==\''+id+'\');S.tasks=S.tasks.filter(t=>t.projectId!==\''+id+'\');S.detailId=null;save();closeModal();render();">Delete</button></div></div></div>';
+  mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:320px;"><div class="mo-hd"><span class="mo-title">Delete project</span><button class="mo-close" onclick="closeModal()">&#215;</button></div><div class="mo-body"><div style="font-size:.84rem;">Delete this project and all its tasks? This cannot be undone.</div></div><div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-danger" onclick="deleteProjectConfirmed(\''+id+'\');">Delete</button></div></div></div>';
 }
 
 function reactivateProject(id){
@@ -6846,6 +6890,53 @@ function deleteTask(id){
   };
 }
 
+
+/* ════ DATE PICKER + COWORK HELPERS ════ */
+
+function dpHtml(field,val){
+  return`<div class="date-wrap" id="${field}-dw"><div class="date-btn" onclick="tmOpenRangeCal(event,'${field}')"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg><span id="${field}-lbl">${val?fmtD(val):''}</span></div><input type="hidden" id="${field}-v" value="${val||''}"></div>`;
+}
+
+function dpVal(field){return el(`${field}-v`)?.value||'';}
+
+function toggleCwMember(id,elBtn){
+  const inp=document.getElementById('cw-members');if(!inp)return;
+  const cur=inp.value?inp.value.split(',').filter(Boolean):[];
+  const idx=cur.indexOf(id);
+  if(idx>=0){cur.splice(idx,1);elBtn.style.background='var(--surface2)';elBtn.style.borderColor='var(--border)';}
+  else{cur.push(id);elBtn.style.background='var(--teal-dim)';elBtn.style.borderColor='var(--acc)';}
+  inp.value=cur.join(',');
+  const tick=elBtn.querySelector('span[style*="margin-left"]');
+  if(tick)tick.textContent=cur.includes(id)?'✓':'';
+  const info=document.getElementById('cw-invite-info');
+  if(info)info.style.display=cur.length>0?'block':'none';
+}
+
+function showCoworkInviteModal(day){
+  const title=encodeURIComponent(day.title||'Co-working Day');
+  const date=(day.date||'').replace(/-/g,'');
+  const start=date+(day.startTime||'0900').replace(':','')+'00Z';
+  const end=date+(day.endTime||'1700').replace(':','')+'00Z';
+  const loc=encodeURIComponent(day.notes||'');
+  const gcUrl=`https://calendar.google.com/calendar/render?action=TEMPLATE&text=${title}&dates=${start}/${end}&location=${loc}`;
+  const icsLines=['BEGIN:VCALENDAR','VERSION:2.0','BEGIN:VEVENT',`DTSTART:${start}`,`DTEND:${end}`,`SUMMARY:${decodeURIComponent(title)}`,`LOCATION:${decodeURIComponent(loc)}`,'END:VEVENT','END:VCALENDAR'];
+  const crlf='\r\n';const blob=new Blob([icsLines.join(crlf)],{type:'text/calendar'});
+
+  const icsUrl=URL.createObjectURL(blob);
+  const mc=el('mc');
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:380px;">
+<div class="mo-hd"><span class="mo-title">Add to Calendar</span><button class="mo-close" onclick="closeModal()">×</button></div>
+<div class="mo-body" style="display:flex;flex-direction:column;gap:10px;">
+  <p style="font-size:.82rem;color:var(--text2);margin:0;">Co-working day saved! Add it to a calendar:</p>
+  <a href="${gcUrl}" target="_blank" class="btn btn-acc" style="text-align:center;text-decoration:none;" onclick="closeModal()">Open in Google Calendar</a>
+  <a href="${icsUrl}" download="${decodeURIComponent(title)}.ics" class="btn btn-ghost" style="text-align:center;text-decoration:none;" onclick="setTimeout(()=>URL.revokeObjectURL('${icsUrl}'),5000);closeModal()">Download .ics file</a>
+</div>
+<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Skip</button></div>
+</div></div>`;
+  mc.style.display='flex';
+}
+
+
 function coworkDayModalHtml(id){
   if(!S.coworkDays)S.coworkDays=[];
   const d=id?S.coworkDays.find(x=>x.id===id):null;
@@ -6861,6 +6952,7 @@ function coworkDayModalHtml(id){
     <div class="field"><label class="flbl">End time</label><input class="inp" type="time" id="cw-end" value="${d?.endTime||'17:00'}"></div>
   </div>
   <div class="field"><label class="flbl">Location</label><input class="inp" id="cw-notes" value="${d?.notes||''}" placeholder="Office address, Google Meet link\u2026"></div>
+  <div class="field"><label class="flbl">What do we want to work on?</label><textarea class="txta" id="cw-objectives" style="min-height:72px;resize:vertical;" placeholder="Goals, tasks, projects to focus on\u2026">${d?.objectives||''}</textarea></div>
   <div class="field"><label class="flbl">Invite Members</label>
     <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;">
       ${S.members.map(m=>{const sel=selMems.includes(m.id);return`<div data-cwm="${m.id}" onclick="toggleCwMember('${m.id}',this)" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:${sel?'var(--teal-dim)':'var(--surface2)'};border:1.5px solid ${sel?'var(--acc)':'var(--border)'};border-radius:8px;cursor:pointer;transition:all .14s;user-select:none;">
@@ -6893,9 +6985,11 @@ function saveCoworkDay(eid){
   const notes=document.getElementById('cw-notes')?.value.trim()||'';
   const startTime=document.getElementById('cw-start')?.value||'09:00';
   const endTime=document.getElementById('cw-end')?.value||'17:00';
+  const objectives=document.getElementById('cw-objectives')?.value.trim()||'';
   const members=(document.getElementById('cw-members')?.value||'').split(',').filter(Boolean);
   if(!S.coworkDays)S.coworkDays=[];
-  const day={id:eid||uid(),title,date,notes,startTime,endTime,members};
+  const day={id:eid||uid(),title,date,notes,objectives,startTime,endTime,members};
+  saveWithUndo(eid?'Edit co-working day':'Add co-working day');
   if(eid){const i=S.coworkDays.findIndex(d=>d.id===eid);if(i>=0)S.coworkDays[i]=day;else S.coworkDays.push(day);}
   else S.coworkDays.push(day);
   save();
@@ -6905,7 +6999,7 @@ function saveCoworkDay(eid){
   if(members.length>0)setTimeout(()=>{window._cwDay=day;showCoworkInviteModal(day);},200);
 }
 
-function deleteCoworkDay(id){S.coworkDays=(S.coworkDays||[]).filter(d=>d.id!==id);save();closeModal();render();}
+function deleteCoworkDay(id){saveWithUndo('Delete co-working day');S.coworkDays=(S.coworkDays||[]).filter(d=>d.id!==id);saveNow();closeModal();render();}
 
 function labelModalHtml(id){
   const l=id?getLabel(id):null;
@@ -7183,14 +7277,17 @@ function sponsorEditModalHtml(s,activeTab){
     <div id="sp-ai-status" style="display:none;margin-top:8px;"></div>
   </div>`:``}
 
+  <!-- Hidden name mirror — always in DOM regardless of active tab -->
+  <input type="hidden" id="sp-nm-mirror" value="${s?.name||''}">
+
   <!-- Tab nav -->
   <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;">
-    ${tabs.map(t=>`<button onclick="openEditSponsor('${s?.id||''}','${t}')" style="padding:5px 12px;background:${tab===t?'var(--acc)':'var(--surface2)'};color:${tab===t?'var(--black)':'var(--text2)'};border:1px solid ${tab===t?'var(--acc)':'var(--border)'};border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .13s;">${tabLabels[t]}</button>`).join('')}
+    ${tabs.map(t=>`<button onclick="openEditSponsor('${s?.id||''}','${t}')"  style="padding:5px 12px;background:${tab===t?'var(--acc)':'var(--surface2)'};color:${tab===t?'var(--black)':'var(--text2)'};border:1px solid ${tab===t?'var(--acc)':'var(--border)'};border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .13s;">${tabLabels[t]}</button>`).join('')}
   </div>
 
   ${tab==='main'?`
   <div class="sp-detail-grid">
-    <div class="field"><label class="flbl">Company Name *</label><input class="inp" id="sp-nm" value="${s?.name||''}" placeholder="e.g. Kilohearts"></div>
+    <div class="field"><label class="flbl">Company Name *</label><input class="inp" id="sp-nm" value="${s?.name||''}" placeholder="e.g. Kilohearts" oninput="const m=el('sp-nm-mirror');if(m)m.value=this.value;"></div>
     <div class="field"><label class="flbl">Website</label><input class="inp" id="sp-web" value="${s?.website||''}" placeholder="kilohearts.com"></div>
   </div>
   <div class="field"><label class="flbl">Company Description</label><textarea class="txta" id="sp-desc" style="min-height:60px;">${s?.description||''}</textarea></div>
@@ -7419,6 +7516,104 @@ function saveTmpl(eid){
   _ttBuf=[];save();closeModal();render();
 }
 
+
+
+function openMemberProfile(id,tab){
+  openModal('memberProfile',{id,tab:tab||'overview'});
+}
+
+function memberProfileModalHtml(id,tab){
+  const m=getMember(id);if(!m)return'';
+  const hours=memberHoursTotal(m);
+  const activeTasks=S.tasks.filter(t=>!t.done&&(t.assignees||[]).includes(id)&&!t.parentId);
+  const doneTasks=S.tasks.filter(t=>t.done&&(t.assignees||[]).includes(id));
+  const activeProjs=[...new Set(activeTasks.map(t=>t.projectId))].map(pid=>getProject(pid)).filter(Boolean);
+  const recentLog=(m.timeLog||[]).slice(-5).reverse();
+
+  const motFields=[
+    {key:'motivWhy',label:'Why am I doing this?',placeholder:'What drives your involvement with Airwiggles…',icon:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'},
+    {key:'motivWant',label:'What do I want to get out of it?',placeholder:'Skills, connections, opportunities…',icon:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'},
+    {key:'motivTravel',label:'Where would I like to travel?',placeholder:'Places, events, conferences…',icon:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'},
+    {key:'motivExperiences',label:'What experiences would I like to have?',placeholder:'Collaborations, events, milestones…',icon:'<path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'},
+    {key:'motivProducts',label:'What products would I like to get?',placeholder:'Software, gear, tools, prizes…',icon:'<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>'},
+  ];
+
+  return`<div class="mo-box mo-wide" style="max-width:620px;">
+<div class="mo-hd">
+  <div style="display:flex;align-items:center;gap:12px;">
+    ${m.photoUrl?`<img src="${m.photoUrl}" style="width:38px;height:38px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="${m.name}">`:`<div class="av" style="width:38px;height:38px;background:${m.color};font-size:.75rem;flex-shrink:0;">${m.initials}</div>`}
+    <div>
+      <div class="mo-title">${m.name}</div>
+      <div style="font-size:.7rem;color:var(--muted);margin-top:1px;">${m.isDirector?'Director · ':''}${m.email||'No email set'}</div>
+    </div>
+  </div>
+  <button class="mo-close" onclick="closeModal()">×</button>
+</div>
+<div class="mo-body">
+
+  <!-- Stats row -->
+  <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:18px;">
+    ${[
+      {label:'Open tasks',val:activeTasks.length,color:'var(--acc)'},
+      {label:'Completed',val:doneTasks.length,color:'var(--green)'},
+      {label:'Projects',val:activeProjs.length,color:'var(--text2)'},
+      {label:'Hours',val:hours.toFixed(1)+'h',color:'var(--yellow)'},
+    ].map(s=>`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:10px 12px;text-align:center;">
+      <div style="font-size:1.1rem;font-weight:700;color:${s.color};font-family:'DM Mono',monospace;">${s.val}</div>
+      <div style="font-size:.64rem;color:var(--muted);margin-top:2px;">${s.label}</div>
+    </div>`).join('')}
+  </div>
+
+  <!-- Active projects -->
+  ${activeProjs.length>0?`<div style="margin-bottom:16px;">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">Active projects</div>
+    <div style="display:flex;flex-wrap:wrap;gap:6px;">
+      ${activeProjs.map(proj=>`<div style="display:inline-flex;align-items:center;gap:5px;padding:3px 9px;background:var(--surface2);border:1px solid var(--border);border-radius:20px;font-size:.73rem;cursor:pointer;" onclick="closeModal();openDetail('${proj.id}')"><div style="width:6px;height:6px;border-radius:50%;background:${proj.color};flex-shrink:0;"></div>${proj.name}</div>`).join('')}
+    </div>
+  </div>`:''}
+
+  <!-- Recent hours -->
+  ${recentLog.length>0?`<div style="margin-bottom:16px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
+      <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Recent hours</div>
+      <button class="btn btn-ghost btn-xs" style="font-size:.62rem;" onclick="closeModal();openModal('memberTime','${id}')">View all →</button>
+    </div>
+    ${recentLog.map(e=>`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border2);font-size:.75rem;">
+      <span style="color:var(--yellow);font-family:'DM Mono',monospace;font-weight:700;flex-shrink:0;">${e.hours}h</span>
+      <span style="flex:1;color:var(--text2);min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${e.note||'—'}</span>
+      <span style="color:var(--muted);font-family:'DM Mono',monospace;flex-shrink:0;">${fmtD(e.date)}</span>
+    </div>`).join('')}
+  </div>`:''}
+
+  <!-- Motivations & Aspirations -->
+  <div style="border-top:1px solid var(--border);padding-top:16px;">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Motivations &amp; Aspirations</div>
+    ${motFields.map(f=>`<div style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round">${f.icon}</svg>
+        <label style="font-size:.75rem;font-weight:600;color:var(--text2);">${f.label}</label>
+      </div>
+      <textarea class="txta" id="mp-${f.key}" style="min-height:56px;font-size:.78rem;resize:vertical;" placeholder="${f.placeholder}">${m[f.key]||''}</textarea>
+    </div>`).join('')}
+  </div>
+
+</div>
+<div class="mo-ft">
+  <button class="btn btn-ghost btn-sm" onclick="closeModal();openModal('member','${id}')">Edit profile</button>
+  <button class="btn btn-ghost btn-sm" onclick="closeModal();openModal('memberTime','${id}')">+ Log hours</button>
+  <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+  <button class="btn btn-acc" onclick="saveMemberProfile('${id}')">Save</button>
+</div></div>`;
+}
+
+function saveMemberProfile(id){
+  const m=getMember(id);if(!m)return;
+  ['motivWhy','motivWant','motivTravel','motivExperiences','motivProducts'].forEach(k=>{
+    const inp=el(`mp-${k}`);
+    if(inp)m[k]=inp.value.trim();
+  });
+  save();closeModal();showToast('Profile saved');
+}
 
 
 function openMemberHoursBreakdown(memberId){
@@ -9369,6 +9564,111 @@ function applyBranding(){
   /* ── Password screen brand name ── */
   const pwBrand = document.getElementById('pw-brand-name');
   if(pwBrand) pwBrand.textContent = name.split('—')[0].trim() || name;
+}
+
+/* ════ DATE PICKER ════ */
+let _calField=null, _calYear=0, _calMonth=0;
+
+function tmOpenRangeCal(e, field){
+  e.stopPropagation();
+  // Close any open calendar first
+  const existing=document.querySelector('.cal-pop');
+  if(existing){
+    if(existing.dataset.field===field){existing.remove();_calField=null;return;}
+    existing.remove();
+  }
+  _calField=field;
+  const val=document.getElementById(field+'-v')?.value||'';
+  const d=val?new Date(val):new Date();
+  _calYear=d.getFullYear();
+  _calMonth=d.getMonth();
+  _calRender(field);
+}
+
+function _calRender(field){
+  const wrap=document.getElementById(field+'-dw');
+  if(!wrap)return;
+  const old=wrap.querySelector('.cal-pop');if(old)old.remove();
+  const val=document.getElementById(field+'-v')?.value||'';
+
+  const MONTHS=['January','February','March','April','May','June','July','August','September','October','November','December'];
+  const DAYS=['Su','Mo','Tu','We','Th','Fr','Sa'];
+
+  // Build grid
+  const first=new Date(_calYear,_calMonth,1).getDay();
+  const daysInMonth=new Date(_calYear,_calMonth+1,0).getDate();
+  const todayStr=new Date().toISOString().slice(0,10);
+
+  let gridHtml='';
+  DAYS.forEach(d=>{gridHtml+=`<div class="cal-dow">${d}</div>`;});
+  // Empty cells before first day
+  for(let i=0;i<first;i++) gridHtml+=`<div class="cal-d empty"></div>`;
+  for(let day=1;day<=daysInMonth;day++){
+    const iso=`${_calYear}-${String(_calMonth+1).padStart(2,'0')}-${String(day).padStart(2,'0')}`;
+    const isSel=iso===val;
+    const isToday=iso===todayStr;
+    gridHtml+=`<button type="button" class="cal-d${isSel?' sel':''}${isToday&&!isSel?' today':''}" onclick="_calPick('${field}','${iso}')">${day}</button>`;
+  }
+
+  const pop=document.createElement('div');
+  pop.className='cal cal-pop';
+  pop.dataset.field=field;
+  // Right-align if near right edge
+  if(wrap.getBoundingClientRect().left > window.innerWidth/2) pop.classList.add('right');
+  pop.innerHTML=`
+    <div class="cal-nav">
+      <button type="button" class="cal-nb" onmousedown="event.preventDefault();_calNav('${field}',-1)">‹</button>
+      <span class="cal-mo">${MONTHS[_calMonth]} ${_calYear}</span>
+      <button type="button" class="cal-nb" onmousedown="event.preventDefault();_calNav('${field}',1)">›</button>
+    </div>
+    <div class="cal-grid">${gridHtml}</div>
+    <div class="cal-ft">
+      <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault();_calClear('${field}')">Clear</button>
+      <button type="button" class="btn btn-ghost btn-xs" onmousedown="event.preventDefault();_calPick('${field}','${todayStr}')">Today</button>
+    </div>`;
+  wrap.appendChild(pop);
+
+  // Close on outside click
+  setTimeout(()=>{
+    document.addEventListener('click',_calOutside,{once:true,capture:true});
+  },0);
+}
+
+function _calNav(field,dir){
+  _calMonth+=dir;
+  if(_calMonth>11){_calMonth=0;_calYear++;}
+  if(_calMonth<0){_calMonth=11;_calYear--;}
+  _calRender(field);
+}
+
+function _calPick(field,iso){
+  const inp=document.getElementById(field+'-v');
+  const lbl=document.getElementById(field+'-lbl');
+  if(inp)inp.value=iso;
+  if(lbl)lbl.textContent=typeof fmtD==='function'?fmtD(iso):iso;
+  // Clear placeholder style if present
+  if(lbl)lbl.classList.remove('ph');
+  // Close
+  const wrap=document.getElementById(field+'-dw');
+  wrap?.querySelector('.cal-pop')?.remove();
+  _calField=null;
+}
+
+function _calClear(field){
+  const inp=document.getElementById(field+'-v');
+  const lbl=document.getElementById(field+'-lbl');
+  if(inp)inp.value='';
+  if(lbl)lbl.textContent='';
+  const wrap=document.getElementById(field+'-dw');
+  wrap?.querySelector('.cal-pop')?.remove();
+  _calField=null;
+}
+
+function _calOutside(e){
+  const pop=document.querySelector('.cal-pop');
+  if(pop&&!pop.contains(e.target)&&!e.target.closest('.date-btn')){
+    pop.remove();_calField=null;
+  }
 }
 </script>
 
