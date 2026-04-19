@@ -1628,6 +1628,7 @@ function _applyDefaults(){
   if(!S.finance.assets)S.finance.assets=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
   if(!S.kbFilter)S.kbFilter={project:'',member:'',label:''};
+  if(!S.taskSort)S.taskSort='default';
   if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
   if(!S.coworkDays)S.coworkDays=[];
   (S.members||[]).forEach(m=>{if(!m.timeLog)m.timeLog=[];if(m.isDirector===undefined)m.isDirector=false;});
@@ -1713,6 +1714,7 @@ let S={
   activeMember:null,
   projFilter:'all',
   kbFilter:{project:'',member:'',label:''},
+  taskSort:'default',
   expandedTasks:[],expandedGantt:[],
   settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',navVisible:{dashboard:true,kanban:true,campaign:true,templates:true,finance:true,sponsors:true,settings:true},bookmarks:[]},
   projectTemplates:[],
@@ -2977,7 +2979,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
           <!-- Tasks pane -->
           <div class="ec-pane${curTab==='tasks'?' active':''}" data-pane="tasks">
             ${quickAddBarHtml(p.id)}
-            ${top.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">${mf?`No tasks assigned to ${getMember(mf)?.name?.split(' ')[0]||'them'} in this project.`:'No tasks yet.'}</div>`:`<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${sortTasksDoneToBottom(top).map(t=>renderTaskRow(t,0,false)).join('')}</div>`}
+            ${top.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">${mf?`No tasks assigned to ${getMember(mf)?.name?.split(' ')[0]||'them'} in this project.`:'No tasks yet.'}</div>`:`<div>${taskSortBarHtml('ec')}<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(top).map(t=>renderTaskRow(t,0,false)).join('')}</div></div>`}
           </div>
 
           <!-- Sponsors pane -->
@@ -3099,7 +3101,7 @@ function renderDashTasksInline(){
   const tasks=getDashTasks();
   const expanded=d.dataset.expanded==='1';
   const limit=expanded?tasks.length:7;
-  d.innerHTML=renderTaskList(tasks.slice(0,limit),true);
+  d.innerHTML=taskSortBarHtml('dash')+renderTaskList(tasks.slice(0,limit),true);
   // Scrollable: truncated = max-height so user can scroll within 7-item view
   d.classList.toggle('truncated',!expanded);
   initBlockedHover();
@@ -3141,6 +3143,47 @@ function collapseDashTasks(){
 
 /* ════ TASK LIST ════ */
 
+function applyTaskSort(tasks){
+  const sort=S.taskSort||'default';
+  const base=[...tasks];
+  if(sort==='alpha'){
+    base.sort((a,b)=>a.name.localeCompare(b.name));
+  } else if(sort==='person'){
+    base.sort((a,b)=>{
+      const an=(a.assignees||[]).map(id=>getMember(id)?.name||'').filter(Boolean).sort()[0]||'\u7fff';
+      const bn=(b.assignees||[]).map(id=>getMember(id)?.name||'').filter(Boolean).sort()[0]||'\u7fff';
+      return an.localeCompare(bn);
+    });
+  } else if(sort==='latest'){
+    base.sort((a,b)=>S.tasks.indexOf(b)-S.tasks.indexOf(a));
+  } else if(sort==='due'){
+    base.sort((a,b)=>{
+      if(!a.endDate&&!b.endDate)return 0;
+      if(!a.endDate)return 1;
+      if(!b.endDate)return -1;
+      return a.endDate<b.endDate?-1:1;
+    });
+  } else if(sort==='priority'){
+    const pri={Critical:0,High:1,Medium:2,Low:3};
+    base.sort((a,b)=>(pri[a.priority]??4)-(pri[b.priority]??4));
+  }
+  return[...base.filter(t=>!t.done&&taskComp(t)<100),...base.filter(t=>t.done||taskComp(t)===100)];
+}
+
+function taskSortBarHtml(ctx){
+  const cur=S.taskSort||'default';
+  const opts=[
+    {v:'default',l:'Default'},{v:'latest',l:'Latest'},{v:'due',l:'Due date'},
+    {v:'alpha',l:'A\u2013Z'},{v:'priority',l:'Priority'},{v:'person',l:'Person'},
+  ];
+  const cb=ctx==='detail'?'render()':'renderDashTasksInline()';
+  const pills=opts.map(o=>{
+    const a=cur===o.v;
+    return '<button type="button" onclick="S.taskSort=\''+o.v+'\';save();'+cb+'" style="padding:2px 8px;border-radius:20px;border:1.5px solid '+(a?'var(--acc)':'var(--border)')+';background:'+(a?'var(--teal-dim)':'transparent')+';color:'+(a?'var(--acc)':'var(--text2)')+';font-size:.62rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .12s;">'+o.l+'</button>';
+  }).join('');
+  return '<div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:7px;align-items:center;"><span style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;margin-right:2px;">Sort</span>'+pills+'</div>';
+}
+
 function sortTasksDoneToBottom(tasks){
   // Stable sort: incomplete first, done last. Within each group preserve original order.
   return [...tasks].sort((a,b)=>{
@@ -3148,7 +3191,7 @@ function sortTasksDoneToBottom(tasks){
     return a.done?1:-1;
   });
 }
-function renderTaskList(tasks,showProj=false){return sortTasksDoneToBottom(tasks).map(t=>renderTaskRow(t,0,showProj)).join('');}
+function renderTaskList(tasks,showProj=false){return applyTaskSort(tasks).map(t=>renderTaskRow(t,0,showProj)).join('');}
 
 function renderTaskRow(t,depth=0,showProj=false){
   const ch=kids(t.id);
@@ -4172,7 +4215,7 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
   <div class="detail-sec-title">Tasks</div>
   ${quickAddBarHtml(p.id)}
   ${top.length===0?`<div class="empty" style="margin-top:4px;"><div class="empty-ico">${ICO.task}</div><div class="empty-txt">No tasks yet — add one above.</div></div>`:
-  `<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${sortTasksDoneToBottom(top).map(t=>renderTaskRow(t,0,false)).join('')}</div>`}
+  `<div>${taskSortBarHtml('detail')}<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(top).map(t=>renderTaskRow(t,0,false)).join('')}</div></div>`}
 </div>
 
 <!-- EXPENSES SECTION — column 2 -->
