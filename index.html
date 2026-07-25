@@ -1458,8 +1458,7 @@ async function _doSave(){
   if(ok){
     _lastSavedAt=now;
     _setSyncStatus('synced');
-    // Fetch PocketBase's server-side 'updated' timestamp after save
-    // so the poll won't mistake our own save for a remote change
+    // Update _pollLastAt so realtime skips our own save
     setTimeout(async()=>{
       try{
         const row=await pbGet();
@@ -1624,34 +1623,67 @@ function _applyDefaults(){
 /* ── Real-time polling (checks every 15s for changes from other users) ── */
 let _pollTimer=null;
 let _pollLastAt=null;
+let _pbEventSource=null;
 
 function startPolling(){
-  if(_pollTimer)clearInterval(_pollTimer);
-  _pollTimer=setInterval(async()=>{
-    if(_saving)return; // don't poll if we're mid-save
-    try{
-      const row=await sbGet();
-      if(!row||row==='unchanged')return;
-      // Use PocketBase's built-in 'updated' timestamp for reliable change detection
-      const remoteTs=row.updated||row.updated_at;
-      if(remoteTs&&remoteTs!==_pollLastAt){
-        _pollLastAt=remoteTs;
-        // Don't overwrite if we have pending unsaved changes
-        if(_saveDebounce)return;
-
-        try{
-          const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
-          Object.assign(S,remote);
-          _applyDefaults();
-          render();
-          const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-          _setSyncStatus('synced',`Updated ${ts}`);
-          _showSyncToast();
-        }catch(e){console.warn('Failed to apply remote update:',e);}
-      }
-    }catch(e){}
-  },5000);
+  _startPBRealtime();
 }
+
+function _startPBRealtime(){
+  if(_pbEventSource){_pbEventSource.close();_pbEventSource=null;}
+  if(!_pbToken){return;}
+
+  if(!_pbRecordId){
+    // No record yet - fetch first then retry
+    setTimeout(async()=>{
+      const row=await sbGet();
+      if(row&&row!=='unchanged'&&row.id){
+        _pbRecordId=row.id;
+        _pollLastAt=row.updated||row.updated_at;
+      }
+      _startPBRealtime();
+    },2000);
+    return;
+  }
+
+  const es=new EventSource(PB_URL+'/api/realtime');
+  _pbEventSource=es;
+
+  es.addEventListener('PB_CONNECT',e=>{
+    try{
+      const d=JSON.parse(e.data);
+      fetch(PB_URL+'/api/realtime',{
+        method:'POST',
+        headers:{Authorization:_pbToken,'Content-Type':'application/json'},
+        body:JSON.stringify({clientId:d.clientId,subscriptions:['workspace_state/'+_pbRecordId]})
+      });
+    }catch(err){}
+  });
+
+  es.addEventListener('workspace_state/'+_pbRecordId,e=>{
+    try{
+      const msg=JSON.parse(e.data);
+      if(msg.action!=='update')return;
+      const row=msg.record;
+      const remoteTs=row.updated||row.updated_at;
+      if(remoteTs===_pollLastAt||_saveDebounce)return;
+      const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
+      Object.assign(S,remote);
+      _applyDefaults();
+      _pollLastAt=remoteTs;
+      render();
+      const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+      _setSyncStatus('synced',`Updated ${ts}`);
+      _showSyncToast();
+    }catch(err){console.warn('Realtime error:',err);}
+  });
+
+  es.onerror=()=>{
+    es.close();_pbEventSource=null;
+    setTimeout(_startPBRealtime,5000);
+  };
+}
+
 
 function _showSyncToast(){
   let t=document.getElementById('sync-toast');
