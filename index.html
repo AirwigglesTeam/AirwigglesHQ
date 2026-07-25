@@ -1458,6 +1458,14 @@ async function _doSave(){
   if(ok){
     _lastSavedAt=now;
     _setSyncStatus('synced');
+    // Fetch PocketBase's server-side 'updated' timestamp after save
+    // so the poll won't mistake our own save for a remote change
+    setTimeout(async()=>{
+      try{
+        const row=await pbGet();
+        if(row&&row!=='unchanged')_pollLastAt=row.updated||row.updated_at;
+      }catch(e){}
+    },500);
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _setSyncStatus('synced',`Saved ${ts}`);
     _saveLocalBackup(); // snapshot to rolling local backup on every successful remote save
@@ -1630,8 +1638,7 @@ function startPolling(){
         _pollLastAt=remoteTs;
         // Don't overwrite if we have pending unsaved changes
         if(_saveDebounce)return;
-        // Skip if this is our own save (timestamps match)
-        if(remoteTs===_lastSavedAt)return;
+
         try{
           const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
           Object.assign(S,remote);
