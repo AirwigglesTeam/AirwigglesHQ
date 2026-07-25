@@ -1571,7 +1571,7 @@ async function load(){
   const row=await sbGet();
   if(row&&row.data){
     try{
-      const p=JSON.parse(row.data);
+      const p=typeof row.data==='string'?JSON.parse(row.data):row.data;
       S={...S,...p};
       _lastSavedAt=row.updated_at||null;
       _applyDefaults();
@@ -1624,18 +1624,20 @@ function startPolling(){
     try{
       const row=await sbGet();
       if(!row||row==='unchanged')return;
-      // Only update if the server has a newer version than what we last saved
-      if(row.updated_at&&row.updated_at!==_lastSavedAt&&row.updated_at!==_pollLastAt){
-        _pollLastAt=row.updated_at;
-        // Don't overwrite if we have pending unsaved changes in the debounce queue
+      // Use PocketBase's built-in 'updated' timestamp for reliable change detection
+      const remoteTs=row.updated||row.updated_at;
+      if(remoteTs&&remoteTs!==_pollLastAt){
+        _pollLastAt=remoteTs;
+        // Don't overwrite if we have pending unsaved changes
         if(_saveDebounce)return;
+        // Skip if this is our own save (timestamps match)
+        if(remoteTs===_lastSavedAt)return;
         try{
-          const remote=JSON.parse(row.data);
+          const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
           Object.assign(S,remote);
           _applyDefaults();
-          _lastSavedAt=row.updated_at;
           render();
-          const ts=new Date(row.updated_at).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+          const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
           _setSyncStatus('synced',`Updated ${ts}`);
           _showSyncToast();
         }catch(e){console.warn('Failed to apply remote update:',e);}
