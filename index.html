@@ -11,7 +11,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Lexend:wght@300;400;500;600;700;800&family=DM+Mono:wght@400;500&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0;}
 :root{
@@ -1341,91 +1340,65 @@ const ICO={
 
 const el=id=>document.getElementById(id);
 
-/* ════ SUPABASE AUTH + CONFIG ════ */
-const SB_URL='https://ozsoadqugrrqufuhlyaz.supabase.co';
-const SB_KEY='sb_publishable_xP5lkE6IzTPjDym__9zmFg_PQBFusKo';
-const SB_WORKSPACE='airwiggles';
+/* ════ POCKETBASE CONFIG ════
+ *  Set PB_URL to your PocketBase server URL.
+ * ════════════════════════════════════════════════════════ */
+const PB_URL       = 'https://airwiggleshq.com';
+const PB_WORKSPACE = 'airwiggles';
 
-// Initialise the Supabase JS client — handles Auth session management
-let _sb;
-try{_sb=supabase.createClient(SB_URL,SB_KEY);}catch(e){console.warn('Supabase SDK not loaded, running offline.',e);}
+let _pbToken    = null;
+let _pbUser     = null;
+let _pbRecordId = null;
+let _pbEtag     = null;
 
-// Get the current user's JWT for authenticated requests
-async function _getAuthHeader(){
-  const {data:{session}}=await _sb.auth.getSession();
-  if(!session)return null;
-  return{'apikey':SB_KEY,'Authorization':'Bearer '+session.access_token,'Content-Type':'application/json'};
-}
-
-/* ── Supabase REST helpers ── */
-async function sbGet(){
+/* Restore session from sessionStorage */
+(function(){
   try{
-    const headers=await _getAuthHeader();
-    if(!headers)return null;
-    const r=await fetch(SB_URL+'/rest/v1/projectflow_state?workspace=eq.'+SB_WORKSPACE+'&select=*',{headers});
-    if(r.status===404||r.status===400){console.error('ProjectFlow: Supabase table missing.');_showSetupBanner();return null;}
+    const t=sessionStorage.getItem('pb_token');
+    const u=sessionStorage.getItem('pb_user');
+    if(t&&u){_pbToken=t;_pbUser=JSON.parse(u);}
+  }catch(e){}
+})();
+
+async function pbGet(){
+  try{
+    if(!_pbToken)return null;
+    const headers={Authorization:_pbToken};
+    if(_pbEtag)headers['If-None-Match']=_pbEtag;
+    const r=await fetch(
+      PB_URL+'/api/collections/workspace_state/records?filter=(workspace%3D"'+PB_WORKSPACE+'")&perPage=1',
+      {headers}
+    );
+    if(r.status===304)return 'unchanged';
     if(!r.ok)return null;
-    const rows=await r.json();
-    return rows.length>0?rows[0]:null;
-  }catch(e){console.warn('Supabase load error:',e);return null;}
+    const etag=r.headers.get('ETag');if(etag)_pbEtag=etag;
+    const d=await r.json();
+    if(d.items?.length>0){_pbRecordId=d.items[0].id;return d.items[0];}
+    return null;
+  }catch(e){console.warn('PocketBase load error:',e);return null;}
 }
 
-async function sbUpsert(data,updatedAt){
+async function pbUpsert(data,updatedAt){
   try{
-    const headers=await _getAuthHeader();
-    if(!headers)return false;
-    const r=await fetch(SB_URL+'/rest/v1/projectflow_state',{
-      method:'POST',
-      headers:Object.assign({},headers,{'Prefer':'resolution=merge-duplicates'}),
-      body:JSON.stringify({workspace:SB_WORKSPACE,data,updated_at:updatedAt})
-    });
+    if(!_pbToken)return false;
+    const body=JSON.stringify({workspace:PB_WORKSPACE,data,updated_at:updatedAt});
+    const headers={Authorization:_pbToken,'Content-Type':'application/json'};
+    let r;
+    if(_pbRecordId){
+      r=await fetch(PB_URL+'/api/collections/workspace_state/records/'+_pbRecordId,
+        {method:'PATCH',headers,body});
+    }else{
+      r=await fetch(PB_URL+'/api/collections/workspace_state/records',
+        {method:'POST',headers,body});
+      if(r.ok){const rec=await r.json();_pbRecordId=rec.id;}
+    }
+    if(r.ok)_pbEtag=null;
     return r.ok;
-  }catch(e){console.warn('Supabase save error:',e);return false;}
+  }catch(e){console.warn('PocketBase save error:',e);return false;}
 }
 
-function _showSetupBanner(){
-  if(document.getElementById('setup-banner'))return;
-  const b=document.createElement('div');
-  b.id='setup-banner';
-  b.style.cssText='position:fixed;top:0;left:0;right:0;background:#f59e0b;color:#000;padding:10px 16px;font-size:.78rem;font-weight:600;z-index:99999;display:flex;align-items:center;gap:12px;';
-  b.innerHTML=`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
-  <span>Supabase table not found. Go to your Supabase dashboard → SQL Editor and run the setup query. <a href="#" onclick="document.getElementById('setup-sql-modal').style.display='flex';return false;" style="text-decoration:underline;">Show SQL →</a></span>
-  <button onclick="this.parentElement.remove()" style="margin-left:auto;background:none;border:none;cursor:pointer;font-size:18px;font-weight:700;">×</button>`;
-  document.body.appendChild(b);
-
-  // Setup SQL modal
-  const m=document.createElement('div');
-  m.id='setup-sql-modal';
-  m.style.cssText='display:none;position:fixed;inset:0;background:rgba(0,0,0,.7);z-index:999999;align-items:center;justify-content:center;padding:20px;';
-  m.innerHTML=`<div style="background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:24px;max-width:560px;width:100%;">
-    <div style="font-size:1rem;font-weight:700;margin-bottom:12px;">Supabase Setup — Run this SQL once</div>
-    <div style="font-size:.72rem;color:var(--text2);margin-bottom:12px;">Go to your Supabase project → SQL Editor → New query → paste and run:</div>
-    <pre id="setup-sql-text" style="background:var(--bg);border:1px solid var(--border);border-radius:8px;padding:14px;font-size:.72rem;font-family:'DM Mono',monospace;overflow-x:auto;white-space:pre;color:var(--acc);">-- 1. Create the table
-CREATE TABLE IF NOT EXISTS projectflow_state (
-  workspace TEXT PRIMARY KEY,
-  data TEXT NOT NULL,
-  updated_at TIMESTAMPTZ DEFAULT NOW()
-);
-
--- 2. Enable Row Level Security
-ALTER TABLE projectflow_state ENABLE ROW LEVEL SECURITY;
-
--- 3. Drop any old open-access policy (safe to run even if it doesn't exist)
-DROP POLICY IF EXISTS "allow_all" ON projectflow_state;
-
--- 4. Only authenticated users can read/write
-CREATE POLICY "auth_users_only" ON projectflow_state
-  FOR ALL
-  USING (auth.role() = 'authenticated')
-  WITH CHECK (auth.role() = 'authenticated');</pre>
-    <div style="display:flex;gap:8px;margin-top:14px;">
-      <button onclick="navigator.clipboard.writeText(document.getElementById('setup-sql-text').textContent);this.textContent='Copied!';setTimeout(()=>this.textContent='Copy SQL',1500);" style="background:var(--acc);color:var(--black);border:none;border-radius:7px;padding:8px 16px;font-size:.78rem;font-weight:700;cursor:pointer;">Copy SQL</button>
-      <button onclick="document.getElementById('setup-sql-modal').style.display='none';" style="background:var(--surface2);color:var(--text);border:1px solid var(--border);border-radius:7px;padding:8px 16px;font-size:.78rem;cursor:pointer;">Close</button>
-    </div>
-  </div>`;
-  document.body.appendChild(m);
-  m.addEventListener('click',e=>{if(e.target===m)m.style.display='none';});
-}
+async function sbGet(){return pbGet();}
+async function sbUpsert(d,t){return pbUpsert(d,t);}
 
 /* ── Sync state ── */
 let _lastSavedAt=null;       // ISO string of last save we wrote
@@ -1648,7 +1621,7 @@ function startPolling(){
     if(_saving||document.hidden)return; // don't poll if we're mid-save or tab is hidden
     try{
       const row=await sbGet();
-      if(!row)return;
+      if(!row||row==='unchanged')return;
       // Only update if the server has a newer version than what we last saved
       if(row.updated_at&&row.updated_at!==_lastSavedAt&&row.updated_at!==_pollLastAt){
         _pollLastAt=row.updated_at;
@@ -2591,15 +2564,13 @@ document.addEventListener('mouseout',e=>{if(!e.relatedTarget?.closest('[data-tip
 /* ════ AUTH ════ */
 function showSignInPanel(){
   const sp=el('auth-signin-panel'),fp=el('auth-forgot-panel'),err=el('auth-error');
-  if(sp)sp.style.display='';
-  if(fp)fp.style.display='none';
+  if(sp)sp.style.display='';if(fp)fp.style.display='none';
   if(err)err.style.display='none';
   setTimeout(()=>el('auth-email')?.focus(),30);
 }
 function showForgotPanel(){
   const sp=el('auth-signin-panel'),fp=el('auth-forgot-panel');
-  if(sp)sp.style.display='none';
-  if(fp)fp.style.display='';
+  if(sp)sp.style.display='none';if(fp)fp.style.display='';
   setTimeout(()=>el('auth-reset-email')?.focus(),30);
 }
 
@@ -2611,15 +2582,27 @@ async function authSignIn(){
   if(!email||!password){errEl.textContent='Please enter your email and password.';errEl.style.display='block';return;}
   btn.textContent='Signing in…';btn.disabled=true;
   try{
-    const {error}=await _sb.auth.signInWithPassword({email,password});
+    const r=await fetch(PB_URL+'/api/collections/users/auth-with-password',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({identity:email,password})
+    });
     btn.textContent='Sign in →';btn.disabled=false;
-    if(error){errEl.textContent=error.message||'Sign in failed.';errEl.style.display='block';el('auth-password').value='';return;}
+    if(!r.ok){
+      let msg='Sign in failed. Check your email and password.';
+      try{const e=await r.json();msg=e.message||msg;}catch(_){}
+      errEl.textContent=msg;errEl.style.display='block';
+      el('auth-password').value='';return;
+    }
+    const d=await r.json();
+    _pbToken=d.token;_pbUser=d.record;
+    sessionStorage.setItem('pb_token',_pbToken);
+    sessionStorage.setItem('pb_user',JSON.stringify(d.record));
     errEl.style.display='none';
+    _onSignedIn(d.record);
   }catch(e){
     btn.textContent='Sign in →';btn.disabled=false;
-    errEl.textContent=window.location.protocol==='file:'?'Cannot sign in from a local file. Please serve via http://.':'Network error — check your connection and try again.';
+    errEl.textContent='Network error — check your connection and try again.';
     errEl.style.display='block';
-    console.error('Sign in error:',e);
   }
 }
 
@@ -2627,22 +2610,54 @@ async function authResetPassword(){
   const email=(el('auth-reset-email')?.value||'').trim();
   const errEl=el('auth-reset-error');
   if(!email){errEl.textContent='Please enter your email address.';errEl.style.display='block';return;}
-  const {error}=await _sb.auth.resetPasswordForEmail(email,{redirectTo:window.location.href});
-  if(error){errEl.textContent=error.message||'Failed to send reset email.';errEl.style.display='block';return;}
-  errEl.style.display='none';
-  const succ=el('auth-reset-success');if(succ)succ.style.display='block';
+  try{
+    const r=await fetch(PB_URL+'/api/collections/users/request-password-reset',{
+      method:'POST',headers:{'Content-Type':'application/json'},
+      body:JSON.stringify({email})
+    });
+    if(!r.ok)throw new Error();
+    errEl.style.display='none';
+    const succ=el('auth-reset-success');if(succ)succ.style.display='block';
+  }catch(_){
+    el('auth-reset-error').textContent='Could not send reset email. Check the address.';
+    el('auth-reset-error').style.display='block';
+  }
 }
 
 async function handleLogout(){
-  await _sb.auth.signOut();
+  _pbToken=null;_pbUser=null;_pbRecordId=null;_pbEtag=null;
+  sessionStorage.removeItem('pb_token');sessionStorage.removeItem('pb_user');
+  el('app').style.display='none';
+  el('pw-screen').style.display='flex';
+  showSignInPanel();
 }
+
+async function authUpdatePassword(){
+  const pw=el('auth-new-pw')?.value||'';
+  const errEl=el('auth-new-pw-err');
+  if(pw.length<8){errEl.textContent='Password must be at least 8 characters.';errEl.style.display='block';return;}
+  try{
+    const r=await fetch(PB_URL+'/api/collections/users/records/'+_pbUser.id,{
+      method:'PATCH',
+      headers:{Authorization:_pbToken,'Content-Type':'application/json'},
+      body:JSON.stringify({password:pw,passwordConfirm:pw,oldPassword:el('auth-old-pw')?.value||''})
+    });
+    if(!r.ok)throw new Error();
+    const succ=el('auth-new-pw-success');if(succ)succ.style.display='block';
+    errEl.style.display='none';
+  }catch(_){
+    errEl.textContent='Update failed. Make sure your current password is correct.';
+    errEl.style.display='block';
+  }
+}
+
 
 function _onSignedIn(user){
   el('pw-screen').style.display='none';
   el('app').style.display='flex';
   const avatar=el('rail-user-avatar');
   if(avatar){
-    avatar.textContent=(user.email||'?').substring(0,2).toUpperCase();
+    avatar.textContent=((user.name||user.email||'?').substring(0,2)).toUpperCase();
     avatar.title=user.email;
     const railUser=el('rail-user');
     if(railUser)railUser.setAttribute('data-tip',user.email);
@@ -2650,34 +2665,15 @@ function _onSignedIn(user){
   init();
 }
 
-async function authUpdatePassword(){
-  const pw=el('auth-new-pw')?.value||'';
-  const errEl=el('auth-new-pw-err');
-  if(pw.length<8){errEl.textContent='Password must be at least 8 characters.';errEl.style.display='block';return;}
-  const {error}=await _sb.auth.updateUser({password:pw});
-  if(error){errEl.textContent=error.message||'Update failed.';errEl.style.display='block';}
-}
-
 // Auth state listener
-_sb?.auth?.onAuthStateChange((event,session)=>{
-  if(event==='SIGNED_IN'||event==='INITIAL_SESSION'){
-    if(session?.user&&el('pw-screen').style.display!=='none'){
-      _onSignedIn(session.user);
-    } else if(session?.user){
-      const avatar=el('rail-user-avatar');
-      if(avatar){avatar.textContent=(session.user.email||'?').substring(0,2).toUpperCase();avatar.title=session.user.email;}
-    }
-  } else if(event==='SIGNED_OUT'){
-    const _app=el('app');if(_app)_app.style.display='none';
-    const _pw=el('pw-screen');if(_pw)_pw.style.display='flex';
-    showSignInPanel();
-  } else if(event==='PASSWORD_RECOVERY'){
-    el('pw-screen').style.display='flex';
-    const sp=el('auth-signin-panel');
-    if(sp)sp.innerHTML='<div style="font-size:.82rem;color:var(--text2);margin-bottom:12px;">Enter your new password:</div><input class="pw-inp" type="password" id="auth-new-pw" placeholder="New password" style="margin-bottom:10px;"><button class="pw-btn" onclick="authUpdatePassword()">Set new password</button><div class="pw-err" id="auth-new-pw-err"></div>';
-    const fp=el('auth-forgot-panel');if(fp)fp.style.display='none';
-  }
-});
+// PocketBase bootstrap
+(function _pbBootstrap(){
+  if(_pbToken&&_pbUser){_onSignedIn(_pbUser);return;}
+  const pw=document.getElementById('pw-screen');
+  const app=document.getElementById('app');
+  if(pw)pw.style.display='flex';
+  if(app)app.style.display='none';
+})();
 
 // Keyboard: Enter navigates email→password→submit, also handles forgot panel
 document.addEventListener('keydown',function(e){
@@ -2688,27 +2684,6 @@ document.addEventListener('keydown',function(e){
   }
 });
 
-// On page load — check for existing session
-(async function(){
-  try{
-    const {data:{session},error}=await _sb.auth.getSession();
-    if(error)throw error;
-    if(session?.user){
-      _onSignedIn(session.user);
-    } else {
-      el('pw-screen').style.display='flex';
-      showSignInPanel();
-    }
-  }catch(e){
-    console.warn('Auth session check failed:',e);
-    el('pw-screen').style.display='flex';
-    showSignInPanel();
-    if(window.location.protocol==='file:'){
-      const sub=el('pw-screen').querySelector('.pw-sub');
-      if(sub)sub.innerHTML='⚠️ Open via a web server, not directly from your Downloads folder.';
-    }
-  }
-})();
 
 /* ════ NAVIGATION ════ */
 let V='dashboard';
