@@ -1458,13 +1458,7 @@ async function _doSave(){
   if(ok){
     _lastSavedAt=now;
     _setSyncStatus('synced');
-    // Update _pollLastAt so realtime skips our own save
-    setTimeout(async()=>{
-      try{
-        const row=await pbGet();
-        if(row&&row!=='unchanged')_pollLastAt=row.updated||row.updated_at;
-      }catch(e){}
-    },500);
+    _myLastSave=now; // mark so realtime can identify our own saves
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _setSyncStatus('synced',`Saved ${ts}`);
     _saveLocalBackup(); // snapshot to rolling local backup on every successful remote save
@@ -1631,10 +1625,10 @@ function startPolling(){
 
 function _startPBRealtime(){
   if(_pbEventSource){_pbEventSource.close();_pbEventSource=null;}
-  if(!_pbToken){return;}
+  if(!_pbToken)return;
 
+  // If no record exists yet, wait until after first save creates one
   if(!_pbRecordId){
-    // No record yet - fetch first then retry
     setTimeout(async()=>{
       const row=await sbGet();
       if(row&&row!=='unchanged'&&row.id){
@@ -1649,39 +1643,124 @@ function _startPBRealtime(){
   const es=new EventSource(PB_URL+'/api/realtime');
   _pbEventSource=es;
 
+  // FIX 2+3: Subscribe to the whole collection with '*' wildcard
+  // This avoids stale record-ID subscriptions entirely
+  let _clientId='';
   es.addEventListener('PB_CONNECT',e=>{
     try{
       const d=JSON.parse(e.data);
+      _clientId=d.clientId;
+      // Subscribe to the specific record (most reliable)
+      // Falls back to wildcard if no record ID yet
+      const topic=_pbRecordId?'workspace_state/'+_pbRecordId:'workspace_state/*';
       fetch(PB_URL+'/api/realtime',{
         method:'POST',
         headers:{Authorization:_pbToken,'Content-Type':'application/json'},
-        body:JSON.stringify({clientId:d.clientId,subscriptions:['workspace_state/'+_pbRecordId]})
+        body:JSON.stringify({clientId:_clientId,subscriptions:[topic]})
       });
     }catch(err){}
   });
 
-  es.addEventListener('workspace_state/'+_pbRecordId,e=>{
+  // Listen on ALL SSE messages — PocketBase fires topic-named events
+  // Wildcard '*' fires as 'workspace_state/RECORD_ID', not 'workspace_state'
+  // Using the message event catches everything regardless of topic name
+  es.onmessage=e=>{
     try{
       const msg=JSON.parse(e.data);
-      if(msg.action!=='update')return;
+      // Skip the connect/auth events
+      if(!msg.action||!msg.record)return;
+      if(msg.action!=='update'&&msg.action!=='create')return;
       const row=msg.record;
+      if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
       const remoteTs=row.updated||row.updated_at;
-      if(remoteTs===_pollLastAt||_saveDebounce)return;
-      const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
-      Object.assign(S,remote);
-      _applyDefaults();
-      _pollLastAt=remoteTs;
-      render();
-      const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-      _setSyncStatus('synced',`Updated ${ts}`);
-      _showSyncToast();
-    }catch(err){console.warn('Realtime error:',err);}
+      if(remoteTs===_pollLastAt)return;
+      _pendingRemote={row,remoteTs};
+      _applyPendingRemote();
+    }catch(err){}
+  };
+
+  // Also listen on named topics (works for specific record subscriptions)
+  ['workspace_state','workspace_state/'+(_pbRecordId||'')].filter(Boolean).forEach(topic=>{
+    es.addEventListener(topic,e=>{
+      try{
+        const msg=JSON.parse(e.data);
+        if(!msg.action||!msg.record)return;
+        if(msg.action!=='update'&&msg.action!=='create')return;
+        const row=msg.record;
+        if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
+        const remoteTs=row.updated||row.updated_at;
+        if(remoteTs===_pollLastAt)return;
+        _pendingRemote={row,remoteTs};
+        _applyPendingRemote();
+      }catch(err){}
+    });
   });
 
-  es.onerror=()=>{
+  es.onerror=async()=>{
     es.close();_pbEventSource=null;
-    setTimeout(_startPBRealtime,5000);
+    // Check if token is still valid before reconnecting
+    if(_pbToken){
+      try{
+        const check=await fetch(PB_URL+'/api/health');
+        if(check.ok){
+          // Server fine — just reconnect
+          setTimeout(_startPBRealtime,5000);
+        } else if(check.status===401){
+          // Token expired — sign out gracefully
+          handleLogout();
+        } else {
+          setTimeout(_startPBRealtime,8000);
+        }
+      }catch(_){
+        // Network issue — retry later
+        setTimeout(_startPBRealtime,10000);
+      }
+    }
   };
+}
+
+let _pendingRemote=null;
+let _myLastSave=null;
+let _fallbackTimer=null;
+
+// Fallback poll every 30s — in case SSE drops silently
+function _startFallbackPoll(){
+  if(_fallbackTimer)clearInterval(_fallbackTimer);
+  _fallbackTimer=setInterval(async()=>{
+    if(!_pbToken||_saving)return;
+    try{
+      const row=await pbGet();
+      if(!row||row==='unchanged')return;
+      const remoteTs=row.updated||row.updated_at;
+      if(remoteTs===_pollLastAt)return;
+      if(row.updated_at===_myLastSave)return;
+      _pendingRemote={row,remoteTs};
+      _applyPendingRemote();
+    }catch(e){}
+  },30000);
+}
+
+function _applyPendingRemote(){
+  if(!_pendingRemote)return;
+  // FIX 4: wait until debounce clears before applying remote state
+  if(_saveDebounce){
+    setTimeout(_applyPendingRemote,300);
+    return;
+  }
+  const {row,remoteTs}=_pendingRemote;
+  _pendingRemote=null;
+  _pollLastAt=remoteTs;
+  // Skip if this is our own save (we sent this updated_at)
+  if(row.updated_at&&row.updated_at===_myLastSave)return;
+  try{
+    const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
+    Object.assign(S,remote);
+    _applyDefaults();
+    render();
+    const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    _setSyncStatus('synced',`Updated ${ts}`);
+    _showSyncToast();
+  }catch(err){console.warn('Failed to apply remote state:',err);}
 }
 
 
@@ -9474,6 +9553,7 @@ async function init(){
   updateRailBookmarks();
   updateFavicon();
   startPolling();
+  _startFallbackPoll();
   startAutoBackup();
   _setSyncStatus('synced','Connected');
 }
