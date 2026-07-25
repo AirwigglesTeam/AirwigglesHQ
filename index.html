@@ -1367,7 +1367,7 @@ async function pbGet(){
     if(_pbEtag)headers['If-None-Match']=_pbEtag;
     const r=await fetch(
       PB_URL+'/api/collections/workspace_state/records?filter=(workspace%3D"'+PB_WORKSPACE+'")&perPage=1',
-      {headers}
+      {headers,cache:'no-store'}
     );
     if(r.status===304)return 'unchanged';
     if(!r.ok)return null;
@@ -1620,7 +1620,7 @@ let _pollLastAt=null;
 function startPolling(){
   if(_pollTimer)clearInterval(_pollTimer);
   _pollTimer=setInterval(async()=>{
-    if(_saving||document.hidden)return; // don't poll if we're mid-save or tab is hidden
+    if(_saving)return; // don't poll if we're mid-save
     try{
       const row=await sbGet();
       if(!row||row==='unchanged')return;
@@ -1657,6 +1657,12 @@ function _showSyncToast(){
 }
 
 /* ── Online/offline detection ── */
+
+/* Poll immediately when tab becomes visible */
+document.addEventListener('visibilitychange',()=>{
+  if(!document.hidden&&_pbToken)startPolling();
+});
+
 window.addEventListener('online',()=>{_online=true;_setSyncStatus('saving');save();});
 window.addEventListener('offline',()=>{_online=false;_setSyncStatus('offline');});
 const COLORS=['#62D0AA','#14b8a6','#06b6d4','#22d3ee','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#ef4444','#f97316','#fb923c','#f59e0b','#84cc16'];
