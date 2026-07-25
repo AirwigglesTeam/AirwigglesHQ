@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -1387,7 +1387,9 @@ async function pbUpsert(data,updatedAt){
     if(_pbRecordId){
       r=await fetch(PB_URL+'/api/collections/workspace_state/records/'+_pbRecordId,
         {method:'PATCH',headers,body});
-    }else{
+      if(r&&r.status===404){_pbRecordId=null;r=null;}
+    }
+    if(!_pbRecordId&&!r){
       r=await fetch(PB_URL+'/api/collections/workspace_state/records',
         {method:'POST',headers,body});
       if(r.ok){const rec=await r.json();_pbRecordId=rec.id;}
