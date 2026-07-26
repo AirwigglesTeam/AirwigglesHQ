@@ -1935,52 +1935,48 @@ function _startPBRealtime(){
   if(_pbEventSource){_pbEventSource.close();_pbEventSource=null;}
   if(!_pbToken)return;
 
-  // If no record exists yet, wait until after first save creates one
+  // If no record ID yet, do ONE lookup then start — never loop
   if(!_pbRecordId){
-    setTimeout(async()=>{
-      const row=await sbGet();
+    if(_pbRealtimeWaiting)return; // already waiting — don't stack
+    _pbRealtimeWaiting=true;
+    sbGet().then(row=>{
+      _pbRealtimeWaiting=false;
       if(row&&row!=='unchanged'&&row.id){
         _pbRecordId=row.id;
         _pollLastAt=row.updated||row.updated_at;
       }
-      _startPBRealtime();
-    },2000);
+      if(_pbToken)_startPBRealtime();
+    }).catch(()=>{
+      _pbRealtimeWaiting=false;
+      // Retry once after 10s if lookup failed
+      if(_pbToken)setTimeout(_startPBRealtime,10000);
+    });
     return;
   }
 
   const es=new EventSource(PB_URL+'/api/realtime');
   _pbEventSource=es;
 
-  // FIX 2+3: Subscribe to the whole collection with '*' wildcard
-  // This avoids stale record-ID subscriptions entirely
-  let _clientId='';
+  let _sseClientId='';
   es.addEventListener('PB_CONNECT',e=>{
     try{
       const d=JSON.parse(e.data);
-      _clientId=d.clientId;
-      // Subscribe to the specific record (most reliable)
-      // Falls back to wildcard if no record ID yet
-      const topic=_pbRecordId?'workspace_state/'+_pbRecordId:'workspace_state/*';
+      _sseClientId=d.clientId;
+      const topic='workspace_state/'+_pbRecordId;
       fetch(PB_URL+'/api/realtime',{
         method:'POST',
         headers:{Authorization:_pbToken,'Content-Type':'application/json'},
-        body:JSON.stringify({clientId:_clientId,subscriptions:[topic]})
+        body:JSON.stringify({clientId:_sseClientId,subscriptions:[topic]})
       });
     }catch(err){}
   });
 
-  // Listen on ALL SSE messages — PocketBase fires topic-named events
-  // Wildcard '*' fires as 'workspace_state/RECORD_ID', not 'workspace_state'
-  // Using the message event catches everything regardless of topic name
-  es.onmessage=e=>{
+  function _handleSSEMessage(msg){
     try{
-      const msg=JSON.parse(e.data);
-      // Skip the connect/auth events
       if(!msg.action||!msg.record)return;
       if(msg.action!=='update'&&msg.action!=='create')return;
       const row=msg.record;
       if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
-      // Skip if this is our own save — check client ID embedded in the data
       try{
         const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
         if(_d&&_d._clientId===_myClientId)return;
@@ -1990,40 +1986,30 @@ function _startPBRealtime(){
       _pendingRemote={row,remoteTs};
       _applyPendingRemote();
     }catch(err){}
+  }
+
+  es.onmessage=e=>{
+    try{_handleSSEMessage(JSON.parse(e.data));}catch(err){}
   };
 
-  // Also listen on named topics (works for specific record subscriptions)
-  ['workspace_state','workspace_state/'+(_pbRecordId||'')].filter(Boolean).forEach(topic=>{
-    es.addEventListener(topic,e=>{
-      try{
-        const msg=JSON.parse(e.data);
-        if(!msg.action||!msg.record)return;
-        if(msg.action!=='update'&&msg.action!=='create')return;
-        const row=msg.record;
-        if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
-        // Skip our own saves — client ID embedded in the data payload
-        try{
-          const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
-          if(_d&&_d._clientId===_myClientId)return;
-        }catch(_){}
-        const remoteTs=row.updated||row.updated_at;
-        if(remoteTs===_pollLastAt)return;
-        _pendingRemote={row,remoteTs};
-        _applyPendingRemote();
-      }catch(err){}
-    });
+  // Named topic listener for specific record subscription
+  const topic='workspace_state/'+_pbRecordId;
+  es.addEventListener(topic,e=>{
+    try{_handleSSEMessage(JSON.parse(e.data));}catch(err){}
   });
 
   es.onerror=()=>{
-    // SSE drops happen routinely — never log out on a realtime error.
-    // Just close and reconnect with backoff.
     es.close();_pbEventSource=null;
-    if(_pbToken){
-      // Simple backoff reconnect — no health check, no logout
-      setTimeout(_startPBRealtime,8000);
+    // Reconnect once after backoff — guard against stacking
+    if(_pbToken&&!_pbReconnectTimer){
+      _pbReconnectTimer=setTimeout(()=>{
+        _pbReconnectTimer=null;
+        _startPBRealtime();
+      },8000);
     }
   };
 }
+
 
 
 /* ── Conflict resolution ── */
@@ -2065,6 +2051,8 @@ function _conflictTakeRemote(){
 let _pendingRemote=null;
 let _myLastSave=null;
 let _fallbackTimer=null;
+let _pbRealtimeWaiting=false; // prevents stacked record-ID lookups
+let _pbReconnectTimer=null;   // prevents stacked SSE reconnects
 
 // Fallback poll every 30s — in case SSE drops silently
 function _startFallbackPoll(){
@@ -3553,7 +3541,6 @@ function render(){
   // Restore scroll position (don't jump to top on every render)
   c.scrollTop=_scrollY;
   initBlockedHover();
-  if(_pbUser)setTimeout(applyPermissionsNav,0); // re-apply nav permissions after render
   
 }
 
