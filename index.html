@@ -3642,9 +3642,10 @@ function getDashTasks(){
 function renderDashTasksInline(){
   const d=el('dash-task-list');if(!d)return;
   const tasks=getDashTasks();
+  const sorted=applyTaskSort(tasks); // sort ALL tasks first
   const expanded=d.dataset.expanded==='1';
-  const limit=expanded?tasks.length:7;
-  d.innerHTML=taskSortBarHtml('dash')+renderTaskList(tasks.slice(0,limit),true);
+  const limit=expanded?sorted.length:7;
+  d.innerHTML=taskSortBarHtml('dash')+sorted.slice(0,limit).map(t=>renderTaskRow(t,0,true)).join('');
   // Scrollable: truncated = max-height so user can scroll within 7-item view
   d.classList.toggle('truncated',!expanded);
   initBlockedHover();
