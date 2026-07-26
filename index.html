@@ -1137,6 +1137,13 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
   .ec-meta>a[title="Event page"]{display:none;}
   .ec-pane{padding:8px 10px;}
 }
+
+/* Conflict banner */
+#conflict-banner{position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--surface);border:1.5px solid var(--yellow);border-radius:11px;padding:11px 16px;z-index:9999;display:none;box-shadow:0 8px 32px rgba(0,0,0,.4);max-width:420px;width:calc(100vw - 32px);}
+#conflict-banner .cb-title{font-size:.76rem;font-weight:700;color:var(--yellow);margin-bottom:6px;display:flex;align-items:center;gap:6px;}
+#conflict-banner .cb-body{font-size:.73rem;color:var(--text2);margin-bottom:10px;line-height:1.5;}
+#conflict-banner .cb-btns{display:flex;gap:8px;}
+
 </style>
 </head>
 <body>
@@ -1721,6 +1728,42 @@ function _startPBRealtime(){
   };
 }
 
+
+/* ── Conflict resolution ── */
+let _conflictRemote=null;
+
+function _showConflictBanner(row,remoteTs){
+  _conflictRemote={row,remoteTs};
+  const banner=document.getElementById('conflict-banner');
+  if(banner)banner.style.display='block';
+}
+
+function _conflictKeepMine(){
+  // Dismiss — our save will fire normally when debounce completes
+  _conflictRemote=null;
+  const banner=document.getElementById('conflict-banner');
+  if(banner)banner.style.display='none';
+}
+
+function _conflictTakeRemote(){
+  const banner=document.getElementById('conflict-banner');
+  if(banner)banner.style.display='none';
+  if(!_conflictRemote)return;
+  // Cancel pending save and apply remote state
+  if(_saveDebounce){clearTimeout(_saveDebounce);_saveDebounce=null;}
+  const {row,remoteTs}=_conflictRemote;
+  _conflictRemote=null;
+  _pollLastAt=remoteTs;
+  if(row.updated_at===_myLastSave)return;
+  try{
+    const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
+    Object.assign(S,remote);
+    _applyDefaults();
+    render();
+    _setSyncStatus('synced','Switched to latest');
+  }catch(err){console.warn('Failed to apply remote:',err);}
+}
+
 let _pendingRemote=null;
 let _myLastSave=null;
 let _fallbackTimer=null;
@@ -1744,9 +1787,10 @@ function _startFallbackPoll(){
 
 function _applyPendingRemote(){
   if(!_pendingRemote)return;
-  // FIX 4: wait until debounce clears before applying remote state
   if(_saveDebounce){
-    setTimeout(_applyPendingRemote,300);
+    // User has unsaved changes — show conflict banner instead of silently waiting
+    _showConflictBanner(_pendingRemote.row,_pendingRemote.remoteTs);
+    _pendingRemote=null;
     return;
   }
   const {row,remoteTs}=_pendingRemote;
@@ -2691,6 +2735,102 @@ document.addEventListener('mouseover',e=>{
 });
 document.addEventListener('mouseout',e=>{if(!e.relatedTarget?.closest('[data-tip]'))TT.style.opacity='0';});
 
+
+
+/* ════ PRESENCE ════
+ * Requires a 'presence' collection in PocketBase with fields:
+ *   user_id (Text), user_name (Text), updated_at (Text)
+ * API rules: all four set to @request.auth.id != ""
+ * ════════════════ */
+let _presenceTimer=null;
+let _presenceRecordId=null;
+
+async function _pingPresence(){
+  if(!_pbToken||!_pbUser)return;
+  const now=new Date().toISOString();
+  const body=JSON.stringify({
+    user_id:_pbUser.id,
+    user_name:_pbUser.name||_pbUser.email||'Unknown',
+    updated_at:now
+  });
+  const headers={Authorization:_pbToken,'Content-Type':'application/json'};
+  try{
+    if(_presenceRecordId){
+      await fetch(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,
+        {method:'PATCH',headers,body});
+    } else {
+      // Check if we already have a record first
+      const existing=await fetch(
+        PB_URL+'/api/collections/presence/records?filter=(user_id="'+_pbUser.id+'")&perPage=1',
+        {headers:{Authorization:_pbToken},cache:'no-store'}
+      );
+      if(existing.ok){
+        const d=await existing.json();
+        if(d.items?.length>0){
+          _presenceRecordId=d.items[0].id;
+          await fetch(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,
+            {method:'PATCH',headers,body});
+        } else {
+          const r=await fetch(PB_URL+'/api/collections/presence/records',
+            {method:'POST',headers,body});
+          if(r.ok){const rec=await r.json();_presenceRecordId=rec.id;}
+        }
+      }
+    }
+    // Fetch all active users (presence updated within last 60s)
+    const cutoff=new Date(Date.now()-60000).toISOString();
+    const active=await fetch(
+      PB_URL+'/api/collections/presence/records?filter=(updated_at>"'+cutoff+'")&perPage=20',
+      {headers:{Authorization:_pbToken},cache:'no-store'}
+    );
+    if(active.ok){
+      const d=await active.json();
+      const others=(d.items||[]).filter(u=>u.user_id!==_pbUser.id);
+      _renderPresence(others);
+    }
+  }catch(e){}
+}
+
+function _renderPresence(users){
+  const container=document.getElementById('rail-presence');
+  if(!container)return;
+  if(users.length===0){container.innerHTML='';return;}
+  container.innerHTML=users.map(u=>{
+    const initials=(u.user_name||'?').substring(0,2).toUpperCase();
+    const colors=['#62D0AA','#3d82f0','#f59e0b','#ec4899','#8b5cf6','#06b6d4'];
+    const color=colors[u.user_name.charCodeAt(0)%colors.length];
+    return`<div class="av" style="width:26px;height:26px;background:${color};font-size:.5rem;flex-shrink:0;border:2px solid var(--surface);border-radius:50%;cursor:default;" title="${u.user_name} is online">${initials}</div>`;
+  }).join('');
+}
+
+function startPresence(){
+  _pingPresence();
+  if(_presenceTimer)clearInterval(_presenceTimer);
+  _presenceTimer=setInterval(_pingPresence,25000);
+}
+
+
+/* ════ IMAGE UPLOAD TO POCKETBASE ════
+ * Requires an 'images' collection in PocketBase with:
+ *   - file (File, single, max 5MB)
+ *   - label (Text)
+ * API rules: all set to @request.auth.id != ""
+ * ════════════════════════════════════ */
+async function _uploadImageToPB(file, label){
+  if(!_pbToken)throw new Error('Not authenticated');
+  const formData=new FormData();
+  formData.append('file', file);
+  formData.append('label', label);
+  const r=await fetch(PB_URL+'/api/collections/images/records',{
+    method:'POST',
+    headers:{Authorization:_pbToken},
+    body:formData
+  });
+  if(!r.ok){const e=await r.json().catch(()=>({}));throw new Error(e.message||'Upload failed');}
+  const rec=await r.json();
+  // PocketBase file URL format:
+  return PB_URL+'/api/files/'+rec.collectionId+'/'+rec.id+'/'+rec.file;
+}
 
 /* ════ USER PERMISSIONS ════ */
 function _userPerms(){
@@ -6194,7 +6334,21 @@ function generateFinanceReport(){
   </div>`;
 
   // ── Assemble & open ──
-  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Airwiggles Finance Report — ${today}</title><style>${css}</style></head><body>${cover}${summary}${catPage}${taxPage}${divPage}</body></html>`;
+  const html=`<!DOCTYPE html><html><head><meta charset="UTF-8"><title>Airwiggles Finance Report — ${today}</title><style>${css}</style></head><body>${cover}${summary}${catPage}${taxPage}${divPage}
+<!-- Conflict banner -->
+<div id="conflict-banner">
+  <div class="cb-title">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    A team member just saved changes
+  </div>
+  <div class="cb-body">You have unsaved changes. Do you want to keep yours or switch to the latest version?</div>
+  <div class="cb-btns">
+    <button class="btn btn-acc btn-sm" onclick="_conflictKeepMine()">Keep mine</button>
+    <button class="btn btn-ghost btn-sm" onclick="_conflictTakeRemote()">Take latest</button>
+  </div>
+</div>
+
+</body></html>`;
   const blob=new Blob([html],{type:'text/html'});
   const url=URL.createObjectURL(blob);
   const w=window.open(url,'_blank');
@@ -6614,11 +6768,24 @@ function openModal(type,data){
   if(type==='taskTmpl')renderTtBuf();
 }
 
-function uploadLogo(input){
+async function uploadLogo(input){
   const file=input.files[0];if(!file)return;
-  const reader=new FileReader();
-  reader.onload=e=>{S.settings.logoUrl=e.target.result;save();applyBranding();updateFavicon();render();};
-  reader.readAsDataURL(file);
+  const statusEl=document.querySelector('.st-logo-status');
+  if(statusEl){statusEl.textContent='Uploading…';statusEl.style.display='block';}
+  try{
+    // Try PocketBase upload first
+    const url=await _uploadImageToPB(file,'logo');
+    S.settings.logoUrl=url;
+    save();applyBranding();updateFavicon();render();
+    if(statusEl){statusEl.textContent='';statusEl.style.display='none';}
+  }catch(e){
+    // Fallback to base64 if PocketBase images collection not set up yet
+    console.warn('PB image upload failed, falling back to base64:',e);
+    const reader=new FileReader();
+    reader.onload=ev=>{S.settings.logoUrl=ev.target.result;save();applyBranding();updateFavicon();render();};
+    reader.readAsDataURL(file);
+    if(statusEl){statusEl.textContent='';statusEl.style.display='none';}
+  }
 }
 
 function setAccent(color,dot){
@@ -7682,9 +7849,19 @@ function saveMember(eid){
   const clearPhoto=el('mm-photo-clear')?.value==='1';
   if(eid){const old=S.members.find(m=>m.id===eid);if(old){member.timeLog=old.timeLog||[];member.email=member.email||old.email||'';member.photoUrl=clearPhoto?null:(old.photoUrl||null);}}
   if(photoFile){
-  const reader=new FileReader();
-  reader.onload=e=>{member.photoUrl=e.target.result;if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);save();closeModal();render();};
-  reader.readAsDataURL(photoFile);return;
+    (async()=>{
+      try{
+        const url=await _uploadImageToPB(photoFile,'member-'+(eid||member.id));
+        member.photoUrl=url;
+      }catch(e){
+        // Fallback to base64
+        console.warn('PB photo upload failed, falling back to base64:',e);
+        await new Promise(res=>{const r=new FileReader();r.onload=ev=>{member.photoUrl=ev.target.result;res();};r.readAsDataURL(photoFile);});
+      }
+      if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);
+      save();closeModal();render();
+    })();
+    return;
   }
   if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);
   save();closeModal();render();
@@ -9594,6 +9771,7 @@ async function init(){
   updateFavicon();
   startPolling();
   _startFallbackPoll();
+  startPresence();
   startAutoBackup();
   _setSyncStatus('synced','Connected');
 }
@@ -10119,5 +10297,19 @@ function _calOutside(e){
   <button class="bulk-btn danger" onclick="bulkDelete()">🗑 Delete</button>
   <button class="bulk-btn clear" onclick="clearBulk()" title="Clear selection">✕</button>
 </div>
+
+<!-- Conflict banner -->
+<div id="conflict-banner">
+  <div class="cb-title">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>
+    A team member just saved changes
+  </div>
+  <div class="cb-body">You have unsaved changes. Do you want to keep yours or switch to the latest version?</div>
+  <div class="cb-btns">
+    <button class="btn btn-acc btn-sm" onclick="_conflictKeepMine()">Keep mine</button>
+    <button class="btn btn-ghost btn-sm" onclick="_conflictTakeRemote()">Take latest</button>
+  </div>
+</div>
+
 </body>
 </html>
