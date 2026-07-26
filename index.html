@@ -1482,10 +1482,18 @@ function _validateBeforeSave(){
     return{ok:false,reason:`Refusing to save: state appears empty (was ${lastTotal} items)`};
   }
 
-  // Warn if data shrank by more than 50% in one save (likely a bug)
-  // Exception: if lastTotal is 0 (first load) or total is reasonable
-  if(lastTotal>10&&total<lastTotal*0.5){
-    return{ok:false,reason:`Suspicious data loss: ${lastTotal} → ${total} items. Save blocked.`};
+  // Guard against any single collection being wiped if it previously had many items
+  // (e.g. tasks going from 50 to 0 in one save is suspicious)
+  const WIPE_THRESHOLD=5; // only flag if collection had more than this many items
+  const collections=[
+    ['projects',S.projects.length,_lastKnownCounts.projects],
+    ['tasks',S.tasks.length,_lastKnownCounts.tasks],
+    ['sponsors',S.sponsors.length,_lastKnownCounts.sponsors],
+  ];
+  for(const [name,now,last] of collections){
+    if(last>WIPE_THRESHOLD&&now===0){
+      return{ok:false,reason:`${name} wiped (was ${last}, now 0). Save blocked as a precaution.`};
+    }
   }
 
   // All good — update known counts
