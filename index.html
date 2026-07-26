@@ -8367,7 +8367,7 @@ function memberTimeModalHtml(memberId){
     +'<div class="field"><label class="flbl">Note</label><input class="inp" id="mt-note" placeholder="What did you work on?"></div>'
     +'</div></div>'
     +'<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Close</button>'
-    +'<button class="btn btn-acc" onclick="logMemberTime(\''+memberId+'\')">Log Time</button></div>'
+    +'<button class="btn btn-acc" onclick="saveMemberTime(\''+memberId+'\')">Log Time</button></div>'
     +'</div>';
 }
 
@@ -8788,6 +8788,10 @@ function memberProfileModalHtml(id,tab){
   </div>`:''}
 
   <!-- Recent hours -->
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Time Logged</div>
+    <button class="btn btn-acc btn-xs" onclick="closeModal();openModal('memberTime','${id}')">+ Log Time</button>
+  </div>
   ${recentLog.length>0?`<div style="margin-bottom:16px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:7px;">
       <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;">Recent hours</div>
@@ -10953,6 +10957,24 @@ function editProjectTool(projId,toolId){
   openModal('projTool',{projId,toolId});
 }
 
+function saveMemberTime(memberId){
+  const m=getMember(memberId);if(!m)return;
+  const hours=parseFloat(el('mt-hrs')?.value);
+  if(!hours||hours<=0){
+    const inp=el('mt-hrs');
+    if(inp){inp.style.borderColor='var(--red)';setTimeout(()=>{inp.style.borderColor='';},1400);}
+    return;
+  }
+  const projId=el('mt-proj')?.value||'';
+  const date=el('mt-date')?.value||toISO(new Date());
+  const note=el('mt-note')?.value.trim()||'';
+  if(!m.timeLog)m.timeLog=[];
+  m.timeLog.push({id:uid(),hours,projectId:projId||null,date,note});
+  save();
+  // Re-open the modal to show the new entry
+  openModal('memberTime',memberId);
+}
+
 /* Log member time */
 function logMemberTime(memberId){
   openModal('memberTime',memberId);
@@ -10963,11 +10985,22 @@ function deleteMemberLog(memberId,entryId){
   const m=getMember(memberId);if(!m)return;
   m.timeLog=(m.timeLog||[]).filter(e=>e.id!==entryId);
   save();
-  // Re-render the time log if modal is open
-  const panel=el('member-time-panel');
-  if(panel)openModal('memberTime',memberId);
+  // Re-open modal to refresh the list
+  const mc=el('mc');
+  if(mc&&mc.style.display!=='none'){
+    openModal('memberTime',memberId);
+  }
 }
-function delMemberLog(memberId,entryId){deleteMemberLog(memberId,entryId);}
+function delMemberLog(memberId,entryId){
+  const m=getMember(memberId);if(!m)return;
+  m.timeLog=(m.timeLog||[]).filter(e=>e.id!==entryId);
+  save();
+  // Refresh whatever view is showing
+  const mc=el('mc');
+  if(mc&&mc.style.display!=='none'){
+    openMemberHoursBreakdown(memberId);
+  }
+}
 
 /* Colour picker for template colours */
 function pickC(swatchId,inputId,color,el2){
