@@ -1687,6 +1687,8 @@ function _startPBRealtime(){
       if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
       const remoteTs=row.updated||row.updated_at;
       if(remoteTs===_pollLastAt)return;
+      // Skip if this is our own save
+      if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave)return;
       _pendingRemote={row,remoteTs};
       _applyPendingRemote();
     }catch(err){}
@@ -1782,7 +1784,7 @@ function _startFallbackPoll(){
       if(!row||row==='unchanged')return;
       const remoteTs=row.updated||row.updated_at;
       if(remoteTs===_pollLastAt)return;
-      if(row.updated_at===_myLastSave)return;
+      if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave)return;
       _pendingRemote={row,remoteTs};
       _applyPendingRemote();
     }catch(e){}
@@ -1791,17 +1793,21 @@ function _startFallbackPoll(){
 
 function _applyPendingRemote(){
   if(!_pendingRemote)return;
+  const {row,remoteTs}=_pendingRemote;
+  // Skip own saves immediately — before conflict check or anything else
+  if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave){
+    _pendingRemote=null;
+    _pollLastAt=remoteTs; // mark as seen so we don't process again
+    return;
+  }
   if(_saveDebounce){
     // User has unsaved changes — show conflict banner instead of silently waiting
-    _showConflictBanner(_pendingRemote.row,_pendingRemote.remoteTs);
+    _showConflictBanner(row,remoteTs);
     _pendingRemote=null;
     return;
   }
-  const {row,remoteTs}=_pendingRemote;
   _pendingRemote=null;
   _pollLastAt=remoteTs;
-  // Skip if this is our own save (we sent this updated_at)
-  if(row.updated_at&&row.updated_at===_myLastSave)return;
   try{
     const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
     Object.assign(S,remote);
@@ -3213,15 +3219,23 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
       </div>`;
     }
     const grouped={};
-    S.quickLinks.forEach(q=>{const c=q.category||'__none__';if(!grouped[c])grouped[c]=[];grouped[c].push(q);});
-    const catLabel=c=>{const l=getLabel(c);return l?`<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:2px;background:${l.color};display:inline-block;"></span>${l.name}</span>`:c==='__none__'?'Other':c;};
-    return Object.entries(grouped).map(([cat,links])=>`
-      <div style="margin-bottom:10px;">
-        <div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:5px;">${catLabel(cat)}</div>
-        <div class="ql-grid">
+    S.quickLinks.forEach(q=>{const cat=q.category||'__none__';if(!grouped[cat])grouped[cat]=[];grouped[cat].push(q);});
+    // Named categories first, uncategorised last
+    const orderedKeys=[...Object.keys(grouped).filter(k=>k!=='__none__'),...(grouped['__none__']?['__none__']:[])];
+    return orderedKeys.map(cat=>{
+      const links=grouped[cat];
+      const title=cat==='__none__'?'Other':cat;
+      return`<div style="margin-bottom:16px;">
+        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
+          <span style="font-size:.72rem;font-weight:700;color:var(--text);letter-spacing:.02em;">${title}</span>
+          <div style="flex:1;height:1px;background:var(--border2);"></div>
+          <button class="ql-btn add-ql" style="padding:3px 8px;font-size:.68rem;margin-bottom:0;" onclick="openModal('quickLink',null);setTimeout(()=>{const el=document.getElementById('ql-cat');if(el)el.value='${cat==='__none__'?'':cat}';},60)">+ Add</button>
+        </div>
+        <div class="ql-grid" style="margin-bottom:0;">
           ${links.map(qlBtnHtml).join('')}
         </div>
-      </div>`).join('')+`<button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>`;
+      </div>`;
+    }).join('')+`<button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>`;
   })()}
 </div>`:''}
 
@@ -9009,6 +9023,23 @@ function histTypeCls(t){return t==='prize'?'sp-type-prize':t==='cash'||t==='cash
 /* Which sponsor is selected in the split view */
 let _spSelectedId=null;
 
+
+function selectSponsor(id){
+  _spSelectedId=id;
+  // Update active class on list rows without touching the search input
+  document.querySelectorAll('.sp-list-row').forEach(row=>{
+    row.classList.toggle('active', row.dataset.spId===id);
+  });
+  // Re-render only the right profile panel — leaves the left list + search intact
+  const panel=document.getElementById('sp-profile-panel');
+  if(panel){
+    const sel=getSponsor(id);
+    panel.innerHTML=sel?renderSpProfile(sel):`<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--muted);font-size:.82rem;">Select a sponsor</div>`;
+  } else {
+    render(); // fallback if panel not found
+  }
+}
+
 function renderSponsors(){
   // Ensure _spSelectedId is valid
   if(_spSelectedId&&!getSponsor(_spSelectedId))_spSelectedId=null;
@@ -9153,7 +9184,7 @@ ${(()=>{
     <div>
       ${list.length===0?`<div style="padding:24px;text-align:center;color:var(--muted);font-size:.78rem;">No sponsors match</div>`:''}
       ${list.map(s=>`
-      <div class="sp-list-row${s.id===_spSelectedId?' active':''}" onclick="_spSelectedId='${s.id}';render()">
+      <div class="sp-list-row${s.id===_spSelectedId?' active':''}" data-sp-id="${s.id}" onclick="selectSponsor('${s.id}')">
         <div class="sp-avatar">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
