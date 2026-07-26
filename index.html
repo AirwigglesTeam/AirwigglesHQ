@@ -3434,16 +3434,49 @@ function _findMyMember(user){
   return me||null;
 }
 
+
+function _updateRailAvatar(){
+  const avatar=el('rail-user-avatar');
+  if(!avatar)return;
+  // Try linked member photo first
+  const myMember=window._myMemberId?getMember(window._myMemberId):null;
+  if(myMember&&myMember.photoUrl){
+    avatar.innerHTML='';
+    avatar.style.background='transparent';
+    avatar.style.padding='0';
+    const img=document.createElement('img');
+    img.src=myMember.photoUrl;
+    img.style.cssText='width:100%;height:100%;border-radius:50%;object-fit:cover;';
+    img.onerror=()=>{
+      // Photo failed to load — fall back to initials
+      avatar.innerHTML='';
+      avatar.style.background='';
+      avatar.style.padding='';
+      if(_pbUser)avatar.textContent=(((_pbUser.name||_pbUser.email||'?')).substring(0,2)).toUpperCase();
+    };
+    avatar.appendChild(img);
+    return;
+  }
+  // Fall back to PocketBase user initials
+  if(_pbUser){
+    avatar.innerHTML='';
+    avatar.style.background='';
+    avatar.textContent=((_pbUser.name||_pbUser.email||'?').substring(0,2)).toUpperCase();
+    if(_pbUser.email)avatar.title=_pbUser.email;
+  }
+}
+
 function _onSignedIn(user){
   el('pw-screen').style.display='none';
   el('app').style.display='flex';
+  // Set initials immediately (photo will be updated after member load)
   const avatar=el('rail-user-avatar');
   if(avatar){
     avatar.textContent=((user.name||user.email||'?').substring(0,2)).toUpperCase();
     avatar.title=user.email;
-    const railUser=el('rail-user');
-    if(railUser)railUser.setAttribute('data-tip',user.email);
   }
+  const railUser=el('rail-user');
+  if(railUser)railUser.setAttribute('data-tip',user.email);
   init().then(()=>applyPermissionsNav());
 }
 
@@ -8412,11 +8445,18 @@ function saveMember(eid){
   const photoFile=el('mm-photo')?.files[0];
   const clearPhoto=el('mm-photo-clear')?.value==='1';
   if(eid){const old=S.members.find(m=>m.id===eid);if(old){member.timeLog=old.timeLog||[];member.email=member.email||old.email||'';member.photoUrl=clearPhoto?null:(old.photoUrl||null);}}
+  // Re-link account after save (pbUserId may have changed)
+  if(_pbUser){
+    const relinked=_findMyMember(_pbUser);
+    if(relinked){window._myMemberId=relinked.id;}
+    _updateRailAvatar();
+  }
   if(photoFile){
     (async()=>{
       try{
         const url=await _uploadImageToPB(photoFile,'member-'+(eid||member.id));
         member.photoUrl=url;
+      if(window._myMemberId===member.id)_updateRailAvatar();
       }catch(e){
         // Fallback to base64
         console.warn('PB photo upload failed, falling back to base64:',e);
@@ -10396,9 +10436,9 @@ async function init(){
   const _myMember=_findMyMember(_pbUser);
   if(_myMember){
     window._myMemberId=_myMember.id;
-    // Auto-set active member filter to self on first load
     if(!S.activeMember)S.activeMember=_myMember.id;
   }
+  _updateRailAvatar(); // show member photo if linked
   _updateMyTasksBtn();
   nav('dashboard');
   applyPermissionsNav();
