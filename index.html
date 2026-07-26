@@ -1376,14 +1376,23 @@ let _pbEtag     = null;
   }catch(e){}
 })();
 
+
+/* Fetch with timeout — prevents indefinite hangs on slow/unreachable server */
+function fetchWithTimeout(url, opts={}, ms=12000){
+  const controller=new AbortController();
+  const timer=setTimeout(()=>controller.abort(),ms);
+  return fetch(url,{...opts,signal:controller.signal})
+    .finally(()=>clearTimeout(timer));
+}
+
 async function pbGet(){
   try{
     if(!_pbToken)return null;
     const headers={Authorization:_pbToken};
     if(_pbEtag)headers['If-None-Match']=_pbEtag;
-    const r=await fetch(
+    const r=await fetchWithTimeout(
       PB_URL+'/api/collections/workspace_state/records?filter=(workspace%3D"'+PB_WORKSPACE+'")&perPage=1',
-      {headers,cache:'no-store'}
+      {headers,cache:'no-store'},12000
     );
     if(r.status===304)return 'unchanged';
     if(!r.ok)return null;
@@ -1403,13 +1412,13 @@ async function pbUpsert(data,updatedAt,_isRetry){
     const headers={Authorization:_pbToken,'Content-Type':'application/json'};
     let r;
     if(_pbRecordId){
-      r=await fetch(PB_URL+'/api/collections/workspace_state/records/'+_pbRecordId,
-        {method:'PATCH',headers,body});
+      r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_state/records/'+_pbRecordId,
+        {method:'PATCH',headers,body},15000);
       if(r&&r.status===404){_pbRecordId=null;r=null;}
     }
     if(!_pbRecordId&&!r){
-      r=await fetch(PB_URL+'/api/collections/workspace_state/records',
-        {method:'POST',headers,body});
+      r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_state/records',
+        {method:'POST',headers,body},15000);
       if(r.ok){const rec=await r.json();_pbRecordId=rec.id;}
     }
     if(r.ok){_pbEtag=null;_lastSaveError='';return true;}
@@ -1700,6 +1709,7 @@ async function _doSave(){
     delete _syncPayload._spSearch;
     ok=await sbUpsert(JSON.stringify(_syncPayload),now);
   }catch(e){
+    _lastSaveError='Serialisation error: '+(e.message||String(e));
     console.error('Save error:',e);
     ok=false;
   }
@@ -1818,8 +1828,14 @@ function redo(){
 
 /* ── load — fetches from Supabase, falls back to localStorage ── */
 async function load(){
-  // First, try Supabase
-  const row=await sbGet();
+  // Fetch from PocketBase with a hard 10s timeout
+  // If unreachable, fall through to localStorage so the app still loads
+  let row=null;
+  try{
+    const rowPromise=sbGet();
+    const timeout=new Promise(res=>setTimeout(()=>res(null),10000));
+    row=await Promise.race([rowPromise,timeout]);
+  }catch(e){row=null;}
   if(row&&row.data){
     try{
       const p=typeof row.data==='string'?JSON.parse(row.data):row.data;
@@ -1964,25 +1980,13 @@ function _startPBRealtime(){
     });
   });
 
-  es.onerror=async()=>{
+  es.onerror=()=>{
+    // SSE drops happen routinely — never log out on a realtime error.
+    // Just close and reconnect with backoff.
     es.close();_pbEventSource=null;
-    // Check if token is still valid before reconnecting
     if(_pbToken){
-      try{
-        const check=await fetch(PB_URL+'/api/health');
-        if(check.ok){
-          // Server fine — just reconnect
-          setTimeout(_startPBRealtime,5000);
-        } else if(check.status===401){
-          // Token expired — sign out gracefully
-          handleLogout();
-        } else {
-          setTimeout(_startPBRealtime,8000);
-        }
-      }catch(_){
-        // Network issue — retry later
-        setTimeout(_startPBRealtime,10000);
-      }
+      // Simple backoff reconnect — no health check, no logout
+      setTimeout(_startPBRealtime,8000);
     }
   };
 }
@@ -3170,8 +3174,9 @@ function _scheduleTokenRefresh(){
     const now=Date.now();
     const msUntilExpiry=expiresAt-now;
     if(msUntilExpiry<=0){
-      // Already expired — sign out
-      handleLogout();
+      // Token looks expired — try to refresh rather than signing out
+      // (clock skew can cause false positives)
+      _refreshToken();
       return;
     }
     // Refresh 1 hour before expiry (or immediately if less than 1h left)
