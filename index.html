@@ -1504,9 +1504,12 @@ function save(){
     setTimeout(()=>{
       try{
         const _lsData={...S};delete _lsData._clientId;
-        localStorage.setItem('pf4',JSON.stringify(_lsData));
-      }catch(e){_lsDirty=true;} // retry next save if it fails
-    },0); // defer to next tick — off main thread timing
+        const _lsStr=JSON.stringify(_lsData);
+        if(_lsStr.length<4500000){ // ~4.5MB safety margin for 5MB quota
+          localStorage.setItem('pf4',_lsStr);
+        }
+      }catch(e){} // quota exceeded — PocketBase is source of truth
+    },0);
   }
   // Debounce remote saves — don't hammer Supabase on every keystroke
   if(_saveDebounce)clearTimeout(_saveDebounce);
@@ -1733,7 +1736,7 @@ async function _doSave(){
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _online=true; // reset on successful save — connection is back
     _setSyncStatus('synced',`Saved ${ts}`);
-    _saveLocalBackup();
+    try{_saveLocalBackup();}catch(e){console.warn('Local backup failed:',e);}
   } else {
     _setSyncStatus('error','⚠ '+(_lastSaveError||'Save failed — check connection'));
     _online=false;
@@ -1743,7 +1746,6 @@ async function _doSave(){
 
 /* ── Local rolling backup ── */
 function _saveLocalBackup(){
-  // Don't back up an empty/blank state — must have at least one project, task, member or sponsor
   const hasData=(S.projects&&S.projects.length>0)||(S.tasks&&S.tasks.length>0)||
                 (S.members&&S.members.length>0)||(S.sponsors&&S.sponsors.length>0)||
                 (S.quickLinks&&S.quickLinks.length>0)||(S.finance&&(
@@ -1751,6 +1753,15 @@ function _saveLocalBackup(){
                   (S.finance.oneoff&&S.finance.oneoff.length>0)||
                   (S.finance.revenueStreams&&S.finance.revenueStreams.some(r=>r.amount>0))));
   if(!hasData)return;
+  // Estimate size before trying — if over 2MB, skip local backup
+  // (PocketBase is the real backup; localStorage is just a convenience fallback)
+  try{
+    const sizeEstimate=JSON.stringify(S).length;
+    if(sizeEstimate>2000000){
+      console.warn('State too large for local backup ('+Math.round(sizeEstimate/1024)+'KB) — skipping');
+      return;
+    }
+  }catch(e){return;}
   try{
     const snap={ts:new Date().toISOString(),data:JSON.stringify(S)};
     let backups=[];
@@ -1761,9 +1772,17 @@ function _saveLocalBackup(){
     if(backups.length>PF_MAX_BACKUPS)backups=backups.slice(-PF_MAX_BACKUPS);
     // Try to save; if quota exceeded, trim until it fits
     let saved=false;
-    while(backups.length>0&&!saved){
-      try{localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(backups));saved=true;}
-      catch(q){backups=backups.slice(-Math.max(1,Math.floor(backups.length/2)));}
+    // Try to save; bail after 8 attempts to prevent infinite loop when state too large
+    let _attempts=0;
+    while(backups.length>0&&!saved&&_attempts<8){
+      try{
+        localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(backups));
+        saved=true;
+      }catch(q){
+        if(backups.length<=1)break; // can't shrink further — give up
+        backups=backups.slice(-Math.max(1,Math.floor(backups.length/2)));
+        _attempts++;
+      }
     }
   }catch(e){console.warn('Auto-backup failed:',e);}
 }
@@ -4125,32 +4144,38 @@ function toggleDone(id){
   const blockedByThis=S.tasks.filter(x=>(x.blockedBy||[]).includes(id));
   blockedByThis.forEach(x=>syncBlockedStatus(x.id));
   save(); // single save — debounced, async
-  // Lightweight DOM update avoids full re-render on simple toggle
-  const _needsFullRender=didSpawn||blockedByThis.length>0;
-  if(!_needsFullRender){
-    _updateTaskRowInPlace(id);
-  } else {
-    render();
-  }
+  // Always update in-place — never trigger a full render from a task toggle
+  _updateTaskRowInPlace(id);
+  // Update blocker rows in-place too
+  blockedByThis.forEach(x=>_updateTaskRowInPlace(x.id));
+  if(didSpawn)render(); // only full render if a new recurring task was spawned
 }
 
 function _updateTaskRowInPlace(id){
   const t=getTask(id);if(!t)return;
-  const row=document.querySelector(`.task-item[data-id="${id}"]`);
-  if(!row){render();return;} // fallback if row not found
-  // Update the checkbox visual
-  const check=row.querySelector('.ti-check');
-  if(check){
-    check.className='ti-check'+(t.done?' done':'');
+  // Find ALL rows with this task ID (could appear in multiple views)
+  const rows=document.querySelectorAll(`.task-item[data-id="${id}"]`);
+  if(!rows.length){
+    // Task not visible in current DOM — no render needed
+    return;
   }
-  // Update the task name strikethrough
-  const name=row.querySelector('.ti-name');
-  if(name){
-    name.className='ti-name'+(t.done?' done':'');
-  }
-  // Update the progress bar if parent
-  const prog=row.querySelector('.ti-prog-fill');
-  if(prog)prog.style.width=taskComp(t)+'%';
+  rows.forEach(row=>{
+    const check=row.querySelector('.ti-check');
+    if(check)check.className='ti-check'+(t.done?' done':'');
+    const name=row.querySelector('.ti-name');
+    if(name)name.className='ti-name'+(t.done?' done':'');
+    const prog=row.querySelector('.ti-prog-fill');
+    if(prog)prog.style.width=taskComp(t)+'%';
+    // Update parent progress if this is a child task
+    if(t.parentId){
+      const parentRow=document.querySelector(`.task-item[data-id="${t.parentId}"]`);
+      if(parentRow){
+        const parentProg=parentRow.querySelector('.ti-prog-fill');
+        const parent=getTask(t.parentId);
+        if(parentProg&&parent)parentProg.style.width=taskComp(parent)+'%';
+      }
+    }
+  });
 }
 
 function spawnRecurring(t){
@@ -10343,6 +10368,11 @@ function copyAiDraft(sid){
 
 /* ════ INIT ════ */
 let _initStarted=false;
+let _renderDebounce=null;
+function debouncedRender(){
+  if(_renderDebounce)clearTimeout(_renderDebounce);
+  _renderDebounce=setTimeout(render,50);
+}
 async function init(){
   if(_initStarted)return; // prevent double-init
   _initStarted=true;
