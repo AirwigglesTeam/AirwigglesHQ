@@ -5,7 +5,8 @@
 <link rel="icon" id="favicon" type="image/png">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
-<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
 <title>Airwiggles — ProjectFlow</title>
 <link id="pwa-manifest" rel="manifest">
 <link rel="preconnect" href="https://fonts.googleapis.com">
@@ -1356,6 +1357,7 @@ const el=id=>document.getElementById(id);
  * ════════════════════════════════════════════════════════ */
 const PB_URL       = 'https://airwiggleshq.com';
 const PB_WORKSPACE = 'airwiggles';
+const _myClientId     = Math.random().toString(36).slice(2)+Date.now().toString(36); // unique per browser tab
 
 let _pbToken    = null;
 let _pbUser     = null;
@@ -1748,7 +1750,12 @@ function _saveLocalBackup(){
     if(backups.length>0&&backups[backups.length-1].data===snap.data)return;
     backups.push(snap);
     if(backups.length>PF_MAX_BACKUPS)backups=backups.slice(-PF_MAX_BACKUPS);
-    localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(backups));
+    // Try to save; if quota exceeded, trim until it fits
+    let saved=false;
+    while(backups.length>0&&!saved){
+      try{localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(backups));saved=true;}
+      catch(q){backups=backups.slice(-Math.max(1,Math.floor(backups.length/2)));}
+    }
   }catch(e){console.warn('Auto-backup failed:',e);}
 }
 
@@ -3079,9 +3086,11 @@ async function _pingPresence(){
   const headers={Authorization:_pbToken,'Content-Type':'application/json'};
   try{
     if(_presenceRecordId){
-      await fetch(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,
+      const pr=await fetch(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,
         {method:'PATCH',headers,body});
-    } else {
+      if(pr.status===404){_presenceRecordId=null;} // stale ID — fall through to create
+    }
+    if(!_presenceRecordId){
       // Check if we already have a record first
       const existing=await fetch(
         PB_URL+'/api/collections/presence/records?filter=(user_id="'+_pbUser.id+'")&perPage=1',
