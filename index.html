@@ -1459,10 +1459,187 @@ function saveNow(){
   _doSave();
 }
 
+
+/* ── Pre-save validation ─────────────────────────────
+ * Prevents pushing a corrupted/empty state to PocketBase.
+ * Returns {ok:true} or {ok:false, reason:'...'}.
+ * ─────────────────────────────────────────────────── */
+let _lastKnownCounts={projects:0,tasks:0,members:0,sponsors:0};
+
+function _validateBeforeSave(){
+  // Must have parsed correctly — check key arrays exist
+  if(!Array.isArray(S.projects)||!Array.isArray(S.tasks)||
+     !Array.isArray(S.members)||!Array.isArray(S.sponsors)){
+    return{ok:false,reason:'State arrays missing or corrupted'};
+  }
+
+  // Refuse to save a completely empty state
+  const total=S.projects.length+S.tasks.length+S.members.length+S.sponsors.length;
+  const lastTotal=_lastKnownCounts.projects+_lastKnownCounts.tasks+
+                  _lastKnownCounts.members+_lastKnownCounts.sponsors;
+
+  if(total===0&&lastTotal>0){
+    return{ok:false,reason:`Refusing to save: state appears empty (was ${lastTotal} items)`};
+  }
+
+  // Warn if data shrank by more than 50% in one save (likely a bug)
+  // Exception: if lastTotal is 0 (first load) or total is reasonable
+  if(lastTotal>10&&total<lastTotal*0.5){
+    return{ok:false,reason:`Suspicious data loss: ${lastTotal} → ${total} items. Save blocked.`};
+  }
+
+  // All good — update known counts
+  _lastKnownCounts={
+    projects:S.projects.length,
+    tasks:S.tasks.length,
+    members:S.members.length,
+    sponsors:S.sponsors.length
+  };
+  return{ok:true};
+}
+
+
+/* ── Server-side version history ────────────────────
+ * Requires a 'workspace_history' collection in PocketBase:
+ *   saved_at (Text), label (Text), data (Text), item_count (Number)
+ * API rules: all set to @request.auth.id != ""
+ * ─────────────────────────────────────────────────── */
+const PB_MAX_HISTORY=20; // keep last 20 server-side snapshots
+
+async function renderPBHistoryList(){
+  const el2=document.getElementById('pb-history-list');
+  if(!el2)return;
+  const snaps=await listHistorySnapshots();
+  if(snaps.length===0){
+    el2.innerHTML='<div style="color:var(--muted);font-size:.78rem;">No snapshots yet — they\'re saved automatically every 5 changes.</div>';
+    return;
+  }
+  el2.innerHTML=snaps.map(s=>{
+    const dt=new Date(s.saved_at);
+    const age=_timeAgo(dt);
+    const count=s.item_count||'?';
+    return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2);">
+      <div style="flex:1;">
+        <div style="font-size:.78rem;font-weight:600;">${s.label||'Auto'}</div>
+        <div style="font-size:.68rem;color:var(--muted);">${age} · ${count} items · ${dt.toLocaleString()}</div>
+      </div>
+      <button class="btn btn-ghost btn-xs" onclick="restoreHistorySnapshot('${s.id}')">Restore</button>
+    </div>`;
+  }).join('');
+}
+
+function _timeAgo(date){
+  const sec=Math.round((Date.now()-date)/1000);
+  if(sec<60)return sec+'s ago';
+  if(sec<3600)return Math.round(sec/60)+'m ago';
+  if(sec<86400)return Math.round(sec/3600)+'h ago';
+  return Math.round(sec/86400)+'d ago';
+}
+
+async function _saveHistorySnapshot(label='Auto'){
+  if(!_pbToken)return;
+  try{
+    const itemCount=(S.projects||[]).length+(S.tasks||[]).length+
+                    (S.members||[]).length+(S.sponsors||[]).length;
+    const body=JSON.stringify({
+      workspace:PB_WORKSPACE,
+      saved_at:new Date().toISOString(),
+      label,
+      data:JSON.stringify({...S,finance:{...S.finance,finAuth:false}}),
+      item_count:itemCount
+    });
+    await fetch(PB_URL+'/api/collections/workspace_history/records',{
+      method:'POST',
+      headers:{Authorization:_pbToken,'Content-Type':'application/json'},
+      body
+    });
+    // Prune old snapshots — keep only last PB_MAX_HISTORY
+    _pruneHistory();
+  }catch(e){console.warn('History snapshot failed:',e);}
+}
+
+async function _pruneHistory(){
+  try{
+    // Fetch all snapshots sorted oldest first
+    const r=await fetch(
+      PB_URL+'/api/collections/workspace_history/records?filter=(workspace="'+PB_WORKSPACE+'")&sort=saved_at&perPage=200',
+      {headers:{Authorization:_pbToken}}
+    );
+    if(!r.ok)return;
+    const d=await r.json();
+    const items=d.items||[];
+    if(items.length<=PB_MAX_HISTORY)return;
+    // Delete oldest ones
+    const toDelete=items.slice(0,items.length-PB_MAX_HISTORY);
+    await Promise.all(toDelete.map(item=>
+      fetch(PB_URL+'/api/collections/workspace_history/records/'+item.id,{
+        method:'DELETE',
+        headers:{Authorization:_pbToken}
+      })
+    ));
+  }catch(e){}
+}
+
+async function listHistorySnapshots(){
+  if(!_pbToken)return[];
+  try{
+    const r=await fetch(
+      PB_URL+'/api/collections/workspace_history/records?filter=(workspace="'+PB_WORKSPACE+'")&sort=-saved_at&perPage='+PB_MAX_HISTORY,
+      {headers:{Authorization:_pbToken},cache:'no-store'}
+    );
+    if(!r.ok)return[];
+    const d=await r.json();
+    return d.items||[];
+  }catch(e){return[];}
+}
+
+async function restoreHistorySnapshot(id){
+  if(!_pbToken||!id)return;
+  if(!confirm('Restore this snapshot? Your current data will be overwritten. This cannot be undone.'))return;
+  try{
+    const r=await fetch(PB_URL+'/api/collections/workspace_history/records/'+id,
+      {headers:{Authorization:_pbToken}});
+    if(!r.ok)throw new Error('Failed to fetch snapshot');
+    const snap=await r.json();
+    const restored=typeof snap.data==='string'?JSON.parse(snap.data):snap.data;
+    // Validate restored data before applying
+    if(!Array.isArray(restored.projects)||!Array.isArray(restored.tasks)){
+      throw new Error('Snapshot data appears corrupt');
+    }
+    Object.assign(S,restored);
+    _applyDefaults();
+    // Update known counts
+    _lastKnownCounts={
+      projects:(S.projects||[]).length,
+      tasks:(S.tasks||[]).length,
+      members:(S.members||[]).length,
+      sponsors:(S.sponsors||[]).length
+    };
+    saveNow();
+    render();
+    showToast('Snapshot restored successfully');
+  }catch(e){
+    alert('Restore failed: '+e.message);
+  }
+}
+
 async function _doSave(){
   if(_saving){_saveQueue=true;return;}
   _saving=true;
   _saveQueue=false;
+
+  // Validate before sending to PocketBase
+  const _validation=_validateBeforeSave();
+  if(!_validation.ok){
+    console.error('SAVE BLOCKED:',_validation.reason);
+    _setSyncStatus('error',`⚠ Save blocked: ${_validation.reason}`);
+    _saving=false;
+    // Still save to localStorage as a safety net
+    try{localStorage.setItem('pf4',JSON.stringify(S));}catch(e){}
+    if(_saveQueue)_doSave();
+    return;
+  }
+
   const now=new Date().toISOString();
   // Strip finAuth before syncing — finance unlock is per-session, not shared
   const _syncPayload={...S,finance:{...S.finance,finAuth:false}};
@@ -1471,7 +1648,11 @@ async function _doSave(){
   if(ok){
     _lastSavedAt=now;
     _setSyncStatus('synced');
-    _myLastSave=now; // mark so realtime can identify our own saves
+    _myLastSave=now;
+    // Save a history snapshot every 5 successful saves
+    if(!window._saveCount)window._saveCount=0;
+    window._saveCount++;
+    if(window._saveCount%5===0)_saveHistorySnapshot('Auto #'+window._saveCount);
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _setSyncStatus('synced',`Saved ${ts}`);
     _saveLocalBackup(); // snapshot to rolling local backup on every successful remote save
@@ -1589,6 +1770,13 @@ async function load(){
       S={...S,...p};
       _lastSavedAt=row.updated_at||null;
       _applyDefaults();
+      // Seed known counts from loaded data so validation has a baseline
+      _lastKnownCounts={
+        projects:(S.projects||[]).length,
+        tasks:(S.tasks||[]).length,
+        members:(S.members||[]).length,
+        sponsors:(S.sponsors||[]).length
+      };
       return;
     }catch(e){console.warn('Failed to parse Supabase data:',e);}
   }
@@ -6558,6 +6746,7 @@ function addFinOO(){S.finance.oneoff.push({id:'o'+uid(),name:'New expense',to:''
 
 /* ════ SETTINGS ════ */
 function renderBackupList(){
+  renderPBHistoryList();
   const el2=document.getElementById('pf-backup-list');
   if(!el2)return;
   const backups=listLocalBackups().slice().reverse();
@@ -6619,6 +6808,15 @@ function renderSettings(){
   <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importData(this)">
   <!-- Auto-backup list -->
   <div id="pf-backup-list"></div>
+  <!-- PocketBase version history -->
+  <div style="margin-top:18px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+      <span style="font-size:.72rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;">Server Version History</span>
+      <button class="btn btn-acc btn-sm" onclick="_saveHistorySnapshot('Manual');setTimeout(renderPBHistoryList,1500)">Save snapshot now</button>
+    </div>
+    <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Snapshots stored in PocketBase — last ${PB_MAX_HISTORY} kept. Auto-saves every 5 changes.</div>
+    <div id="pb-history-list"><div style="color:var(--muted);font-size:.78rem;">Loading…</div></div>
+  </div>
 
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Branding</div>
