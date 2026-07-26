@@ -1394,9 +1394,11 @@ async function pbGet(){
   }catch(e){console.warn('PocketBase load error:',e);return null;}
 }
 
-async function pbUpsert(data,updatedAt){
+let _lastSaveError=''; // human-readable reason for the last save failure
+
+async function pbUpsert(data,updatedAt,_isRetry){
   try{
-    if(!_pbToken)return false;
+    if(!_pbToken){_lastSaveError='Not signed in';return false;}
     const body=JSON.stringify({workspace:PB_WORKSPACE,data,updated_at:updatedAt});
     const headers={Authorization:_pbToken,'Content-Type':'application/json'};
     let r;
@@ -1410,9 +1412,46 @@ async function pbUpsert(data,updatedAt){
         {method:'POST',headers,body});
       if(r.ok){const rec=await r.json();_pbRecordId=rec.id;}
     }
-    if(r.ok)_pbEtag=null;
-    return r.ok;
-  }catch(e){console.warn('PocketBase save error:',e);return false;}
+    if(r.ok){_pbEtag=null;_lastSaveError='';return true;}
+
+    // ── Save failed: capture the real reason ──
+    if(r.status===401&&!_isRetry){
+      // Token expired mid-session — refresh and retry ONCE
+      console.warn('Save got 401 — attempting token refresh and retry');
+      const refreshed=await _tryTokenRefresh();
+      if(refreshed)return pbUpsert(data,updatedAt,true);
+      _lastSaveError='Session expired — please sign in again';
+      return false;
+    }
+    let serverMsg='';
+    try{const eb=await r.json();serverMsg=eb.message||JSON.stringify(eb.data||{}).slice(0,120);}catch(_){}
+    _lastSaveError=`HTTP ${r.status}${serverMsg?': '+serverMsg:''}`;
+    if(r.status===400&&data.length>9000000){
+      _lastSaveError=`Data too large (${(data.length/1000000).toFixed(1)}M chars, limit 10M) — remove base64 images`;
+    }
+    console.error('PocketBase save failed:',_lastSaveError,'| payload size:',data.length,'chars');
+    return false;
+  }catch(e){
+    _lastSaveError='Network error: '+(e.message||'unreachable');
+    console.warn('PocketBase save error:',e);
+    return false;
+  }
+}
+
+/* Refresh token synchronously for save-retry — returns true on success */
+async function _tryTokenRefresh(){
+  try{
+    const r=await fetch(PB_URL+'/api/collections/users/auth-refresh',{
+      method:'POST',headers:{Authorization:_pbToken}
+    });
+    if(!r.ok)return false;
+    const d=await r.json();
+    _pbToken=d.token;_pbUser=d.record;
+    sessionStorage.setItem('pb_token',_pbToken);
+    sessionStorage.setItem('pb_user',JSON.stringify(d.record));
+    _scheduleTokenRefresh();
+    return true;
+  }catch(_){return false;}
 }
 
 async function sbGet(){return pbGet();}
@@ -1675,7 +1714,7 @@ async function _doSave(){
     _setSyncStatus('synced',`Saved ${ts}`);
     _saveLocalBackup();
   } else {
-    _setSyncStatus('error','Save failed — check connection');
+    _setSyncStatus('error','⚠ '+(_lastSaveError||'Save failed — check connection'));
     _online=false;
   }
   if(_saveQueue)_doSave();
@@ -1912,6 +1951,11 @@ function _startPBRealtime(){
         if(msg.action!=='update'&&msg.action!=='create')return;
         const row=msg.record;
         if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
+        // Skip our own saves — client ID embedded in the data payload
+        try{
+          const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
+          if(_d&&_d._clientId===_myClientId)return;
+        }catch(_){}
         const remoteTs=row.updated||row.updated_at;
         if(remoteTs===_pollLastAt)return;
         _pendingRemote={row,remoteTs};
@@ -2008,10 +2052,19 @@ function _startFallbackPoll(){
 function _applyPendingRemote(){
   if(!_pendingRemote)return;
   const {row,remoteTs}=_pendingRemote;
-  // Skip own saves immediately — before conflict check or anything else
+  // FINAL safety net: skip own saves via client ID, regardless of which listener queued this
+  try{
+    const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
+    if(_d&&_d._clientId===_myClientId){
+      _pendingRemote=null;
+      _pollLastAt=remoteTs;
+      return;
+    }
+  }catch(_){}
+  // Legacy timestamp check (secondary)
   if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave){
     _pendingRemote=null;
-    _pollLastAt=remoteTs; // mark as seen so we don't process again
+    _pollLastAt=remoteTs;
     return;
   }
   if(_saveDebounce){
