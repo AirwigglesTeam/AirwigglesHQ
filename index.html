@@ -3341,6 +3341,7 @@ async function authResetPassword(){
 }
 
 async function handleLogout(){
+  _initStarted=false; // allow re-init after next login
   // Clean up presence and cancel token refresh before signing out
   await _cleanupPresence().catch(()=>{});
   if(_tokenRefreshTimer){clearTimeout(_tokenRefreshTimer);_tokenRefreshTimer=null;}
@@ -10341,7 +10342,10 @@ function copyAiDraft(sid){
 }
 
 /* ════ INIT ════ */
+let _initStarted=false;
 async function init(){
+  if(_initStarted)return; // prevent double-init
+  _initStarted=true;
   // Show loading state while fetching from Supabase
   const c=el('content');
   if(c)c.innerHTML=`<div style="display:flex;align-items:center;justify-content:center;height:60vh;flex-direction:column;gap:14px;">
@@ -10427,7 +10431,12 @@ function _setFavicon(dataUrl){
 
 
 
-document.addEventListener('DOMContentLoaded',init);
+document.addEventListener('DOMContentLoaded',()=>{
+  // Only init if already authenticated (token in sessionStorage)
+  // Otherwise _pbBootstrap has already shown the login screen and
+  // init() will be called by _onSignedIn() after the user logs in.
+  if(_pbToken&&_pbUser)init();
+});
 
 
 /* ════ MISSING FUNCTIONS — restored ════ */
