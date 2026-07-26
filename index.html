@@ -1641,6 +1641,7 @@ async function _doSave(){
   }
 
   const now=new Date().toISOString();
+  _myLastSave=now; // set BEFORE the await so realtime events during the request are skipped
   // Strip finAuth before syncing — finance unlock is per-session, not shared
   const _syncPayload={...S,finance:{...S.finance,finAuth:false}};
   const ok=await sbUpsert(JSON.stringify(_syncPayload),now);
@@ -1648,7 +1649,6 @@ async function _doSave(){
   if(ok){
     _lastSavedAt=now;
     _setSyncStatus('synced');
-    _myLastSave=now;
     // Save a history snapshot every 5 successful saves
     if(!window._saveCount)window._saveCount=0;
     window._saveCount++;
@@ -9382,7 +9382,7 @@ ${(()=>{
     <div>
       ${list.length===0?`<div style="padding:24px;text-align:center;color:var(--muted);font-size:.78rem;">No sponsors match</div>`:''}
       ${list.map(s=>`
-      <div class="sp-list-row${s.id===_spSelectedId?' active':''}" data-sp-id="${s.id}" onclick="selectSponsor('${s.id}')">
+      <div class="sp-list-row${s.id===_spSelectedId?' active':''}" data-sp-id="${s.id}" data-name="${(s.name||'')}" data-tags="${(s.categories||[]).join(' ')}" onclick="selectSponsor('${s.id}')">
         <div class="sp-avatar">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
         <div style="flex:1;min-width:0;">
           <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${s.name}</div>
@@ -9569,7 +9569,7 @@ function _spSearchInput(val){
 
 function _filterSponsorList(q){
   // Filter sponsor rows in-place without re-rendering
-  const rows=document.querySelectorAll('.sp-list-item');
+  const rows=document.querySelectorAll('.sp-list-row[data-sp-id]');
   if(rows.length===0){
     // List not rendered yet — fall back to full render
     render();return;
