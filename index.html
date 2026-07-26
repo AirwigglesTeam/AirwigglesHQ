@@ -1453,7 +1453,9 @@ async function _doSave(){
   _saving=true;
   _saveQueue=false;
   const now=new Date().toISOString();
-  const ok=await sbUpsert(JSON.stringify(S),now);
+  // Strip finAuth before syncing — finance unlock is per-session, not shared
+  const _syncPayload={...S,finance:{...S.finance,finAuth:false}};
+  const ok=await sbUpsert(JSON.stringify(_syncPayload),now);
   _saving=false;
   if(ok){
     _lastSavedAt=now;
@@ -2689,6 +2691,40 @@ document.addEventListener('mouseover',e=>{
 });
 document.addEventListener('mouseout',e=>{if(!e.relatedTarget?.closest('[data-tip]'))TT.style.opacity='0';});
 
+
+/* ════ USER PERMISSIONS ════ */
+function _userPerms(){
+  // Returns the user's permissions array, or all pages if not set (admin fallback)
+  const perms=_pbUser?.permissions;
+  if(!perms||!Array.isArray(perms)||perms.length===0){
+    // No permissions set — grant everything (superuser / admin convenience)
+    return['dashboard','kanban','campaign','finance','sponsors','templates','settings','cowork'];
+  }
+  return perms;
+}
+
+function canAccess(page){
+  return _userPerms().includes(page);
+}
+
+
+function applyPermissionsNav(){
+  // Hide rail buttons and panel nav items for pages user can't access
+  const allPages=['kanban','campaign','finance','sponsors','templates','settings'];
+  allPages.forEach(page=>{
+    const allowed=canAccess(page);
+    // Rail buttons
+    document.querySelectorAll(`.rbtn[data-v="${page}"]`).forEach(b=>{
+      b.style.display=allowed?'':'none';
+    });
+    // Panel nav items
+    document.querySelectorAll(`.nitem[data-v="${page}"]`).forEach(n=>{
+      const row=n.closest('.nav-row')||n;
+      row.style.display=allowed?'':'none';
+    });
+  });
+}
+
 /* ════ AUTH ════ */
 function showSignInPanel(){
   const sp=el('auth-signin-panel'),fp=el('auth-forgot-panel'),err=el('auth-error');
@@ -2790,7 +2826,7 @@ function _onSignedIn(user){
     const railUser=el('rail-user');
     if(railUser)railUser.setAttribute('data-tip',user.email);
   }
-  init();
+  init().then(()=>applyPermissionsNav());
 }
 
 // Auth state listener
@@ -2815,7 +2851,17 @@ document.addEventListener('keydown',function(e){
 
 /* ════ NAVIGATION ════ */
 let V='dashboard';
-function nav(view){V=view;S.detailId=null;document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('active',b.dataset.v===view));document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',i.dataset.v===view));closePanel();render();}
+function nav(view){
+  // Check permission — redirect to dashboard if not allowed
+  const guarded=['kanban','campaign','finance','sponsors','templates','settings'];
+  if(guarded.includes(view)&&!canAccess(view)){
+    view='dashboard';
+  }
+  V=view;S.detailId=null;
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('active',b.dataset.v===view));
+  document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',i.dataset.v===view));
+  closePanel();render();
+}
 
 function renderRailBookmarks(){
   if(!S.settings)return'';
@@ -2888,11 +2934,9 @@ function render(){
     case'labels':c.innerHTML=renderLabels();break;
     case'templates':c.innerHTML=renderTemplates();break;
     case'finance':
-      if(!S.finance.finAuth){
-        c.innerHTML=renderFinanceGate();
-      } else {
-        c.innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);
-      }
+      if(!canAccess('finance')){nav('dashboard');return;}
+      S.finance.finAuth=true; // auto-unlock if permitted
+      c.innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);
       break;
     case'sponsors':c.innerHTML=renderSponsors();setTimeout(()=>initSponsorSearch(),50);break;
     case'settings':c.innerHTML=renderSettings();setTimeout(renderBackupList,0);break;
@@ -5839,14 +5883,9 @@ function renderFinanceGate(){
   </div>`;
 }
 function checkFinAuth(){
-  const pw=el('fin-pw-inp')?.value;
-  if(pw==='AirwigglesFinance'){
-    S.finance.finAuth=true;save();
-    el('content').innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);
-  } else {
-    const e=el('fin-pw-err');if(e){e.style.display='block';}
-    const i=el('fin-pw-inp');if(i){i.style.borderColor='var(--red)';setTimeout(()=>{if(el('fin-pw-inp'))el('fin-pw-inp').style.borderColor='';},1400);}
-  }
+  // Legacy — no longer used. Finance access is controlled by user permissions.
+  S.finance.finAuth=true;save();
+  el('content').innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);
 }
 
 function generateFinanceReport(){
@@ -9550,6 +9589,7 @@ async function init(){
   applyNavVis();
   applyNavIcons();
   nav('dashboard');
+  applyPermissionsNav();
   updateRailBookmarks();
   updateFavicon();
   startPolling();
