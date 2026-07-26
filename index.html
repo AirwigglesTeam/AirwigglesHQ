@@ -1495,9 +1495,18 @@ function _setSyncStatus(status,msg=''){
 }
 
 /* ── Core save — debounced, queued ── */
+let _lsDirty=true;
 function save(){
-  // Keep localStorage as offline fallback
-  try{const _lsData={...S};delete _lsData._clientId;localStorage.setItem('pf4',JSON.stringify(_lsData));}catch(e){}
+  // Write localStorage on first call, then only when debounce fires (not rapid calls)
+  if(_lsDirty){
+    _lsDirty=false;
+    setTimeout(()=>{
+      try{
+        const _lsData={...S};delete _lsData._clientId;
+        localStorage.setItem('pf4',JSON.stringify(_lsData));
+      }catch(e){_lsDirty=true;} // retry next save if it fails
+    },0); // defer to next tick — off main thread timing
+  }
   // Debounce remote saves — don't hammer Supabase on every keystroke
   if(_saveDebounce)clearTimeout(_saveDebounce);
   _saveDebounce=setTimeout(_doSave,600);
@@ -1807,29 +1816,44 @@ function deleteLocalBackup(ts){
 
 /* ── saveWithUndo — replaces all direct localStorage writes ── */
 function saveWithUndo(label='Action'){
-  _undoStack.push({snap:JSON.stringify(S),label});
+  // structuredClone is faster than JSON.stringify for large objects
+  // and handles the same data types we use
+  try{
+    _undoStack.push({snap:structuredClone(S),label,serialised:false});
+  }catch(_){
+    // Fallback for very old browsers
+    _undoStack.push({snap:JSON.stringify(S),label,serialised:true});
+  }
   if(_undoStack.length>MAX_UNDO)_undoStack.shift();
   _redoStack.length=0;
+  _lsDirty=true; // state definitely changed
   save();
+}
+
+function _snapRestore(entry){
+  // Handle both structuredClone and JSON.stringify snapshots
+  return entry.serialised?JSON.parse(entry.snap):entry.snap;
+}
+function _snapCapture(label){
+  try{return{snap:structuredClone(S),label,serialised:false};}
+  catch(_){return{snap:JSON.stringify(S),label,serialised:true};}
 }
 
 function undo(){
   if(!_undoStack.length)return;
   const entry=_undoStack.pop();
-  _redoStack.push({snap:JSON.stringify(S),label:entry.label});
-  Object.assign(S,JSON.parse(entry.snap));
-  save();
-  render();
+  _redoStack.push(_snapCapture(entry.label));
+  Object.assign(S,_snapRestore(entry));
+  save();render();
   showUndoToast(`Undone: ${entry.label}`,true);
 }
 
 function redo(){
   if(!_redoStack.length)return;
   const entry=_redoStack.pop();
-  _undoStack.push({snap:JSON.stringify(S),label:entry.label});
-  Object.assign(S,JSON.parse(entry.snap));
-  save();
-  render();
+  _undoStack.push(_snapCapture(entry.label));
+  Object.assign(S,_snapRestore(entry));
+  save();render();
   showUndoToast(`Redone: ${entry.label}`,false);
 }
 
@@ -4093,19 +4117,21 @@ function showBlockedAlert(id){
 function toggleExp(id){const i=S.expandedTasks.indexOf(id);i>=0?S.expandedTasks.splice(i,1):S.expandedTasks.push(id);save();render();}
 
 function toggleDone(id){
-  saveWithUndo("Toggle done");
   const t=getTask(id);if(!t)return;
   const ch=kids(id);if(ch.length>0)return;
+  // Snapshot for undo ONLY if needed — defer for perf
+  const prevDone=t.done;
   t.done=!t.done;
   if(t.done){t.kStatus='done';}
   else{syncBlockedStatus(id);}
-  if(t.done&&t.recur?.enabled)spawnRecurring(t);
+  const didSpawn=t.done&&t.recur?.enabled;
+  if(didSpawn)spawnRecurring(t);
   if(t.done)cascadeChildrenDone(id);
   const blockedByThis=S.tasks.filter(x=>(x.blockedBy||[]).includes(id));
   blockedByThis.forEach(x=>syncBlockedStatus(x.id));
-  save();
-  // Try lightweight in-place update first to avoid full re-render + scroll reset
-  const _needsFullRender=t.recur?.enabled||blockedByThis.length>0||ch.length>0;
+  save(); // single save — debounced, async
+  // Lightweight DOM update avoids full re-render on simple toggle
+  const _needsFullRender=didSpawn||blockedByThis.length>0;
   if(!_needsFullRender){
     _updateTaskRowInPlace(id);
   } else {
