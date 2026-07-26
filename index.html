@@ -1652,6 +1652,7 @@ async function _doSave(){
   _myLastSave=now; // set BEFORE the await so realtime events during the request are skipped
   // Strip finAuth before syncing — finance unlock is per-session, not shared
   const _syncPayload={...S,finance:{...S.finance,finAuth:false},_clientId:_myClientId};
+  delete _syncPayload._spSearch; // UI state, not data
   const ok=await sbUpsert(JSON.stringify(_syncPayload),now);
   _saving=false;
   if(ok){
@@ -1775,6 +1776,7 @@ async function load(){
   if(row&&row.data){
     try{
       const p=typeof row.data==='string'?JSON.parse(row.data):row.data;
+      delete p._clientId; // don't let remote session ID pollute local state
       S={...S,...p};
       _lastSavedAt=row.updated_at||null;
       _applyDefaults();
@@ -3339,6 +3341,7 @@ function render(){
   // Restore scroll position (don't jump to top on every render)
   c.scrollTop=_scrollY;
   initBlockedHover();
+  if(_pbUser)setTimeout(applyPermissionsNav,0); // re-apply nav permissions after render
   
 }
 
@@ -10669,6 +10672,195 @@ function _calOutside(e){
     pop.remove();_calField=null;
   }
 }
+
+/* ════ MISSING FUNCTIONS ════ */
+
+/* Members */
+function deleteMember(id){
+  if(!confirm('Remove this member? They will be unassigned from all tasks.'))return;
+  saveWithUndo('Delete member');
+  S.members=S.members.filter(m=>m.id!==id);
+  S.tasks.forEach(t=>{t.assignees=(t.assignees||[]).filter(a=>a!==id);});
+  save();render();
+}
+
+/* Labels */
+function deleteLabel(id){
+  saveWithUndo('Delete label');
+  S.labels=S.labels.filter(l=>l.id!==id);
+  S.tasks.forEach(t=>{t.labels=(t.labels||[]).filter(l=>l!==id);});
+  save();render();
+}
+
+/* Project reorder (left/right in dashboard grid) */
+function reorderProject(id,dir){
+  const i=S.projects.findIndex(p=>p.id===id);
+  if(i<0)return;
+  const ni=i+dir;
+  if(ni<0||ni>=S.projects.length)return;
+  saveWithUndo('Reorder project');
+  const tmp=S.projects[i];S.projects[i]=S.projects[ni];S.projects[ni]=tmp;
+  save();render();
+}
+
+/* Task modal: update parent task options when project changes */
+function updParentOpts(projId){
+  const sel=el('tm-parent');if(!sel)return;
+  const tasks=S.tasks.filter(t=>t.projectId===projId&&!t.parentId&&t.id!==(el('tm-id')?.value));
+  sel.innerHTML='<option value="">— none —</option>'+tasks.map(t=>`<option value="${t.id}">${t.name}</option>`).join('');
+}
+
+/* Sponsor product quantity input styling */
+function updateQtyStyle(inp){
+  if(!inp)return;
+  inp.style.width=Math.max(40,inp.value.length*9+20)+'px';
+}
+
+/* Member photo preview before upload */
+function previewMemberPhoto(input){
+  const file=input.files[0];if(!file)return;
+  const prev=document.getElementById('mm-photo-prev');
+  if(!prev)return;
+  const reader=new FileReader();
+  reader.onload=e=>{
+    prev.src=e.target.result;
+    prev.style.display='block';
+  };
+  reader.readAsDataURL(file);
+}
+
+/* Clear all data */
+function clearAll(){
+  if(!confirm('This will permanently delete ALL your data. Are you absolutely sure?'))return;
+  if(!confirm('Last chance — this cannot be undone. Delete everything?'))return;
+  S=JSON.parse(JSON.stringify(window._S_DEFAULTS||{projects:[],tasks:[],members:[],labels:[],areas:[],quickLinks:[],taskTemplates:[],coworkDays:[],sponsors:[],finance:{recurring:[],oneoff:[]},settings:{},members:[]}));
+  _lastKnownCounts={projects:0,tasks:0,members:0,sponsors:0};
+  saveNow();render();
+}
+
+/* Quick links category label */
+function catLabel(cat){
+  if(cat==='__none__')return'Other';
+  const l=getLabel(cat);
+  return l?l.name:cat;
+}
+
+/* Slack webhook */
+function saveSlack(){
+  const inp=el('st-slack');if(!inp)return;
+  S.settings.slackWebhook=inp.value.trim();
+  save();
+  const st=el('slack-st');if(st){st.textContent='Saved ✓';st.style.color='var(--green)';setTimeout(()=>st.textContent='',2000);}
+}
+async function testSlack(){
+  const url=S.settings?.slackWebhook;
+  const st=el('slack-st');
+  if(!url){if(st){st.textContent='No webhook URL saved.';st.style.color='var(--red)';}return;}
+  if(st){st.textContent='Sending…';st.style.color='var(--muted)';}
+  try{
+    await fetch(url,{method:'POST',body:JSON.stringify({text:'✓ ProjectFlow test message from Airwiggles HQ'})});
+    if(st){st.textContent='Sent! Check Slack.';st.style.color='var(--green)';}
+  }catch(e){
+    if(st){st.textContent='Failed: '+e.message;st.style.color='var(--red)';}
+  }
+  setTimeout(()=>{if(st)st.textContent='';},3000);
+}
+
+/* Task slack reminder clear */
+function clearReminder(taskId){
+  const t=getTask(taskId);if(!t)return;
+  t.slackReminder={enabled:false,date:'',time:'',message:''};
+  save();render();
+}
+
+/* Save task as template */
+function saveAsTmpl(taskId){
+  const t=getTask(taskId);if(!t)return;
+  const name=prompt('Template name:',t.name);if(!name)return;
+  if(!S.taskTemplates)S.taskTemplates=[];
+  S.taskTemplates.push({
+    id:uid(),name,
+    description:t.description||'',
+    priority:t.priority||'Medium',
+    labels:t.labels||[],
+    subtasks:(kids(taskId)||[]).map(c=>({name:c.name,description:c.description||''}))
+  });
+  save();
+  showToast('Saved as template: '+name);
+}
+
+/* Template subtask add */
+function addTmplSub(ti,name){
+  if(!_ttBuf||!_ttBuf[ti])return;
+  if(!_ttBuf[ti].subtasks)_ttBuf[ti].subtasks=[];
+  _ttBuf[ti].subtasks.push({name,description:''});
+  // Re-render the subtask list in the template editor
+  const container=el('tmpl-subs-'+ti);
+  if(container){
+    container.innerHTML=_ttBuf[ti].subtasks.map((s,si)=>
+      `<div style="display:flex;align-items:center;gap:6px;margin-bottom:4px;">
+        <span style="font-size:.75rem;flex:1;">${s.name}</span>
+        <button class="btn btn-ghost btn-xs" onclick="rmTmplSub(${ti},${si})">×</button>
+      </div>`
+    ).join('');
+  }
+}
+
+/* Project expense edit */
+function editProjExp(projId,expId){
+  openModal('projExp',{projId,expId});
+}
+
+/* Project expense save */
+function saveProjExp(projId,expId){
+  const p=getProject(projId);if(!p)return;
+  if(!p.expenses)p.expenses=[];
+  const name=el('pe-name')?.value.trim()||'';
+  const amount=parseFloat(el('pe-amount')?.value)||0;
+  const category=el('pe-cat')?.value||'';
+  const notes=el('pe-notes')?.value.trim()||'';
+  if(!name)return;
+  saveWithUndo(expId?'Edit expense':'Add expense');
+  if(expId){
+    const i=p.expenses.findIndex(e=>e.id===expId);
+    if(i>=0)p.expenses[i]={id:expId,name,amount,category,notes};
+  } else {
+    p.expenses.push({id:uid(),name,amount,category,notes});
+  }
+  save();closeModal();render();
+}
+
+/* Project tool edit */
+function editProjectTool(projId,toolId){
+  openModal('projTool',{projId,toolId});
+}
+
+/* Log member time */
+function logMemberTime(memberId){
+  openModal('memberTime',memberId);
+}
+
+/* Delete member time log entry */
+function deleteMemberLog(memberId,entryId){
+  const m=getMember(memberId);if(!m)return;
+  m.timeLog=(m.timeLog||[]).filter(e=>e.id!==entryId);
+  save();
+  // Re-render the time log if modal is open
+  const panel=el('member-time-panel');
+  if(panel)openModal('memberTime',memberId);
+}
+function delMemberLog(memberId,entryId){deleteMemberLog(memberId,entryId);}
+
+/* Colour picker for template colours */
+function pickC(swatchId,inputId,color,el2){
+  const inp=el(inputId);if(inp)inp.value=color;
+  // Update active state on swatches
+  const swatches=el(swatchId);
+  if(swatches)swatches.querySelectorAll('svg').forEach(s=>s.querySelector('.ring-hover')?.setAttribute('stroke','rgba(0,0,0,0)'));
+  if(el2)el2.querySelector('.ring-hover')?.setAttribute('stroke','white');
+}
+
+/* ════ END MISSING FUNCTIONS ════ */
 </script>
 
 <!-- SEARCH OVERLAY -->
