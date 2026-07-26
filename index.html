@@ -1144,6 +1144,10 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 #conflict-banner .cb-body{font-size:.73rem;color:var(--text2);margin-bottom:10px;line-height:1.5;}
 #conflict-banner .cb-btns{display:flex;gap:8px;}
 
+
+.my-tasks-btn{display:flex;align-items:center;justify-content:center;width:32px;height:32px;border-radius:8px;border:none;background:transparent;cursor:pointer;color:var(--muted);transition:all .15s;}
+.my-tasks-btn:hover,.my-tasks-btn.active{background:var(--teal-dim);color:var(--acc);}
+
 </style>
 </head>
 <body>
@@ -2955,6 +2959,45 @@ async function authUpdatePassword(){
   }
 }
 
+
+
+
+function toggleMyTasks(){
+  const me=getMyMember();if(!me)return;
+  const btn=el('my-tasks-btn');
+  if(S.activeMember===me.id){
+    S.activeMember=null;
+    btn?.classList.remove('active');
+  } else {
+    S.activeMember=me.id;
+    btn?.classList.add('active');
+  }
+  save();if(V==='dashboard')render();
+}
+
+function _updateMyTasksBtn(){
+  const btn=el('my-tasks-btn');
+  if(!btn)return;
+  const me=getMyMember();
+  if(me){
+    btn.style.display='flex';
+    btn.classList.toggle('active',S.activeMember===me.id);
+  } else {
+    btn.style.display='none';
+  }
+}
+
+function getMyMember(){
+  return window._myMemberId?getMember(window._myMemberId):null;
+}
+
+function _findMyMember(user){
+  // Try explicit link first
+  let me=S.members.find(m=>m.pbUserId===user.id);
+  // Fall back to email match
+  if(!me&&user.email)me=S.members.find(m=>m.email&&m.email.toLowerCase()===user.email.toLowerCase());
+  return me||null;
+}
 
 function _onSignedIn(user){
   el('pw-screen').style.display='none';
@@ -6750,7 +6793,13 @@ function openModal(type,data){
   switch(type){
     case'project':html=projectModalHtml(data);break;
     case'task':html=taskModalHtml(data);break;
-    case'member':html=memberModalHtml(data);break;
+    case'member':
+      memberModalHtml(data).then(h=>{
+        const mc=el('mc');
+        mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()">'+h+'</div>';
+        mc.style.display='flex';
+      });
+      return; // async path — return early, modal opens when promise resolves
     case'memberProfile':html=memberProfileModalHtml(typeof data==='object'?data.id:data, typeof data==='object'?data.tab:'tasks');break;
     case'label':html=labelModalHtml(data);break;
     case'quickLink':html=quickLinkModalHtml();break;
@@ -7783,6 +7832,7 @@ function labelModalHtml(id){
     +'<div class="mo-body">'
     +'<div class="field"><label class="flbl">Name *</label>'
     +'<input class="inp" id="lm-name" value="'+(l?.name||'')+'" placeholder="Bug, Feature, Urgent\u2026"></div>'
+    +accountPicker
     +'<div class="field"><label class="flbl">Colour</label>'
     +'<div class="clr-grid" id="lm-clrs">'+colorDots+'</div>'
     +'<input type="hidden" id="lm-clr" value="'+(l?.color||COLORS[0])+'"></div>'
@@ -7794,7 +7844,19 @@ function labelModalHtml(id){
 
 function saveLabel(eid){const name=el('lm-name')?.value.trim();if(!name)return;const label={id:eid||uid(),name,color:el('lm-clr')?.value||COLORS[0]};if(eid){const i=S.labels.findIndex(l=>l.id===eid);if(i>=0)S.labels[i]=label;}else S.labels.push(label);save();closeModal();render();}
 
-function memberModalHtml(id){
+
+async function _fetchPBUsers(){
+  if(!_pbToken)return[];
+  try{
+    const r=await fetch(PB_URL+'/api/collections/users/records?perPage=100',
+      {headers:{Authorization:_pbToken},cache:'no-store'});
+    if(!r.ok)return[];
+    const d=await r.json();
+    return d.items||[];
+  }catch(e){return[];}
+}
+
+async function memberModalHtml(id){
   const m=id?getMember(id):null;
   const colorDots=COLORS.map(c=>{
     const sel=(m?.color||COLORS[0])===c;
@@ -7817,6 +7879,18 @@ function memberModalHtml(id){
     +'</div></div>'
     +'<div id="mm-photo-preview-wrap" style="'+(m?.photoUrl?'':'display:none;')+'margin-top:8px;"></div>'
     +'<input type="hidden" id="mm-photo-hidden" value="'+(m?.photoUrl||'')+'"></div>';
+  // Fetch PocketBase accounts for the link picker
+  const _pbUsers=await _fetchPBUsers();
+  const _pbUserOpts=_pbUsers.map(u=>`<option value="${u.id}" ${m?.pbUserId===u.id?'selected':''}>${u.name||u.email}</option>`).join('');
+  const accountPicker=_pbUsers.length>0
+    ?'<div class="field"><label class="flbl">Linked Account</label>'
+      +'<select class="fsel" id="mm-pbuser" style="width:100%;">'
+      +'<option value="">Not linked</option>'+_pbUserOpts
+      +'</select>'
+      +'<div style="font-size:.68rem;color:var(--muted);margin-top:4px;">Links this member to a login account for automatic task filtering.</div>'
+      +'</div>'
+    :'';
+
   return '<div class="mo-box" style="max-width:420px;">'
     +'<div class="mo-hd"><span class="mo-title">'+(m?'Edit Member':'Add Member')+'</span>'
     +'<button class="mo-close" onclick="closeModal()">&#215;</button></div>'
@@ -7832,6 +7906,7 @@ function memberModalHtml(id){
     +'<div><div style="font-size:.82rem;font-weight:600;">Company Director</div>'
     +'<div style="font-size:.68rem;color:var(--muted);margin-top:2px;">Directors are paid via dividends \u2014 excluded from payroll calculations</div>'
     +'</div></label></div>'
+    +accountPicker
     +'<div class="field"><label class="flbl">Colour</label>'
     +'<div class="clr-grid" id="mm-clrs">'+colorDots+'</div>'
     +'<input type="hidden" id="mm-clr" value="'+(m?.color||COLORS[0])+'"></div>'
@@ -7844,7 +7919,7 @@ function memberModalHtml(id){
 function saveMember(eid){
   const name=el('mm-name')?.value.trim();if(!name)return;
   const initials=name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-  const member={id:eid||uid(),name,initials,email:el('mm-email')?.value.trim()||'',color:el('mm-clr')?.value||COLORS[0],timeLog:[],isDirector:el('mm-director')?.checked||false};
+  const member={id:eid||uid(),name,initials,email:el('mm-email')?.value.trim()||'',color:el('mm-clr')?.value||COLORS[0],timeLog:[],isDirector:el('mm-director')?.checked||false,pbUserId:el('mm-pbuser')?.value||null};
   const photoFile=el('mm-photo')?.files[0];
   const clearPhoto=el('mm-photo-clear')?.value==='1';
   if(eid){const old=S.members.find(m=>m.id===eid);if(old){member.timeLog=old.timeLog||[];member.email=member.email||old.email||'';member.photoUrl=clearPhoto?null:(old.photoUrl||null);}}
@@ -9765,6 +9840,14 @@ async function init(){
   applyBranding();
   applyNavVis();
   applyNavIcons();
+  // Link logged-in account to app member
+  const _myMember=_findMyMember(_pbUser);
+  if(_myMember){
+    window._myMemberId=_myMember.id;
+    // Auto-set active member filter to self on first load
+    if(!S.activeMember)S.activeMember=_myMember.id;
+  }
+  _updateMyTasksBtn();
   nav('dashboard');
   applyPermissionsNav();
   updateRailBookmarks();
