@@ -1367,7 +1367,12 @@ let _pbEtag     = null;
   try{
     const t=sessionStorage.getItem('pb_token');
     const u=sessionStorage.getItem('pb_user');
-    if(t&&u){_pbToken=t;_pbUser=JSON.parse(u);}
+    if(t&&u){
+      _pbToken=t;
+      _pbUser=JSON.parse(u);
+      // Schedule refresh for restored session (may be close to expiry)
+      setTimeout(_scheduleTokenRefresh,100);
+    }
   }catch(e){}
 })();
 
@@ -1482,9 +1487,9 @@ function _validateBeforeSave(){
     return{ok:false,reason:`Refusing to save: state appears empty (was ${lastTotal} items)`};
   }
 
-  // Guard against any single collection being wiped if it previously had many items
-  // (e.g. tasks going from 50 to 0 in one save is suspicious)
-  const WIPE_THRESHOLD=5; // only flag if collection had more than this many items
+  // Warn (but don't block) if a collection drops to zero — could be legitimate
+  // Hard-block only if state is structurally corrupt (arrays missing entirely)
+  const WIPE_THRESHOLD=5;
   const collections=[
     ['projects',S.projects.length,_lastKnownCounts.projects],
     ['tasks',S.tasks.length,_lastKnownCounts.tasks],
@@ -1492,7 +1497,8 @@ function _validateBeforeSave(){
   ];
   for(const [name,now,last] of collections){
     if(last>WIPE_THRESHOLD&&now===0){
-      return{ok:false,reason:`${name} wiped (was ${last}, now 0). Save blocked as a precaution.`};
+      // Log prominently but allow the save — user may have legitimately deleted everything
+      console.warn(`⚠ ProjectFlow: ${name} dropped from ${last} to 0 items. Saving anyway — check if this was intentional.`);
     }
   }
 
@@ -1610,13 +1616,12 @@ async function restoreHistorySnapshot(id){
     if(!r.ok)throw new Error('Failed to fetch snapshot');
     const snap=await r.json();
     const restored=typeof snap.data==='string'?JSON.parse(snap.data):snap.data;
-    // Validate restored data before applying
     if(!Array.isArray(restored.projects)||!Array.isArray(restored.tasks)){
       throw new Error('Snapshot data appears corrupt');
     }
+    delete restored._clientId;
     Object.assign(S,restored);
     _applyDefaults();
-    // Update known counts
     _lastKnownCounts={
       projects:(S.projects||[]).length,
       tasks:(S.tasks||[]).length,
@@ -1649,27 +1654,30 @@ async function _doSave(){
   }
 
   const now=new Date().toISOString();
-  _myLastSave=now; // set BEFORE the await so realtime events during the request are skipped
-  // Strip finAuth before syncing — finance unlock is per-session, not shared
-  const _syncPayload={...S,finance:{...S.finance,finAuth:false},_clientId:_myClientId};
-  delete _syncPayload._spSearch; // UI state, not data
-  const ok=await sbUpsert(JSON.stringify(_syncPayload),now);
-  _saving=false;
+  _myLastSave=now;
+  let ok=false;
+  try{
+    const _syncPayload={...S,finance:{...S.finance,finAuth:false},_clientId:_myClientId};
+    delete _syncPayload._spSearch;
+    ok=await sbUpsert(JSON.stringify(_syncPayload),now);
+  }catch(e){
+    console.error('Save error:',e);
+    ok=false;
+  }
+  _saving=false; // ALWAYS reset — never get stuck
   if(ok){
     _lastSavedAt=now;
-    _setSyncStatus('synced');
-    // Save a history snapshot every 5 successful saves
     if(!window._saveCount)window._saveCount=0;
     window._saveCount++;
     if(window._saveCount%5===0)_saveHistorySnapshot('Auto #'+window._saveCount);
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+    _online=true; // reset on successful save — connection is back
     _setSyncStatus('synced',`Saved ${ts}`);
-    _saveLocalBackup(); // snapshot to rolling local backup on every successful remote save
+    _saveLocalBackup();
   } else {
-    _setSyncStatus('error');
+    _setSyncStatus('error','Save failed — check connection');
     _online=false;
   }
-  // If another save was queued while this one was in flight, run it now
   if(_saveQueue)_doSave();
 }
 
@@ -2016,9 +2024,16 @@ function _applyPendingRemote(){
   _pollLastAt=remoteTs;
   try{
     const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
-    delete remote._clientId; // strip — only meaningful in PocketBase, not in local state
+    delete remote._clientId;
     Object.assign(S,remote);
     _applyDefaults();
+    // Update known counts so validation doesn't flag legitimate remote deletions
+    _lastKnownCounts={
+      projects:(S.projects||[]).length,
+      tasks:(S.tasks||[]).length,
+      members:(S.members||[]).length,
+      sponsors:(S.sponsors||[]).length
+    };
     render();
     const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _setSyncStatus('synced',`Updated ${ts}`);
@@ -2044,7 +2059,11 @@ document.addEventListener('visibilitychange',()=>{
   if(!document.hidden&&_pbToken)startPolling();
 });
 
-window.addEventListener('online',()=>{_online=true;_setSyncStatus('saving');save();});
+window.addEventListener('online',()=>{
+  _online=true;
+  _setSyncStatus('saving');
+  save(); // this will set _online=false again if still failing, or show saved on success
+});
 window.addEventListener('offline',()=>{_online=false;_setSyncStatus('offline');});
 const COLORS=['#62D0AA','#14b8a6','#06b6d4','#22d3ee','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#ef4444','#f97316','#fb923c','#f59e0b','#84cc16'];
 const PRIOS=['High','Medium','Low'];
@@ -2962,6 +2981,36 @@ document.addEventListener('mouseout',e=>{if(!e.relatedTarget?.closest('[data-tip
 let _presenceTimer=null;
 let _presenceRecordId=null;
 
+
+async function _cleanupPresence(){
+  if(!_pbToken||!_pbUser)return;
+  try{
+    // Delete our own presence record on logout
+    if(_presenceRecordId){
+      await fetch(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,{
+        method:'DELETE',
+        headers:{Authorization:_pbToken}
+      });
+      _presenceRecordId=null;
+    }
+    // Also clean up any very stale records (older than 5 minutes) left by crashed sessions
+    const cutoff=new Date(Date.now()-5*60*1000).toISOString();
+    const r=await fetch(
+      PB_URL+'/api/collections/presence/records?filter=(updated_at<"'+cutoff+'")&perPage=50',
+      {headers:{Authorization:_pbToken}}
+    );
+    if(r.ok){
+      const d=await r.json();
+      await Promise.all((d.items||[]).map(item=>
+        fetch(PB_URL+'/api/collections/presence/records/'+item.id,{
+          method:'DELETE',headers:{Authorization:_pbToken}
+        })
+      ));
+      if(d.items?.length>0)console.log(`Cleaned up ${d.items.length} stale presence records`);
+    }
+  }catch(e){console.warn('Presence cleanup failed:',e);}
+}
+
 async function _pingPresence(){
   if(!_pbToken||!_pbUser)return;
   const now=new Date().toISOString();
@@ -3049,6 +3098,67 @@ async function _uploadImageToPB(file, label){
   return PB_URL+'/api/files/'+rec.collectionId+'/'+rec.id+'/'+rec.file;
 }
 
+
+/* ── JWT auto-refresh ──────────────────────────────
+ * PocketBase tokens expire (default 5 days).
+ * We decode the expiry from the JWT and refresh
+ * 1 hour before it expires so sessions never drop.
+ * ─────────────────────────────────────────────── */
+let _tokenRefreshTimer=null;
+
+function _scheduleTokenRefresh(){
+  if(_tokenRefreshTimer)clearTimeout(_tokenRefreshTimer);
+  if(!_pbToken)return;
+  try{
+    // Decode JWT payload (base64url middle segment)
+    const payload=JSON.parse(atob(_pbToken.split('.')[1].replace(/-/g,'+').replace(/_/g,'/')));
+    if(!payload.exp)return;
+    const expiresAt=payload.exp*1000; // convert to ms
+    const now=Date.now();
+    const msUntilExpiry=expiresAt-now;
+    if(msUntilExpiry<=0){
+      // Already expired — sign out
+      handleLogout();
+      return;
+    }
+    // Refresh 1 hour before expiry (or immediately if less than 1h left)
+    const refreshIn=Math.max(0,msUntilExpiry-(60*60*1000));
+    console.log(`Token refresh scheduled in ${Math.round(refreshIn/1000/60)} minutes`);
+    _tokenRefreshTimer=setTimeout(_refreshToken,refreshIn);
+  }catch(e){
+    console.warn('Could not schedule token refresh:',e);
+  }
+}
+
+async function _refreshToken(){
+  if(!_pbToken||!_pbUser)return;
+  try{
+    const r=await fetch(PB_URL+'/api/collections/users/auth-refresh',{
+      method:'POST',
+      headers:{Authorization:_pbToken}
+    });
+    if(!r.ok){
+      // Refresh failed — token may have already expired, sign out gracefully
+      console.warn('Token refresh failed — signing out');
+      handleLogout();
+      return;
+    }
+    const d=await r.json();
+    _pbToken=d.token;
+    _pbUser=d.record;
+    sessionStorage.setItem('pb_token',_pbToken);
+    sessionStorage.setItem('pb_user',JSON.stringify(d.record));
+    console.log('Token refreshed successfully');
+    // Schedule the next refresh
+    _scheduleTokenRefresh();
+  }catch(e){
+    console.warn('Token refresh error:',e);
+    // Don't sign out on network error — user may just be offline temporarily
+    // Try again in 10 minutes
+    _tokenRefreshTimer=setTimeout(_refreshToken,10*60*1000);
+  }
+}
+
 /* ════ USER PERMISSIONS ════ */
 function _userPerms(){
   // Returns the user's permissions array, or all pages if not set (admin fallback)
@@ -3118,6 +3228,7 @@ async function authSignIn(){
     _pbToken=d.token;_pbUser=d.record;
     sessionStorage.setItem('pb_token',_pbToken);
     sessionStorage.setItem('pb_user',JSON.stringify(d.record));
+    _scheduleTokenRefresh(); // auto-refresh before expiry
     errEl.style.display='none';
     _onSignedIn(d.record);
   }catch(e){
@@ -3146,6 +3257,11 @@ async function authResetPassword(){
 }
 
 async function handleLogout(){
+  // Clean up presence and cancel token refresh before signing out
+  await _cleanupPresence().catch(()=>{});
+  if(_tokenRefreshTimer){clearTimeout(_tokenRefreshTimer);_tokenRefreshTimer=null;}
+  if(_presenceTimer){clearInterval(_presenceTimer);_presenceTimer=null;}
+  if(_pbEventSource){_pbEventSource.close();_pbEventSource=null;}
   _pbToken=null;_pbUser=null;_pbRecordId=null;_pbEtag=null;
   sessionStorage.removeItem('pb_token');sessionStorage.removeItem('pb_user');
   el('app').style.display='none';
@@ -3731,7 +3847,7 @@ function taskSortBarHtml(ctx){
     {v:'default',l:'Default'},{v:'latest',l:'Latest'},{v:'due',l:'Due date'},
     {v:'alpha',l:'A\u2013Z'},{v:'priority',l:'Priority'},{v:'person',l:'Person'},
   ];
-  const cb=ctx==='detail'?'render()':'renderDashTasksInline()';
+  const cb=ctx==='detail'||ctx==='ec'?'render()':'renderDashTasksInline()';
   const pills=opts.map(o=>{
     const a=cur===o.v;
     return '<button type="button" onclick="S.taskSort=\''+o.v+'\';save();'+cb+'" style="padding:2px 8px;border-radius:20px;border:1.5px solid '+(a?'var(--acc)':'var(--border)')+';background:'+(a?'var(--teal-dim)':'transparent')+';color:'+(a?'var(--acc)':'var(--text2)')+';font-size:.62rem;font-weight:600;cursor:pointer;white-space:nowrap;transition:all .12s;">'+o.l+'</button>';
@@ -10166,6 +10282,8 @@ async function init(){
   startPolling();
   _startFallbackPoll();
   startPresence();
+  // Hourly stale presence cleanup
+  setInterval(()=>{if(_pbToken)_cleanupPresence();},60*60*1000);
   startAutoBackup();
   _setSyncStatus('synced','Connected');
 }
