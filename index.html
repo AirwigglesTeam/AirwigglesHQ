@@ -1478,7 +1478,7 @@ let _saveCount=0;            // counts successful saves, triggers history snapsh
 let _online=true;            // connectivity flag
 
 /* ── Undo/redo ── */
-const MAX_UNDO=30;
+const MAX_UNDO=10;
 const PF_BACKUP_KEY='pf4_backups';   // localStorage key for rolling backups
 const PF_MAX_BACKUPS=10;             // keep last 10 snapshots
 const PF_BACKUP_INTERVAL=10*60*1000; // auto-backup every 10 minutes
@@ -2381,7 +2381,6 @@ function bulkMarkDone(done){
 function bulkDelete(){
   if(!_bulkSel.size)return;
   saveWithUndo('Bulk delete tasks');
-  saveWithUndo('Bulk delete');
   function del(tid){S.tasks=S.tasks.filter(t=>t.id!==tid);kids(tid).forEach(ch=>del(ch.id));}
   _bulkSel.forEach(id=>del(id));
   save();
@@ -3090,8 +3089,10 @@ async function _cleanupPresence(){
   }catch(e){console.warn('Presence cleanup failed:',e);}
 }
 
+let _pinging=false;
 async function _pingPresence(){
-  if(!_pbToken||!_pbUser)return;
+  if(!_pbToken||!_pbUser||_pinging)return;
+  _pinging=true;
   const now=new Date().toISOString();
   const body=JSON.stringify({
     user_id:_pbUser.id,
@@ -3101,15 +3102,15 @@ async function _pingPresence(){
   const headers={Authorization:_pbToken,'Content-Type':'application/json'};
   try{
     if(_presenceRecordId){
-      const pr=await fetch(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,
-        {method:'PATCH',headers,body});
+      const pr=await fetchWithTimeout(PB_URL+'/api/collections/presence/records/'+_presenceRecordId,
+        {method:'PATCH',headers,body},8000);
       if(pr.status===404){_presenceRecordId=null;} // stale ID — fall through to create
     }
     if(!_presenceRecordId){
       // Check if we already have a record first
-      const existing=await fetch(
+      const existing=await fetchWithTimeout(
         PB_URL+'/api/collections/presence/records?filter=(user_id="'+_pbUser.id+'")&perPage=1',
-        {headers:{Authorization:_pbToken},cache:'no-store'}
+        {headers:{Authorization:_pbToken},cache:'no-store'},8000
       );
       if(existing.ok){
         const d=await existing.json();
@@ -3136,6 +3137,7 @@ async function _pingPresence(){
       _renderPresence(others);
     }
   }catch(e){}
+  _pinging=false;
 }
 
 function _renderPresence(users){
