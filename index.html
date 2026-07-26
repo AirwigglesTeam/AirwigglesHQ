@@ -1474,6 +1474,7 @@ let _syncChannel=null;       // Supabase realtime channel
 let _saveDebounce=null;      // debounce timer for rapid saves
 let _saveQueue=null;         // pending save while one is in flight
 let _saving=false;           // save in flight flag
+let _saveCount=0;            // counts successful saves, triggers history snapshots
 let _online=true;            // connectivity flag
 
 /* ── Undo/redo ── */
@@ -1727,9 +1728,8 @@ async function _doSave(){
   _saving=false; // ALWAYS reset — never get stuck
   if(ok){
     _lastSavedAt=now;
-    if(!window._saveCount)window._saveCount=0;
-    window._saveCount++;
-    if(window._saveCount%5===0)_saveHistorySnapshot('Auto #'+window._saveCount);
+    _saveCount++;
+    if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _online=true; // reset on successful save — connection is back
     _setSyncStatus('synced',`Saved ${ts}`);
@@ -1912,8 +1912,11 @@ function _applyDefaults(){
   if(!S.taskSort)S.taskSort='default';
   if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
   if(!S.coworkDays)S.coworkDays=[];
-  (S.members||[]).forEach(m=>{if(!m.timeLog)m.timeLog=[];if(m.isDirector===undefined)m.isDirector=false;});
-  (S.projects||[]).forEach(p=>{if(!p.expenses)p.expenses=[];if(!p.tools)p.tools=[];if(p.budget===undefined)p.budget=0;if(!p.phaseWeeks)p.phaseWeeks={planning:null,prelaunch:null,postEvent:null};});
+  S.members=(S.members||[]).filter(Boolean); // strip any null/undefined entries
+  S.members.forEach(m=>{if(!m.timeLog)m.timeLog=[];if(m.isDirector===undefined)m.isDirector=false;});
+  S.tasks=(S.tasks||[]).filter(Boolean);
+  S.projects=(S.projects||[]).filter(Boolean);
+  S.projects.forEach(p=>{if(!p.expenses)p.expenses=[];if(!p.tools)p.tools=[];if(p.budget===undefined)p.budget=0;if(!p.phaseWeeks)p.phaseWeeks={planning:null,prelaunch:null,postEvent:null};});
   if(!S.settings.phaseDefaults)S.settings.phaseDefaults={planning:2,prelaunch:6,postEvent:2};
   if(!S.settings.shortcuts)S.settings.shortcuts={};
   (S.tasks||[]).forEach(t=>{if(t.phase===undefined)t.phase='';});
@@ -3412,10 +3415,12 @@ function getMyMember(){
 }
 
 function _findMyMember(user){
+  if(!user)return null;
+  const members=(S.members||[]).filter(Boolean); // guard against null entries
   // Try explicit link first
-  let me=S.members.find(m=>m.pbUserId===user.id);
+  let me=members.find(m=>m.pbUserId===user.id);
   // Fall back to email match
-  if(!me&&user.email)me=S.members.find(m=>m.email&&m.email.toLowerCase()===user.email.toLowerCase());
+  if(!me&&user.email)me=members.find(m=>m.email&&m.email.toLowerCase()===user.email.toLowerCase());
   return me||null;
 }
 
