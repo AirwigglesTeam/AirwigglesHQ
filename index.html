@@ -3107,6 +3107,7 @@ function render(){
   const c=el('content');
   if(!c)return;
   hideBlockTooltip();
+  const _scrollY=c.scrollTop; // save scroll before re-render
   if(S.detailId){c.innerHTML=renderDetail(S.detailId);initBlockedHover();return;}
   switch(V){
     case'dashboard':try{c.innerHTML=renderDash();}catch(e){console.error('Dashboard error:',e);c.innerHTML=`<div class='fu'><div class='page-hd'><div class='page-title'><em>Dashboard</em></div></div><div class='empty'><div class='empty-ico'><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="opacity:.35"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class='empty-txt'>Error loading dashboard: ${e.message}</div></div></div>`;}setTimeout(()=>{scrollGanttToday();initCoworkTooltips();},60);break;
@@ -3124,7 +3125,8 @@ function render(){
     case'sponsors':c.innerHTML=renderSponsors();setTimeout(()=>initSponsorSearch(),50);break;
     case'settings':c.innerHTML=renderSettings();setTimeout(renderBackupList,0);break;
   }
-  c.scrollTop=0;
+  // Restore scroll position (don't jump to top on every render)
+  c.scrollTop=_scrollY;
   initBlockedHover();
   
 }
@@ -3690,13 +3692,38 @@ function toggleDone(id){
   const ch=kids(id);if(ch.length>0)return;
   t.done=!t.done;
   if(t.done){t.kStatus='done';}
-  else{syncBlockedStatus(id);} // restore to blocked or todo based on active blockers
+  else{syncBlockedStatus(id);}
   if(t.done&&t.recur?.enabled)spawnRecurring(t);
-  // Cascade: if marking a parent done, also complete all children
   if(t.done)cascadeChildrenDone(id);
-  // Unblock any tasks that were waiting on this one
-  S.tasks.filter(x=>(x.blockedBy||[]).includes(id)).forEach(x=>syncBlockedStatus(x.id));
-  save();render();
+  const blockedByThis=S.tasks.filter(x=>(x.blockedBy||[]).includes(id));
+  blockedByThis.forEach(x=>syncBlockedStatus(x.id));
+  save();
+  // Try lightweight in-place update first to avoid full re-render + scroll reset
+  const _needsFullRender=t.recur?.enabled||blockedByThis.length>0||ch.length>0;
+  if(!_needsFullRender){
+    _updateTaskRowInPlace(id);
+  } else {
+    render();
+  }
+}
+
+function _updateTaskRowInPlace(id){
+  const t=getTask(id);if(!t)return;
+  const row=document.querySelector(`.task-item[data-id="${id}"]`);
+  if(!row){render();return;} // fallback if row not found
+  // Update the checkbox visual
+  const check=row.querySelector('.ti-check');
+  if(check){
+    check.className='ti-check'+(t.done?' done':'');
+  }
+  // Update the task name strikethrough
+  const name=row.querySelector('.ti-name');
+  if(name){
+    name.className='ti-name'+(t.done?' done':'');
+  }
+  // Update the progress bar if parent
+  const prog=row.querySelector('.ti-prog-fill');
+  if(prog)prog.style.width=taskComp(t)+'%';
 }
 
 function spawnRecurring(t){
@@ -8987,7 +9014,7 @@ function renderSponsors(){
   if(_spSelectedId&&!getSponsor(_spSelectedId))_spSelectedId=null;
   if(!_spSelectedId&&S.sponsors.length>0)_spSelectedId=S.sponsors[0].id;
 
-  const q=(el('sp-search')||{}).value||'';
+  const q=S._spSearch||'';
   const pFilter=(el('sp-prio-filter')||{}).value||'';
   let list=S.sponsors.filter(s=>{
     const search=(s.name+' '+(s.notes||'')+' '+(s.products||[]).map(p=>p.name).join(' ')).toLowerCase();
@@ -9117,7 +9144,7 @@ ${(()=>{
   <!-- LEFT: Sponsor list -->
   <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
     <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:7px;">
-      <input id="sp-search" class="inp" placeholder="Search sponsors…" style="font-size:.75rem;padding:6px 10px;" oninput="render()" value="${q}">
+      <input id="sp-search" class="inp" placeholder="Search sponsors…" style="font-size:.75rem;padding:6px 10px;" oninput="_spSearchInput(this.value)" value="${q}">
       <select id="sp-prio-filter" class="fsel" style="font-size:.72rem;" onchange="render()">
         <option value="">All priorities</option>
         ${Object.entries(SP_PRIO_LABELS).map(([v,l])=>`<option value="${v}" ${pFilter===v?'selected':''}>${l}</option>`).join('')}
@@ -9299,7 +9326,41 @@ function renderSpProfile(s){
 }
 
 function renderSponsorsInline(){render();} // now a full re-render for simplicity
-function initSponsorSearch(){} // no longer needed - handled by render()
+let _spSearchDebounce=null;
+function _spSearchInput(val){
+  // Store value so it survives a render
+  if(!S._spSearch)S._spSearch='';
+  S._spSearch=val;
+  // Debounce — filter after 150ms of no typing
+  clearTimeout(_spSearchDebounce);
+  _spSearchDebounce=setTimeout(()=>{
+    _filterSponsorList(val);
+  },150);
+}
+
+function _filterSponsorList(q){
+  // Filter sponsor rows in-place without re-rendering
+  const rows=document.querySelectorAll('.sp-list-item');
+  if(rows.length===0){
+    // List not rendered yet — fall back to full render
+    render();return;
+  }
+  const lq=(q||'').toLowerCase().trim();
+  rows.forEach(row=>{
+    if(!lq){row.style.display='';return;}
+    const name=(row.dataset.name||'').toLowerCase();
+    const tags=(row.dataset.tags||'').toLowerCase();
+    row.style.display=(name.includes(lq)||tags.includes(lq))?'':'none';
+  });
+  // Show/hide empty state
+  const empty=document.getElementById('sp-list-empty');
+  if(empty){
+    const visible=Array.from(rows).some(r=>r.style.display!=='none');
+    empty.style.display=visible?'none':'block';
+  }
+}
+
+function initSponsorSearch(){}
 
 function openNewSponsor(){
   _spSelectedId=null;
