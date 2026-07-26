@@ -1442,7 +1442,7 @@ function _setSyncStatus(status,msg=''){
 /* ── Core save — debounced, queued ── */
 function save(){
   // Keep localStorage as offline fallback
-  try{localStorage.setItem('pf4',JSON.stringify(S));}catch(e){}
+  try{const _lsData={...S};delete _lsData._clientId;localStorage.setItem('pf4',JSON.stringify(_lsData));}catch(e){}
   // Debounce remote saves — don't hammer Supabase on every keystroke
   if(_saveDebounce)clearTimeout(_saveDebounce);
   _saveDebounce=setTimeout(_doSave,600);
@@ -1453,7 +1453,7 @@ function save(){
 /* Immediate save — bypasses debounce. Use for destructive actions like deletions
    so Supabase is updated before the user can refresh and get stale data. */
 function saveNow(){
-  try{localStorage.setItem('pf4',JSON.stringify(S));}catch(e){}
+  try{const _lsData={...S};delete _lsData._clientId;localStorage.setItem('pf4',JSON.stringify(_lsData));}catch(e){}
   if(_saveDebounce){clearTimeout(_saveDebounce);_saveDebounce=null;}
   _setSyncStatus('saving');
   _doSave();
@@ -1635,7 +1635,7 @@ async function _doSave(){
     _setSyncStatus('error',`⚠ Save blocked: ${_validation.reason}`);
     _saving=false;
     // Still save to localStorage as a safety net
-    try{localStorage.setItem('pf4',JSON.stringify(S));}catch(e){}
+    try{const _lsData={...S};delete _lsData._clientId;localStorage.setItem('pf4',JSON.stringify(_lsData));}catch(e){}
     if(_saveQueue)_doSave();
     return;
   }
@@ -1643,7 +1643,7 @@ async function _doSave(){
   const now=new Date().toISOString();
   _myLastSave=now; // set BEFORE the await so realtime events during the request are skipped
   // Strip finAuth before syncing — finance unlock is per-session, not shared
-  const _syncPayload={...S,finance:{...S.finance,finAuth:false}};
+  const _syncPayload={...S,finance:{...S.finance,finAuth:false},_clientId:_myClientId};
   const ok=await sbUpsert(JSON.stringify(_syncPayload),now);
   _saving=false;
   if(ok){
@@ -1873,10 +1873,13 @@ function _startPBRealtime(){
       if(msg.action!=='update'&&msg.action!=='create')return;
       const row=msg.record;
       if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
+      // Skip if this is our own save — check client ID embedded in the data
+      try{
+        const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
+        if(_d&&_d._clientId===_myClientId)return;
+      }catch(_){}
       const remoteTs=row.updated||row.updated_at;
       if(remoteTs===_pollLastAt)return;
-      // Skip if this is our own save
-      if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave)return;
       _pendingRemote={row,remoteTs};
       _applyPendingRemote();
     }catch(err){}
@@ -1951,6 +1954,7 @@ function _conflictTakeRemote(){
   if(row.updated_at===_myLastSave)return;
   try{
     const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
+    delete remote._clientId; // strip — only meaningful in PocketBase, not in local state
     Object.assign(S,remote);
     _applyDefaults();
     render();
@@ -1970,9 +1974,13 @@ function _startFallbackPoll(){
     try{
       const row=await pbGet();
       if(!row||row==='unchanged')return;
+      // Skip own saves via client ID
+      try{
+        const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
+        if(_d&&_d._clientId===_myClientId)return;
+      }catch(_){}
       const remoteTs=row.updated||row.updated_at;
       if(remoteTs===_pollLastAt)return;
-      if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave)return;
       _pendingRemote={row,remoteTs};
       _applyPendingRemote();
     }catch(e){}
@@ -1998,6 +2006,7 @@ function _applyPendingRemote(){
   _pollLastAt=remoteTs;
   try{
     const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
+    delete remote._clientId; // strip — only meaningful in PocketBase, not in local state
     Object.assign(S,remote);
     _applyDefaults();
     render();
