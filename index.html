@@ -4219,6 +4219,8 @@ function _updateTaskRowInPlace(id){
     if(name)name.className='ti-name'+(t.done?' done':'');
     const prog=row.querySelector('.ti-prog-fill');
     if(prog)prog.style.width=taskComp(t)+'%';
+    // Campaign view uses opacity to show done state
+    row.style.opacity=t.done?'.55':'1';
     // Update parent progress if this is a child task
     if(t.parentId){
       const parentRow=document.querySelector(`.task-item[data-id="${t.parentId}"]`);
@@ -5445,7 +5447,7 @@ function renderCampaign(){
     const comp=taskComp(t);
     const phC=t.phase?phaseColor(t.phase):'';
     const phBg=t.phase?phaseBg(t.phase):'';
-    return`<div style="background:var(--surface2);border:1px solid ${t.done?'var(--border2)':od?'rgba(224,96,96,.3)':'var(--border)'};border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;opacity:${t.done?.55:1};" onclick="openModal('task','${t.id}')">
+    return`<div class="task-item" data-id="${t.id}" style="background:var(--surface2);border:1px solid ${t.done?'var(--border2)':od?'rgba(224,96,96,.3)':'var(--border)'};border-radius:10px;padding:10px 12px;cursor:pointer;transition:border-color .15s;opacity:${t.done?.55:1};" onclick="openModal('task','${t.id}')">
       <div style="display:flex;align-items:flex-start;gap:8px;">
         <div class="ti-check ${t.done?'done':''}" onclick="event.stopPropagation();toggleDone('${t.id}')" style="margin-top:2px;flex-shrink:0;"></div>
         <div style="flex:1;min-width:0;">
