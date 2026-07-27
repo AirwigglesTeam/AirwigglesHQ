@@ -1415,12 +1415,12 @@ async function pbUpsert(data,updatedAt,_isRetry){
     let r;
     if(_pbRecordId){
       r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_state/records/'+_pbRecordId,
-        {method:'PATCH',headers,body},15000);
+        {method:'PATCH',headers,body},_isRetry?30000:20000);
       if(r&&r.status===404){_pbRecordId=null;r=null;}
     }
     if(!_pbRecordId&&!r){
       r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_state/records',
-        {method:'POST',headers,body},15000);
+        {method:'POST',headers,body},_isRetry?30000:20000);
       if(r.ok){const rec=await r.json();_pbRecordId=rec.id;}
     }
     if(r.ok){_pbEtag=null;_lastSaveError='';return true;}
@@ -1443,6 +1443,16 @@ async function pbUpsert(data,updatedAt,_isRetry){
     console.error('PocketBase save failed:',_lastSaveError,'| payload size:',data.length,'chars');
     return false;
   }catch(e){
+    // AbortError = our timeout fired — retry once with a longer window
+    if(e.name==='AbortError'&&!_isRetry){
+      console.warn('Save timed out — retrying with extended timeout');
+      return pbUpsert(data,updatedAt,true); // _isRetry=true skips further retries
+    }
+    if(e.name==='AbortError'){
+      _lastSaveError=''; // don't show an error — save will retry via _saveQueue
+      _online=false;
+      return false;
+    }
     _lastSaveError='Network error: '+(e.message||'unreachable');
     console.warn('PocketBase save error:',e);
     return false;
@@ -1738,7 +1748,11 @@ async function _doSave(){
     _setSyncStatus('synced',`Saved ${ts}`);
     try{_saveLocalBackup();}catch(e){console.warn('Local backup failed:',e);}
   } else {
-    _setSyncStatus('error','⚠ '+(_lastSaveError||'Save failed — check connection'));
+    if(_lastSaveError){ // only show error if we have a real reason
+      _setSyncStatus('error','⚠ '+_lastSaveError);
+    } else {
+      _setSyncStatus('saving'); // stay in "saving" state — will retry
+    }
     _online=false;
   }
   if(_saveQueue)_doSave();
