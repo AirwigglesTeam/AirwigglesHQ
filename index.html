@@ -3853,7 +3853,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
         ${focusTasks.map(t=>{
           const proj=getProject(t.projectId);
           const od=t.endDate<todayStr;
-          return`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);cursor:pointer;" onclick="openDetail('${t.projectId}')">
+          return`<div class="task-item" data-id="${t.id}" style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);cursor:pointer;" onclick="openDetail('${t.projectId}')">
             <div class="ti-check${t.done?' done':''}" onclick="event.stopPropagation();toggleDone('${t.id}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(255,255,255,.18);flex-shrink:0;"></div>
             <div style="flex:1;min-width:0;">
               <div style="font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${t.name}</div>
