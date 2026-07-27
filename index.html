@@ -1436,6 +1436,11 @@ async function pbUpsert(data,updatedAt,_isRetry){
     }
     let serverMsg='';
     try{const eb=await r.json();serverMsg=eb.message||JSON.stringify(eb.data||{}).slice(0,120);}catch(_){}
+    if(r.status===502||r.status===503||r.status===504){
+      _lastSaveError='Server temporarily unavailable — will retry';
+      _online=false;
+      return false;
+    }
     _lastSaveError=`HTTP ${r.status}${serverMsg?': '+serverMsg:''}`;
     if(r.status===400&&data.length>9000000){
       _lastSaveError=`Data too large (${(data.length/1000000).toFixed(1)}M chars, limit 10M) — remove base64 images`;
@@ -1484,7 +1489,8 @@ let _syncChannel=null;       // Supabase realtime channel
 let _saveDebounce=null;      // debounce timer for rapid saves
 let _saveQueue=null;         // pending save while one is in flight
 let _saving=false;           // save in flight flag
-let _saveCount=0;            // counts successful saves, triggers history snapshots
+let _saveCount=0;
+let _initStarted=false;      // prevents double-init            // counts successful saves, triggers history snapshots
 let _online=true;            // connectivity flag
 
 /* ── Undo/redo ── */
@@ -1897,7 +1903,7 @@ async function load(){
   let row=null;
   try{
     const rowPromise=sbGet();
-    const timeout=new Promise(res=>setTimeout(()=>res(null),10000));
+    const timeout=new Promise(res=>setTimeout(()=>res(null),25000));
     row=await Promise.race([rowPromise,timeout]);
   }catch(e){row=null;}
   if(row&&row.data){
@@ -10421,7 +10427,6 @@ function copyAiDraft(sid){
 }
 
 /* ════ INIT ════ */
-let _initStarted=false;
 let _renderDebounce=null;
 function debouncedRender(){
   if(_renderDebounce)clearTimeout(_renderDebounce);
