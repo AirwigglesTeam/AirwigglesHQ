@@ -3833,13 +3833,13 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
                 const s=getSponsor(sp.id);if(!s)return'';
                 const t=SP_TYPES[sp.type]||SP_TYPES.product;
                 const prods=(sp.products||[]).filter(x=>(x.categories||[]).length>0||(x.quantities&&Object.values(x.quantities).some(q=>parseInt(q)>0)));
-                return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View ${s.name} profile">
-                  <div class="sp-avatar" style="width:28px;height:28px;font-size:.55rem;flex-shrink:0;">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
-                  <div style="flex:1;min-width:0;">
+                return`<div style="display:flex;align-items:center;gap:10px;padding:8px 10px;background:var(--surface2);border-radius:8px;">
+                  <div class="sp-avatar" style="width:28px;height:28px;font-size:.55rem;flex-shrink:0;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View ${s.name} profile">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
+                  <div style="flex:1;min-width:0;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View ${s.name} profile">
                     <div style="font-size:.8rem;font-weight:600;">${s.name}</div>
                     <div style="font-size:.62rem;color:${t.color};margin-top:1px;">${t.label}${prods.length>0?` · ${prods.length} product${prods.length!==1?'s':''} allocated`:''}</div>
                   </div>
-                  <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                  <button class="del-btn" onclick="event.stopPropagation();removeProjSponsor('${p.id}','${sp.id}')" title="Remove sponsor from event" style="font-size:15px;">×</button>
                 </div>`;
               }).join('')}
             </div>
@@ -10994,6 +10994,12 @@ function refreshSponsorRow(i){
 
 function removeProjSponsorRow(i){
   const row=el(`pm-sp-row-${i}`);if(row)row.remove();
+}
+function removeProjSponsor(projId,sponsorId){
+  const p=getProject(projId);if(!p)return;
+  saveWithUndo('Remove sponsor from event');
+  p.sponsors=(p.sponsors||[]).filter(s=>s.id!==sponsorId);
+  save();render();
 }
 
 function addProjSponsorRow(){
