@@ -3889,7 +3889,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
       return`<div class="card" id="dash-member-okrs">
       <div class="card-hd" style="cursor:pointer;" onclick="(function(){const b=el('dash-mem-okr-bd');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span class="card-title" style="color:var(--acc);">✦ ${mfm.name}'s Objectives</span>${isMe?`<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openMemberProfile('${mf}','okrs')">Edit</button>`:''}</div>
       <div class="card-bd" id="dash-mem-okr-bd">
-        ${memOkrs.length===0?`<div style="font-size:.75rem;color:var(--muted);">${isMe?'You haven\'t set any objectives yet. <button class=\"btn btn-ghost btn-xs\" onclick=\"openMemberProfile(\\\\u0027'+mf+'\\\\u0027,\\\\u0027okrs\\\\u0027)\">Set them up</button>':'No objectives set yet.'}</div>`:''}
+        ${memOkrs.length===0?`<div style="font-size:.75rem;color:var(--muted);">${isMe?'You haven\'t set any objectives yet. <button class="btn btn-ghost btn-xs" onclick="openMemberProfile(\''+mf+'\',\'okrs\')">Set them up</button>':'No objectives set yet.'}</div>`:''}
         ${memOkrs.map(okr=>`<div style="margin-bottom:12px;">
           <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:5px;">◈ ${okr.objective}</div>
           ${(okr.keyResults||[]).map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:4px 8px;border-left:2px solid ${kr.done?'var(--green)':'var(--border)'};margin-bottom:3px;">
@@ -3951,14 +3951,13 @@ function renderTeamOkrs(){
       return '<div data-nsid="'+n.id+'" style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'
         +'<span style="color:var(--acc);flex-shrink:0;margin-top:1px;font-size:10px;">★</span>'
         +'<span data-nstext="'+n.id+'" style="flex:1;font-size:.78rem;color:var(--text);">'+escHtml(n.text)+'</span>'
-        +'<button onclick="startEditNs(\''+n.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px;opacity:.5;" title="Edit">✎</button>'
-        +'<button onclick="deleteTeamNorthStar(\''+n.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0;opacity:.5;" title="Delete">×</button>'
+        +'<button onclick="startEditNs(\'' + n.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px;opacity:.5;" title="Edit">✎</button>'
+        +'<button onclick="deleteTeamNorthStar(\'' + n.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0;opacity:.5;" title="Delete">×</button>'
         +'</div>';
     }).join('');
   } else {
     html+='<div style="font-size:.73rem;color:var(--muted);padding:4px 8px 6px;">No principles yet.</div>';
   }
-  // North Star inline-add row
   html+='<div id="team-ns-input-row" style="display:none;margin-top:6px;">'
     +'<div style="display:flex;gap:6px;align-items:center;">'
     +'<input class="inp" id="team-ns-inp" style="flex:1;font-size:.8rem;" placeholder="e.g. Build community, make knowledge accessible…" onkeydown="if(event.key===\'Enter\')commitTeamNs();if(event.key===\'Escape\')hideTeamInput(\'ns\');">'
@@ -3973,16 +3972,15 @@ function renderTeamOkrs(){
   if(yr.length>0){
     html+=yr.map(y=>{
       return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'
-        +'<div class="ti-check'+(y.done?' done':'')+'" onclick="toggleTeamYearly(\'+y.id+\')" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;"></div>'
+        +'<div class="ti-check'+(y.done?' done':'')+'" onclick="toggleTeamYearly(\'' + y.id + '\')" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;"></div>'
         +'<span style="flex:1;font-size:.78rem;'+(y.done?'text-decoration:line-through;color:var(--muted);':'')+'">'
         +escHtml(y.text)+'</span>'
-        +'<button onclick="deleteTeamYearly(\'+y.id+\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0;opacity:.5;" title="Delete">×</button>'
+        +'<button onclick="deleteTeamYearly(\'' + y.id + '\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0;opacity:.5;" title="Delete">×</button>'
         +'</div>';
     }).join('');
   } else {
     html+='<div style="font-size:.73rem;color:var(--muted);padding:4px 8px 6px;">No goals yet.</div>';
   }
-  // Yearly inline-add row
   html+='<div id="team-yr-input-row" style="display:none;margin-top:6px;">'
     +'<div style="display:flex;gap:6px;align-items:center;">'
     +'<input class="inp" id="team-yr-inp" style="flex:1;font-size:.8rem;" placeholder="e.g. Systematise our outreach…" onkeydown="if(event.key===\'Enter\')commitTeamYr();if(event.key===\'Escape\')hideTeamInput(\'yr\');">'
@@ -4341,7 +4339,7 @@ function renderTaskRow(t,depth=0,showProj=false){
   <div class="ti-meta-zone">
   <div class="ti-col ti-col-labels">
     ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phaseBg(t.phase)};color:${phaseColor(t.phase)};white-space:nowrap;">${t.phase}</span>`:''}
-    ${(t.labels||[]).slice(0,2).map(id=>lcHtml(id)).join('')}
+    ${(t.labels||[]).map(id=>lcHtml(id)).join('')}
   </div>
   <div class="ti-col ti-col-proj">
     ${proj?`<span class="ti-proj-chip"><span style="width:6px;height:6px;border-radius:50%;background:${proj.color};flex-shrink:0;"></span><span class="ti-proj-name">${proj.name}</span></span>`:''}
@@ -5375,30 +5373,29 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
 <hr class="div">
 <div class="detail-layout">
 
-<!-- TASKS SECTION — column 1 (wider), split by phase -->
+<!-- EXPENSES SECTION — compact row above tasks -->
 <div class="detail-sec" style="grid-column:1 / -1;">
-  ${renderDetailPhaseSections(p,top)}
-</div>
-
-<!-- EXPENSES SECTION — column 2 -->
-<div class="detail-sec">
-  <div class="detail-sec-title">
+  <div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">
     Project Expenses
     <button class="btn btn-ghost btn-sm" onclick="openModal('projExp','${p.id}')">+ Add Expense</button>
+    ${expTotal>0?`<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:.82rem;font-weight:600;color:var(--yellow);">${fmtGBP(expTotal)} total</span>`:''}
   </div>
-  ${(p.expenses||[]).length===0?`<div style="color:var(--muted);font-size:.78rem;">No expenses logged.</div>`:`
-  <div class="exp-total-bar">
-    <span style="font-size:.78rem;color:var(--text2);">Total expenses</span>
-    <span style="font-family:'DM Mono',monospace;font-size:1rem;font-weight:600;color:var(--yellow);">${fmtGBP(expTotal)}</span>
-  </div>
-  ${(p.expenses||[]).map(e=>`<div class="proj-exp-row">
-    <span style="flex:1;font-size:.82rem;">${e.name}</span>
-    <span style="font-size:.7rem;color:var(--muted);">${fmtD(e.date)}</span>
-    <span style="font-size:.7rem;color:var(--text2);background:var(--surface3);padding:2px 7px;border-radius:4px;">${e.category||'General'}</span>
-    <span style="font-family:'DM Mono',monospace;font-size:.8rem;color:var(--yellow);">${fmtGBP(e.amount)}</span>
-    <button class="del-btn" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 3px;" onclick="editProjExp('${p.id}','${e.id}')" title="Edit">✎</button>
+  ${(p.expenses||[]).length===0?`<div style="color:var(--muted);font-size:.73rem;">No expenses logged yet.</div>`:`
+  <div style="display:flex;flex-wrap:wrap;gap:6px;">
+  ${(p.expenses||[]).map(e=>`<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:.75rem;">
+    <span style="font-weight:600;">${e.name}</span>
+    <span style="color:var(--muted);font-size:.68rem;">${fmtD(e.date)}</span>
+    <span style="font-size:.68rem;color:var(--text2);background:var(--surface3);padding:1px 6px;border-radius:4px;">${e.category||'General'}</span>
+    <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--yellow);font-weight:600;">${fmtGBP(e.amount)}</span>
+    <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;" onclick="editProjExp('${p.id}','${e.id}')" title="Edit">✎</button>
     <button class="del-btn" onclick="deleteProjExp('${p.id}','${e.id}')">×</button>
-  </div>`).join('')}`}
+  </div>`).join('')}
+  </div>`}
+</div>
+
+<!-- TASKS SECTION — split by phase -->
+<div class="detail-sec" style="grid-column:1 / -1;">
+  ${renderDetailPhaseSections(p,top)}
 </div>
 
 </div>`;
@@ -5480,11 +5477,12 @@ function togglePhaseSection(sectionId,bodyId){
   if(chev)chev.style.transform=isNowCollapsed?'rotate(-90deg)':'rotate(0deg)';
 }
 
-// Quick-add bar pre-tagged with a phase
+// Quick-add bar pre-tagged with a phase — full meta row including labels & date
 function quickAddBarPhaseHtml(projectId,phase){
   const barId='qap-'+phase.toLowerCase().replace(/[^a-z0-9]/g,'')+'-'+uid();
   if(!window._qaAssignees[barId])window._qaAssignees[barId]=[];
   const hasMems=S.members.length>0;
+  const hasLabels=S.labels.length>0;
   return`<div class="qa-bar" id="${barId}" style="margin-bottom:6px;">
   <div class="qa-bar-main">
     <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
@@ -5497,19 +5495,22 @@ function quickAddBarPhaseHtml(projectId,phase){
   </div>
   <div class="qa-desc-row" id="${barId}-meta" style="display:none;">
     <textarea class="qa-desc" id="${barId}-desc" placeholder="Description…" rows="2"></textarea>
-    <input class="inp" type="date" id="${barId}-date" style="font-size:.7rem;">
+    ${hasLabels?`<div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-top:4px;">
+      ${S.labels.map(l=>`<button class="qa-label-dot" data-lid="${l.id}" onclick="this.classList.toggle('active')" style="border:1px solid ${l.color};color:${l.color};background:transparent;border-radius:20px;padding:2px 9px;font-size:.65rem;font-weight:600;cursor:pointer;transition:background .15s;">${l.name}</button>`).join('')}
+    </div>`:''}
+    <input class="inp" type="date" id="${barId}-date" style="font-size:.7rem;margin-top:4px;">
   </div>
 </div>`;
 }
 
 
-/* ════ KANBAN ════ */
+
+
 function renderKanban(){
   const projects=S.projects.filter(p=>p.status==='active');
-  const {project:kProj,member:kMem,label:kLbl}=S.kbFilter||{};
+  const {project:kProj,member:kMem,label:kLbl,phase:kPh}=S.kbFilter||{};
   const tasksByCol={};KB_COLS.forEach(c=>{tasksByCol[c.id]=[];});
   // Include ALL tasks (top-level and subtasks)
-  const kPh=S.kbFilter?.phase||'';
   S.tasks.filter(t=>{
     const p=getProject(t.projectId);if(!p||p.status!=='active')return false;
     if(kProj&&t.projectId!==kProj)return false;
@@ -5539,7 +5540,7 @@ function renderKanban(){
     ${S.labels.map(l=>`<option value="${l.id}" ${kLbl===l.id?'selected':''}>${l.name}</option>`).join('')}
   </select>
   <div class="kb-phase-pills">
-    ${PHASES.map(ph=>`<button class="kb-phase-pill${kPh===ph?' active':''}" onclick="S.kbFilter.phase=S.kbFilter.phase===\'${ph}\'?\'\':\'${ph}\';save();render()" style="border-color:${phaseColor(ph)};${kPh===ph?`background:${phaseColor(ph)};color:#fff;`:`color:${phaseColor(ph)};`}">${ph}</button>`).join('')}
+    ${PHASES.map(ph=>`<button class="kb-phase-pill${kPh===ph?' active':''}" onclick="S.kbFilter.phase=S.kbFilter.phase==='${ph}'?'':'${ph}';save();render()" style="border-color:${phaseColor(ph)};${kPh===ph?'background:'+phaseColor(ph)+';color:#fff;':'color:'+phaseColor(ph)+';'}">${ph}</button>`).join('')}
   </div>
   ${(kProj||kMem||kLbl||kPh)?`<button class="btn btn-ghost btn-sm" onclick="S.kbFilter={project:'',member:'',label:'',phase:''};save();render()">Clear filters</button>`:''}
 </div>
@@ -7854,7 +7855,7 @@ function importData(input){
       if(!S.areas)S.areas=[];
 
       // Filters & UI state
-      if(!S.kbFilter)S.kbFilter={project:'',member:'',label:''};
+      if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
       if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
       if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
       if(S.hideDone===undefined)S.hideDone=false;
@@ -7958,33 +7959,7 @@ function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
   const newSponsors=readProjSponsorRows();
   const isAirCon=!!el('pm-aircon')?.value;
-  // Read event OKRs from modal
-  const newOkrs=(()=>{
-    const items=el('pm-okr-list')?.querySelectorAll('.pm-okr-item')||[];
-    const list=[];
-    items.forEach((item,oi)=>{
-      const objInp=el(`pm-okr-obj-${oi}`);
-      const obj=objInp?objInp.value.trim():'';
-      if(!obj)return;
-      const krInputs=item.querySelectorAll('[id^="pm-okr-kr-"]');
-      const krs=[];
-      krInputs.forEach(inp=>{const t=inp.value.trim();if(t)krs.push({id:uid(),text:t,done:false});});
-      list.push({id:uid(),objective:obj,keyResults:krs});
-    });
-    // New objective row
-    const newObj=el('pm-new-okr-obj')?.value.trim();
-    if(newObj)list.push({id:uid(),objective:newObj,keyResults:[]});
-    return list;
-  })();
-  // Read phase date overrides
-  const phaseDates={};
-  PHASES.forEach(ph=>{
-    const phKey=ph.toLowerCase().replace(/[^a-z0-9]/g,'');
-    const s=el('pm-phase-s-'+phKey)?.value||'';
-    const e=el('pm-phase-e-'+phKey)?.value||'';
-    if(s||e)phaseDates[ph]={start:s,end:e};
-  });
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs,phaseDates};
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -8002,18 +7977,6 @@ function saveProject(eid){
       // Find newly added sponsors
       const oldSpIds=(old.sponsors||[]).map(s=>s.id);
       const addedSponsors=proj.sponsors.filter(s=>!oldSpIds.includes(s.id));
-      // Preserve OKR ids and done states when editing
-      if(proj.okrs&&proj.okrs.length>0&&old.okrs&&old.okrs.length>0){
-        proj.okrs=proj.okrs.map((okr,oi)=>{
-          const existing=(old.okrs||[]).find(o=>o.id===okr.id)||(old.okrs||[])[oi];
-          return{...okr,id:existing?.id||okr.id,keyResults:(okr.keyResults||[]).map((kr,ki)=>{
-            const existKR=existing?(existing.keyResults||[]).find(k=>k.id===kr.id)||(existing.keyResults||[])[ki]:null;
-            return{...kr,id:existKR?.id||kr.id,done:existKR?.done||false};
-          })};
-        });
-      } else if(!proj.okrs||proj.okrs.length===0){
-        proj.okrs=old.okrs||[];
-      }
       S.projects[i]={...old,...proj};
       addedSponsors.forEach(sp=>autoGenerateSponsorTasks(eid,sp));
     }
@@ -8101,62 +8064,7 @@ function projectModalHtml(id){
   <div id="pm-sponsors-list">${renderProjSponsorsEdit(p?.sponsors||[],p?.id||'')}</div>
   ${S.sponsors.length>0?`<button class="add-row-btn" onclick="addProjSponsorRow()">+ Add sponsor</button>`:`<div style="font-size:.73rem;color:var(--muted);">No sponsors yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('sponsors')">Add sponsors \u2192</span></div>`}
 
-
-  <!-- EVENT OKRs -->
-  <hr class="div" style="margin:16px 0 12px 0;">
-  <div style="margin-bottom:14px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-      <label class="flbl" style="margin:0;">Event Objectives <span style="font-weight:400;color:var(--muted);">(OKR)</span></label>
-    </div>
-    <div id="pm-okr-list">
-      ${(p?.okrs||[]).map((okr,oi)=>`
-      <div class="pm-okr-item" data-okr-idx="${oi}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:7px;">
-        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
-          <span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">Objective</span>
-          <button onclick="removePmOkr(${oi})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button>
-        </div>
-        <input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Grow community awareness" value="${okr.objective||''}" id="pm-okr-obj-${oi}">
-        <div id="pm-okr-krs-${oi}">
-          ${(okr.keyResults||[]).map((kr,ki)=>`
-          <div style="display:flex;gap:5px;margin-bottom:4px;" data-kr-idx="${ki}">
-            <span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span>
-            <input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" value="${kr.text||''}" id="pm-okr-kr-${oi}-${ki}">
-            <button onclick="removePmKr(${oi},${ki})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>
-          </div>`).join('')}
-        </div>
-        <button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addPmKr(${oi})">+ Key result</button>
-      </div>`).join('')}
-    </div>
-    <div style="display:flex;align-items:center;gap:7px;margin-top:6px;">
-      <input class="inp" id="pm-new-okr-obj" style="flex:1;font-size:.8rem;" placeholder="New objective…" onkeydown="if(event.key==='Enter'){addPmOkr();event.preventDefault();}">
-      <button class="btn btn-ghost btn-xs" onclick="addPmOkr()">+ Add objective</button>
-    </div>
-  </div>
-
-  <div style="margin-top:8px;"></div>
-  <!-- PHASE DURATIONS -->
-  <hr class="div">
-  <div class="field"><label class="flbl">Phase Dates <span style="font-size:.68rem;color:var(--muted);font-weight:400;">(optional — overrides defaults)</span></label>
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
-    ${PHASES.map(ph=>{
-      const pd=(p?.phaseDates||{})[ph]||{};
-      const phKey=ph.toLowerCase().replace(/[^a-z0-9]/g,'');
-      return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;">
-        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${phaseColor(ph)};margin-bottom:7px;">${ph}</div>
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
-          <div>
-            <label style="font-size:.65rem;color:var(--muted);display:block;margin-bottom:3px;">Start</label>
-            <input class="inp" type="date" id="pm-phase-s-${phKey}" value="${pd.start||''}" style="font-size:.72rem;padding:5px 7px;">
-          </div>
-          <div>
-            <label style="font-size:.65rem;color:var(--muted);display:block;margin-bottom:3px;">End</label>
-            <input class="inp" type="date" id="pm-phase-e-${phKey}" value="${pd.end||''}" style="font-size:.72rem;padding:5px 7px;">
-          </div>
-        </div>
-      </div>`;
-    }).join('')}
-  </div></div>
-  <div style="margin-top:8px;"></div>
+  <div style="margin-top:20px;"></div>
   <div class="field"><label class="flbl">Colour</label><div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${defColor===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}</div><input type="hidden" id="pm-clr" value="${defColor}"></div>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProject('${p?.id||''}')">
@@ -9489,32 +9397,31 @@ function memberProfileModalHtml(id,tab){
 
   <!-- OKRs -->
   <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px;">
-    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">My Objectives <span style="font-weight:400;">(OKRs)</span></div>
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Objectives &amp; Key Results</div>
     <div id="mp-okr-list">
       ${(m.okrs||[]).map((okr,oi)=>`
-      <div class="mp-okr-item" data-okr-idx="${oi}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px;">
+      <div class="mp-okr-item" data-okr-idx="${oi}" data-okr-id="${okr.id||''}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px;">
         <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
           <span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span>
-          <button onclick="removeMpOkr(${oi})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button>
+          <button onclick="this.closest('.mp-okr-item').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button>
         </div>
-        <input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Become a confident presenter" value="${okr.objective||''}" id="mp-okr-obj-${oi}">
+        <input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Become a confident presenter" value="${escHtml(okr.objective||'')}" id="mp-okr-obj-${oi}">
         <div id="mp-okr-krs-${oi}">
           ${(okr.keyResults||[]).map((kr,ki)=>`
-          <div style="display:flex;gap:5px;margin-bottom:4px;">
+          <div style="display:flex;gap:5px;margin-bottom:4px;" data-kr-id="${kr.id||''}" data-kr-done="${kr.done?'1':'0'}">
             <span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span>
-            <input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" value="${kr.text||''}" id="mp-okr-kr-${oi}-${ki}">
-            <button onclick="removeMpKr(${oi},${ki})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>
+            <input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="mp-okr-kr-${oi}-${ki}" value="${escHtml(kr.text||'')}">
+            <button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>
           </div>`).join('')}
         </div>
         <button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addMpKr(${oi})">+ Key result</button>
       </div>`).join('')}
     </div>
-    <div style="display:flex;align-items:center;gap:7px;margin-top:6px;">
-      <input class="inp" id="mp-new-okr-obj" style="flex:1;font-size:.8rem;" placeholder="New objective…" onkeydown="if(event.key===\'Enter\'){addMpOkr();event.preventDefault();}">
+    <div style="display:flex;gap:6px;margin-top:4px;">
+      <input class="inp" id="mp-new-okr-obj" placeholder="New objective…" style="flex:1;font-size:.78rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();addMpOkr();}">
       <button class="btn btn-ghost btn-xs" onclick="addMpOkr()">+ Add objective</button>
     </div>
   </div>
-
 
 </div>
 <div class="mo-ft">
@@ -9528,64 +9435,33 @@ function memberProfileModalHtml(id,tab){
 function saveMemberProfile(id){
   const m=getMember(id);if(!m)return;
   ['motivWhy','motivWant','motivTravel','motivExperiences','motivProducts'].forEach(k=>{
-    const inp=el(`mp-${k}`);
+    const inp=el('mp-'+k);
     if(inp)m[k]=inp.value.trim();
   });
   // Save OKRs
-  const existingOkrs=m.okrs||[];
-  const savedOkrs=existingOkrs.map((okr,oi)=>{
-    const objInp=el(`mp-okr-obj-${oi}`);
-    const newObj=objInp?objInp.value.trim():okr.objective;
-    const krCount=el(`mp-okr-krs-${oi}`)?.querySelectorAll('input').length||0;
-    const newKRs=okr.keyResults?okr.keyResults.map((kr,ki)=>{
-      const krInp=el(`mp-okr-kr-${oi}-${ki}`);
-      return krInp?{...kr,text:krInp.value.trim()}:kr;
-    }).filter(kr=>kr.text):[];
-    return{...okr,objective:newObj,keyResults:newKRs};
-  }).filter(okr=>okr.objective);
-  // New objective
-  const newObjInp=el('mp-new-okr-obj');
-  if(newObjInp&&newObjInp.value.trim()){
-    savedOkrs.push({id:uid(),objective:newObjInp.value.trim(),keyResults:[]});
-  }
-  m.okrs=savedOkrs;
+  const okrItems=document.querySelectorAll('#mp-okr-list .mp-okr-item');
+  const okrs=[];
+  okrItems.forEach((item,oi)=>{
+    const objInp=item.querySelector('#mp-okr-obj-'+oi)||item.querySelector('input[id^="mp-okr-obj-"]');
+    const objText=objInp?objInp.value.trim():'';
+    if(!objText)return;
+    const existingOkrId=item.dataset.okrId||uid();
+    const krRows=[...item.querySelectorAll('[data-kr-id]')];
+    const keyResults=krRows.map(row=>{
+      const inp=row.querySelector('input');
+      const txt=inp?inp.value.trim():'';
+      if(!txt)return null;
+      return{id:row.dataset.krId||uid(),text:txt,done:row.dataset.krDone==='1'};
+    }).filter(Boolean);
+    // Also catch newly added KRs (no data-kr-id)
+    const newKrInputs=[...item.querySelectorAll('input[id^="mp-okr-kr-"]')].filter(inp=>{
+      const row=inp.closest('[data-kr-id]');return!row;
+    });
+    newKrInputs.forEach(inp=>{const txt=inp.value.trim();if(txt)keyResults.push({id:uid(),text:txt,done:false});});
+    okrs.push({id:existingOkrId,objective:objText,keyResults});
+  });
+  m.okrs=okrs;
   save();closeModal();showToast('Profile saved');
-}
-
-// Member OKR DOM helpers (used inside memberProfileModal)
-function addMpOkr(){
-  const inp=el('mp-new-okr-obj');if(!inp)return;
-  const obj=inp.value.trim();if(!obj)return;
-  const list=el('mp-okr-list');if(!list)return;
-  const oi=list.querySelectorAll('.mp-okr-item').length;
-  const div=document.createElement('div');
-  div.className='mp-okr-item';div.dataset.okrIdx=oi;
-  div.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px;';
-  div.innerHTML=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span><button onclick="this.closest('.mp-okr-item').remove();renumberMpOkrs()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button></div><input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Become a confident presenter" value="${obj}" id="mp-okr-obj-${oi}"><div id="mp-okr-krs-${oi}"></div><button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addMpKrDyn(${oi})">+ Key result</button>`;
-  list.appendChild(div);
-  inp.value='';inp.focus();
-}
-function addMpKr(oi){
-  const krs=el(`mp-okr-krs-${oi}`);if(!krs)return;
-  const ki=krs.querySelectorAll('input').length;
-  const d=document.createElement('div');d.style.cssText='display:flex;gap:5px;margin-bottom:4px;';
-  d.innerHTML=`<span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="mp-okr-kr-${oi}-${ki}"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>`;
-  krs.appendChild(d);d.querySelector('input').focus();
-}
-function addMpKrDyn(oi){addMpKr(oi);}
-function removeMpOkr(oi){
-  const item=el('mp-okr-list')?.querySelectorAll('.mp-okr-item')[oi];
-  if(item)item.remove();
-  renumberMpOkrs();
-}
-function removeMpKr(oi,ki){
-  const krs=el(`mp-okr-krs-${oi}`);if(!krs)return;
-  const rows=krs.querySelectorAll('div[data-kr-idx]');
-  if(rows[ki])rows[ki].remove();
-}
-function renumberMpOkrs(){
-  const list=el('mp-okr-list');if(!list)return;
-  list.querySelectorAll('.mp-okr-item').forEach((item,i)=>{item.dataset.okrIdx=i;});
 }
 
 
@@ -11027,7 +10903,7 @@ async function init(){
   initPWA();
   if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
   if(S.hideDone===undefined)S.hideDone=false;
-  if(!S.kbFilter)S.kbFilter={project:'',member:'',label:''};
+  if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
   if(!S.coworkDays)S.coworkDays=[];
   applyBranding();
   applyNavVis();
