@@ -7617,6 +7617,7 @@ function renderSettings(){
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Slack Integration</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Connect a Slack webhook for task reminders. <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:var(--acc);">Learn how →</a></p>
   <div class="field"><label class="flbl">Webhook URL</label><input class="inp" id="slack-inp" type="url" placeholder="https://hooks.slack.com/services/..." value="${S.slackWebhook}"></div>
+  <div class="field" style="margin-top:10px;"><label class="flbl">App URL <span style="font-weight:400;color:var(--muted);">(used in Slack message deep links)</span></label><input class="inp" id="slack-appurl-inp" type="url" placeholder="https://pb.airwiggles.com" value="${S.settings?.appUrl||''}"></div>
   <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
     <button class="btn btn-acc btn-sm" onclick="saveSlack()">Save</button>
     <button class="btn btn-ghost btn-sm" onclick="testSlack()">Test</button>
@@ -10987,6 +10988,21 @@ async function init(){
   startAutoBackup();
   _setSyncStatus('synced','Connected');
   initReminderPoller();
+  // Deep-link routing: ?view=project&project=ID&task=ID
+  const _qs=new URLSearchParams(window.location.search);
+  if(_qs.has('project')){
+    const _dpProj=_qs.get('project');
+    const _dpTask=_qs.get('task');
+    if(_dpTask){
+      // Open the project detail then the task modal
+      setTimeout(()=>{
+        openDetail(_dpProj);
+        setTimeout(()=>openModal('task',_dpTask),400);
+      },300);
+    } else {
+      setTimeout(()=>openDetail(_dpProj),300);
+    }
+  }
 }
 
 /* ════ FAVICON ════ */
@@ -11579,6 +11595,8 @@ function catLabel(cat){
 function saveSlack(){
   const inp=el('slack-inp');if(!inp)return;
   S.slackWebhook=inp.value.trim();
+  const appUrlInp=el('slack-appurl-inp');
+  if(appUrlInp){if(!S.settings)S.settings={};S.settings.appUrl=appUrlInp.value.trim();}
   save();
   const st=el('slack-st');if(st){st.textContent='Saved ✓';st.style.color='var(--green)';setTimeout(()=>st.textContent='',2000);}
 }
