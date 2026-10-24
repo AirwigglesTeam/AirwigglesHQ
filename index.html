@@ -4135,6 +4135,28 @@ function removePmKr(oi,ki){
   const rows=krs.querySelectorAll('div');
   if(rows[ki])rows[ki].remove();
 }
+function readPmOkrs(){
+  const list=el('pm-okr-list');if(!list)return[];
+  const okrs=[];
+  list.querySelectorAll('.pm-okr-item').forEach(item=>{
+    const oi=item.dataset.okrIdx;
+    const objective=(el('pm-okr-obj-'+oi)?.value||'').trim();
+    if(!objective)return;
+    const existingId=item.dataset.okrId||uid();
+    const krsContainer=el('pm-okr-krs-'+oi);
+    const keyResults=[];
+    if(krsContainer){
+      krsContainer.querySelectorAll('div').forEach(div=>{
+        const inp=div.querySelector('input');
+        const text=(inp?.value||'').trim();
+        if(!text)return;
+        keyResults.push({id:div.dataset.krId||uid(),text,done:div.dataset.krDone==='true'});
+      });
+    }
+    okrs.push({id:existingId,objective,keyResults});
+  });
+  return okrs;
+}
 
 // ── Member OKR DOM helpers ──
 function addMpOkr(){
@@ -5286,6 +5308,7 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
               Deliver prizes
             </button>
+            <button class="btn btn-ghost btn-xs" style="font-size:.6rem;color:var(--muted);" onclick="removeProjSponsor('${p.id}','${s.id}')" title="Remove sponsor from this event">× Remove</button>
           </div>
         </div>
         ${isCashSponsor?`<div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
@@ -7958,8 +7981,9 @@ function saveNavIcon(view,iconId){
 function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
   const newSponsors=readProjSponsorRows();
+  const newOkrs=readPmOkrs();
   const isAirCon=!!el('pm-aircon')?.value;
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -8050,6 +8074,17 @@ function projectModalHtml(id){
   <div class="field"><label class="flbl">Status</label><select class="sel" id="pm-status"><option value="active" ${(!p||p.status==='active')?'selected':''}>Active</option><option value="backlog" ${p?.status==='backlog'?'selected':''}>Backlog</option><option value="completed" ${p?.status==='completed'?'selected':''}>Completed</option></select></div>
   <div class="field"><label class="flbl">Graphics Folder URL (Google Drive, Dropbox, etc.)</label><input class="inp" id="pm-graphics" type="url" placeholder="https://drive.google.com/..." value="${p?.graphicsUrl||''}" style="margin-bottom:2px;"></div>
   <div class="field"><label class="flbl">Event URL</label><input class="inp" id="pm-eventurl" type="url" placeholder="https://airwiggles.com/c/conference/aircon26" value="${p?.eventUrl||''}"></div>
+
+  <!-- EVENT OBJECTIVES -->
+  <hr class="div" style="margin:10px 0;">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
+    <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Event Objectives</div>
+  </div>
+  <div id="pm-okr-list">${(p?.okrs||[]).map((okr,oi)=>`<div class="pm-okr-item" data-okr-idx="${oi}" data-okr-id="${okr.id||''}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span><button onclick="this.closest('.pm-okr-item').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button></div><input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Grow community awareness" value="${escHtml(okr.objective||'')}" id="pm-okr-obj-${oi}"><div id="pm-okr-krs-${oi}">${(okr.keyResults||[]).map((kr,ki)=>`<div style="display:flex;gap:5px;margin-bottom:4px;" data-kr-id="${kr.id||''}" data-kr-done="${kr.done||false}"><span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="pm-okr-kr-${oi}-${ki}" value="${escHtml(kr.text||'')}"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button></div>`).join('')}</div><button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addPmKr(${oi})">+ Key result</button></div>`).join('')}</div>
+  <div style="display:flex;gap:6px;margin-bottom:4px;">
+    <input class="inp" id="pm-new-okr-obj" style="flex:1;font-size:.8rem;" placeholder="New objective…">
+    <button class="btn btn-ghost btn-xs" style="white-space:nowrap;flex-shrink:0;" onclick="addPmOkr()">+ Add objective</button>
+  </div>
 
   <!-- SPONSOR ASSIGNMENT -->
   <hr class="div" style="margin:10px 0;">
