@@ -3689,7 +3689,7 @@ ${active.length>0?`<div style="margin-bottom:18px;">
     <svg class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
   </div>
   <div id="dash-gantt">${renderGantt(active,false)}</div>
-</div>`:''}}
+</div>`:''}
 
 <!-- TEAM OKRs -->
 <div style="margin-bottom:18px;" id="dash-team-okrs">
@@ -3948,11 +3948,11 @@ function renderTeamOkrs(){
   html+='<div style="font-size:.64rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px;">★ North Star Principles</div>';
   if(ns.length>0){
     html+=ns.map(n=>{
-      return '<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'
+      return '<div data-nsid="'+n.id+'" style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'
         +'<span style="color:var(--acc);flex-shrink:0;margin-top:1px;font-size:10px;">★</span>'
-        +'<span style="flex:1;font-size:.78rem;color:var(--text);">'+escHtml(n.text)+'</span>'
-        +'<button onclick="startEditNs(\'+n.id+\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px;opacity:.5;" title="Edit">✎</button>'
-        +'<button onclick="deleteTeamNorthStar(\'+n.id+\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0;opacity:.5;" title="Delete">×</button>'
+        +'<span data-nstext="'+n.id+'" style="flex:1;font-size:.78rem;color:var(--text);">'+escHtml(n.text)+'</span>'
+        +'<button onclick="startEditNs(\''+n.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0 3px;opacity:.5;" title="Edit">✎</button>'
+        +'<button onclick="deleteTeamNorthStar(\''+n.id+'\')" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0;opacity:.5;" title="Delete">×</button>'
         +'</div>';
     }).join('');
   } else {
@@ -4036,23 +4036,20 @@ function commitTeamYr(){
 function startEditNs(id){
   const ns=(S.teamOkrs||{northStar:[]}).northStar||[];
   const item=ns.find(n=>n.id===id);if(!item)return;
-  // Find the span showing the text and replace with input
   const body=el('dash-team-okr-body');if(!body)return;
-  const spans=body.querySelectorAll('span[style*="flex:1"]');
-  for(const span of spans){
-    if(span.textContent===item.text){
-      const inp=document.createElement('input');
-      inp.className='inp';inp.style.cssText='flex:1;font-size:.78rem;';
-      inp.value=item.text;
-      inp.onkeydown=function(e){
-        if(e.key==='Enter'){commitEditNs(id,this.value);}
-        if(e.key==='Escape'){body.innerHTML=renderTeamOkrs();}
-      };
-      inp.onblur=function(){commitEditNs(id,this.value);};
-      span.replaceWith(inp);inp.focus();inp.select();
-      break;
-    }
-  }
+  // Find span by data-nstext attribute
+  const span=body.querySelector('[data-nstext="'+id+'"]');
+  if(!span)return;
+  const inp=document.createElement('input');
+  inp.className='inp';inp.style.cssText='flex:1;font-size:.78rem;min-width:0;';
+  inp.value=item.text;
+  let committed=false;
+  inp.onkeydown=function(e){
+    if(e.key==='Enter'){e.preventDefault();if(!committed){committed=true;commitEditNs(id,this.value);}}
+    if(e.key==='Escape'){body.innerHTML=renderTeamOkrs();}
+  };
+  inp.onblur=function(){if(!committed){committed=true;commitEditNs(id,this.value);}};
+  span.replaceWith(inp);inp.focus();inp.select();
 }
 function commitEditNs(id,newText){
   const text=newText.trim();
