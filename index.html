@@ -4330,7 +4330,7 @@ function renderTaskRow(t,depth=0,showProj=false){
 
   <!-- Task name — flex:1 -->
   <div class="ti-name-col">
-    <span class="ti-name${comp===100?' done':''}" onclick="inlineEditName('${t.id}',this)" ondblclick="event.stopPropagation();openModal('task','${t.id}')" title="Click to rename · Double-click for full edit"${t.description?` data-desc="${t.description.replace(/"/g,'&quot;').slice(0,120)}"`:''}>${t.name}</span>
+    <span class="ti-name${comp===100?' done':''}" onclick="openModal('task','${t.id}')" title="Open task"${t.description?` data-desc="${t.description.replace(/"/g,'&quot;').slice(0,120)}"`:''}>${t.name}</span>
     ${blocked?`<span class="ti-badge" style="color:var(--yellow);display:inline-flex;align-items:center;" title="${bn.join(', ')}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>`:''}
     ${t.recur?.enabled?`<span class="ti-badge ti-badge-purple" title="Recurring"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg></span>`:''}
   </div>
@@ -9004,22 +9004,32 @@ function editProjQL(projId,qlId){const mc=el('mc');mc.style.display='flex';mc.in
 
 function deleteProjQL(projId,qlId){const p=getProject(projId);if(!p)return;p.quickLinks=(p.quickLinks||[]).filter(q=>q.id!==qlId);save();render();}
 
-function reminderModalHtml(taskId){const t=getTask(taskId);if(!t)return'';const ex=t.slackReminder?.datetime||'';
-return`<div class="mo-box" style="max-width:380px;">
-<div class="mo-hd"><span class="mo-title">\ud83d\udd14 Set Reminder</span><button class="mo-close" onclick="closeModal()">\u00d7</button></div>
+function reminderModalHtml(taskId){
+  const t=getTask(taskId);if(!t)return'';
+  const ex=t.slackReminder?.datetime||'';
+  const exMsg=t.slackReminder?.message||'';
+  const proj=getProject(t.projectId);
+  const hasSent=t.slackReminder?.sent;
+  return`<div class="mo-box" style="max-width:400px;">
+<div class="mo-hd"><span class="mo-title">\ud83d\udd14 Slack Reminder</span><button class="mo-close" onclick="closeModal()">\u00d7</button></div>
 <div class="mo-body">
-  <p style="font-size:.8rem;color:var(--text2);margin-bottom:12px;">${t.name}</p>
-  ${!S.slackWebhook?`<div class="warn-box" style="margin-bottom:12px;width:100%;">\u26a0 No Slack webhook. <span style="cursor:pointer;text-decoration:underline;" onclick="closeModal();nav('settings')">Configure \u2192</span></div>`:''}
-  ${ex?`<div class="info-box" style="margin-bottom:12px;width:100%;">\u23f0 ${new Date(ex).toLocaleString()}</div>`:''}
-  <div class="field"><label class="flbl">Date &amp; time</label><input class="inp" type="datetime-local" id="rm-dt" value="${ex||''}"></div>
+  <p style="font-size:.82rem;font-weight:600;color:var(--text);margin-bottom:4px;">${t.name}</p>
+  ${proj?`<p style="font-size:.72rem;color:var(--muted);margin-bottom:12px;">${proj.name}</p>`:''}
+  ${!S.slackWebhook?`<div class="warn-box" style="margin-bottom:12px;">\u26a0\ufe0f No Slack webhook configured. <span style="cursor:pointer;text-decoration:underline;" onclick="closeModal();nav('settings')">Set it up \u2192</span></div>`:''}
+  ${hasSent?`<div class="info-box" style="margin-bottom:12px;">\u2705 Reminder was sent ${ex?'on '+new Date(ex).toLocaleString():''}.</div>`:''}
+  ${ex&&!hasSent?`<div class="info-box" style="margin-bottom:12px;">\u23f0 Scheduled for ${new Date(ex).toLocaleString()}</div>`:''}
+  <div class="field"><label class="flbl">Date & time</label><input class="inp" type="datetime-local" id="rm-dt" value="${ex||''}"></div>
+  <div class="field" style="margin-top:10px;"><label class="flbl">Note <span style="font-weight:400;color:var(--muted);">(optional \u2014 included in Slack message)</span></label><input class="inp" type="text" id="rm-msg" placeholder="e.g. Check with the team before this" value="${exMsg.replace(/"/g,'&quot;')}"></div>
 </div>
-<div class="mo-ft">${ex?`<button class="btn btn-danger btn-sm" onclick="clearReminder('${taskId}')">Clear</button>`:''}
-<button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-<button class="btn btn-acc" onclick="saveReminder('${taskId}')">Set</button></div></div>`;}
+<div class="mo-ft">
+  ${ex?`<button class="btn btn-danger btn-sm" onclick="clearReminder('${taskId}')">Clear</button>`:''}
+  <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
+  <button class="btn btn-acc" onclick="saveReminder('${taskId}')">Set reminder</button>
+</div></div>`;}
 
 
 
-function saveReminder(tid){const t=getTask(tid);const dt=el('rm-dt')?.value;if(!t||!dt)return;t.slackReminder={datetime:dt,sent:false};save();closeModal();showToast('Reminder set');}
+function saveReminder(tid){const t=getTask(tid);const dt=el('rm-dt')?.value;if(!t||!dt)return;const msg=el('rm-msg')?.value.trim()||'';t.slackReminder={datetime:dt,sent:false,message:msg};save();closeModal();showToast('⏰ Reminder set for '+new Date(dt).toLocaleString());}
 
 function dependencyModalHtml(taskId){
   const t=getTask(taskId);if(!t)return'';
@@ -10927,6 +10937,7 @@ async function init(){
   setInterval(()=>{if(_pbToken)_cleanupPresence();},60*60*1000);
   startAutoBackup();
   _setSyncStatus('synced','Connected');
+  initReminderPoller();
 }
 
 /* ════ FAVICON ════ */
@@ -11517,13 +11528,13 @@ function catLabel(cat){
 
 /* Slack webhook */
 function saveSlack(){
-  const inp=el('st-slack');if(!inp)return;
-  S.settings.slackWebhook=inp.value.trim();
+  const inp=el('slack-inp');if(!inp)return;
+  S.slackWebhook=inp.value.trim();
   save();
   const st=el('slack-st');if(st){st.textContent='Saved ✓';st.style.color='var(--green)';setTimeout(()=>st.textContent='',2000);}
 }
 async function testSlack(){
-  const url=S.settings?.slackWebhook;
+  const url=S.slackWebhook;
   const st=el('slack-st');
   if(!url){if(st){st.textContent='No webhook URL saved.';st.style.color='var(--red)';}return;}
   if(st){st.textContent='Sending…';st.style.color='var(--muted)';}
@@ -11539,8 +11550,54 @@ async function testSlack(){
 /* Task slack reminder clear */
 function clearReminder(taskId){
   const t=getTask(taskId);if(!t)return;
-  t.slackReminder={enabled:false,date:'',time:'',message:''};
+  t.slackReminder={};
   save();render();
+}
+
+/* ════ SLACK REMINDER POLLER ════ */
+function initReminderPoller(){
+  // Check immediately and then every 60 seconds
+  _checkAndSendReminders();
+  setInterval(_checkAndSendReminders,60*1000);
+}
+
+async function _checkAndSendReminders(){
+  const webhook=S.slackWebhook;
+  if(!webhook)return;
+  const now=new Date();
+  const due=S.tasks.filter(t=>{
+    const r=t.slackReminder;
+    if(!r||!r.datetime||r.sent)return false;
+    return new Date(r.datetime)<=now;
+  });
+  if(due.length===0)return;
+  for(const t of due){
+    const proj=getProject(t.projectId);
+    const assigneeNames=(t.assignees||[]).map(id=>{const m=getMember(id);return m?m.name:'?';}).join(', ');
+    const dueDateStr=t.endDate?`\n*Due:* ${fmtD(t.endDate)}`:'';
+    const projStr=proj?`\n*Project:* ${proj.name}`:'';
+    const assignStr=assigneeNames?`\n*Assigned to:* ${assigneeNames}`:'';
+    const phaseStr=t.phase?`\n*Phase:* ${t.phase}`:'';
+    const priorityEmoji={'Critical':'🔴','High':'🟠','Medium':'🟡','Low':'🟢'}[t.priority]||'⚪';
+    const doneState=t.done?'~':'';
+    const noteStr=t.slackReminder?.message?`\n\n📝 _${t.slackReminder.message}_`:'';
+    const payload={
+      text:`⏰ Task reminder: ${t.name}`,
+      blocks:[
+        {type:'header',text:{type:'plain_text',text:'⏰ Task Reminder',emoji:true}},
+        {type:'section',text:{type:'mrkdwn',text:`${doneState}*${t.name}*${doneState}${projStr}${phaseStr}${dueDateStr}${assignStr}\n${priorityEmoji} *${t.priority||'Medium'} priority*${t.done?' · ✅ Completed':''}${noteStr}`}},
+        {type:'context',elements:[{type:'mrkdwn',text:`Sent from *Airwiggles ProjectFlow* · ${new Date().toLocaleString()}`}]}
+      ]
+    };
+    try{
+      await fetch(webhook,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+      t.slackReminder.sent=true;
+      showToast(`📤 Slack reminder sent: ${t.name}`);
+    }catch(e){
+      console.warn('Slack reminder failed',e);
+    }
+  }
+  if(due.length>0){save();render();}
 }
 
 /* Save task as template */
