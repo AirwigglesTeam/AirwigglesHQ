@@ -3448,9 +3448,9 @@ function _findMyMember(user){
   if(!user)return null;
   const members=(S.members||[]).filter(Boolean); // guard against null entries
   // Try explicit link first
-  let me=members.find(m=>m.pbUserId===user.id);
+  let me=members.find(m=>m&&m.pbUserId===user.id);
   // Fall back to email match
-  if(!me&&user.email)me=members.find(m=>m.email&&m.email.toLowerCase()===user.email.toLowerCase());
+  if(!me&&user.email)me=members.find(m=>m&&m.email&&m.email.toLowerCase()===user.email.toLowerCase());
   return me||null;
 }
 
@@ -3685,7 +3685,41 @@ ${active.length>0?`<div style="margin-bottom:18px;">
     <svg class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
   </div>
   <div id="dash-gantt">${renderGantt(active,false)}</div>
-</div>`:''}
+</div>`:''}}
+
+<!-- TEAM OKRs -->
+<div style="margin-bottom:18px;" id="dash-team-okrs">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="(function(){const b=el('dash-team-okr-body');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span class="sec-lbl">Team Objectives</span></div>
+    <div style="display:flex;gap:5px;">
+      <button class="btn btn-ghost btn-xs" onclick="addTeamNorthStar()">+ North Star</button>
+      <button class="btn btn-ghost btn-xs" onclick="addTeamYearly()">+ Yearly Goal</button>
+    </div>
+  </div>
+  <div id="dash-team-okr-body">
+    ${(()=>{
+      const okrs=S.teamOkrs||{northStar:[],yearly:[]};
+      let html='';
+      const ns=okrs.northStar||[];
+      const yr=okrs.yearly||[];
+      if(ns.length>0){
+        html+='<div style="margin-bottom:12px;"><div style="font-size:.64rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px;">★ North Star Principles</div>';
+        html+=ns.map(n=>'<div style="display:flex;align-items:flex-start;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'+'<span style="color:var(--acc);flex-shrink:0;margin-top:1px;font-size:10px;">★</span>'+'<span style="flex:1;font-size:.78rem;color:var(--text);">'+n.text+'</span>'+'<button onclick="editTeamNorthStar(\\"'+n.id+'\\",event)" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;padding:0;opacity:.5;" title="Edit">✎</button>'+'<button onclick="deleteTeamNorthStar(\\"'+n.id+'\")" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:0;opacity:.5;">×</button>'+'</div>').join('');
+        html+='</div>';
+      } else {
+        html+='<div style="margin-bottom:10px;"><div style="font-size:.64rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.09em;margin-bottom:5px;">★ North Star Principles</div><div style="font-size:.73rem;color:var(--muted);padding:4px 8px;">No principles yet — <button class="btn btn-ghost btn-xs" onclick="addTeamNorthStar()">add one</button></div></div>';
+      }
+      if(yr.length>0){
+        html+='<div><div style="font-size:.64rem;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px;">◎ Yearly Goals</div>';
+        html+=yr.map(y=>'<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'+'<div class="ti-check'+(y.done?' done':'')+'" onclick="toggleTeamYearly(\\"'+y.id+'\")" style="width:14px;height:14px;flex-shrink:0;cursor:pointer;"></div>'+'<span style="flex:1;font-size:.78rem;'+(y.done?'text-decoration:line-through;color:var(--muted);':'')+'">'+y.text+'</span>'+'<button onclick="deleteTeamYearly(\\"'+y.id+'\")" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:12px;padding:0;opacity:.5;">×</button>'+'</div>').join('');
+        html+='</div>';
+      } else {
+        html+='<div><div style="font-size:.64rem;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.09em;margin-bottom:5px;">◎ Yearly Goals</div><div style="font-size:.73rem;color:var(--muted);padding:4px 8px;">No goals yet — <button class="btn btn-ghost btn-xs" onclick="addTeamYearly()">add one</button></div></div>';
+      }
+      return html;
+    })()}
+  </div>
+</div>
 
 <!-- QUICK LINKS -->
 ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
@@ -3865,6 +3899,26 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
       </div>
     </div>
 
+    ${mf?(()=>{
+      const mfm=getMember(mf);
+      if(!mfm)return'';
+      const memOkrs=mfm.okrs||[];
+      const isMe=window._myMemberId===mf;
+      return`<div class="card" id="dash-member-okrs">
+      <div class="card-hd" style="cursor:pointer;" onclick="(function(){const b=el('dash-mem-okr-bd');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span class="card-title" style="color:var(--acc);">✦ ${mfm.name}'s Objectives</span>${isMe?`<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openMemberProfile('${mf}','okrs')">Edit</button>`:''}</div>
+      <div class="card-bd" id="dash-mem-okr-bd">
+        ${memOkrs.length===0?`<div style="font-size:.75rem;color:var(--muted);">${isMe?'You haven\'t set any objectives yet. <button class=\"btn btn-ghost btn-xs\" onclick=\"openMemberProfile(\\\\u0027'+mf+'\\\\u0027,\\\\u0027okrs\\\\u0027)\">Set them up</button>':'No objectives set yet.'}</div>`:''}
+        ${memOkrs.map(okr=>`<div style="margin-bottom:12px;">
+          <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:5px;">◈ ${okr.objective}</div>
+          ${(okr.keyResults||[]).map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:4px 8px;border-left:2px solid ${kr.done?'var(--green)':'var(--border)'};margin-bottom:3px;">
+            <div class="ti-check${kr.done?' done':''}" style="width:12px;height:12px;flex-shrink:0;margin-top:2px;cursor:${isMe?'pointer':'default'};" ${isMe?`onclick="toggleMemberKR('${mf}','${okr.id}','${kr.id}')"`:''}></div>
+            <span style="font-size:.74rem;color:${kr.done?'var(--muted)':'var(--text2)'};${kr.done?'text-decoration:line-through;':''}">${kr.text}</span>
+          </div>`).join('')}
+        </div>`).join('')}
+      </div>
+    </div>`;
+    })():''}
+
     <!-- Team workload -->
     <div class="card">
       <div class="card-hd">
@@ -3894,6 +3948,97 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
 </div>`;
 }
 
+
+/* ════ OKR FUNCTIONS ════ */
+
+// ── Team OKRs ──
+function addTeamNorthStar(){
+  const text=prompt('Enter North Star principle:','');
+  if(!text||!text.trim())return;
+  if(!S.teamOkrs)S.teamOkrs={northStar:[],yearly:[]};
+  if(!S.teamOkrs.northStar)S.teamOkrs.northStar=[];
+  S.teamOkrs.northStar.push({id:uid(),text:text.trim()});
+  save();render();
+}
+function editTeamNorthStar(id,e){
+  if(e)e.stopPropagation();
+  if(!S.teamOkrs)return;
+  const ns=S.teamOkrs.northStar||[];
+  const item=ns.find(n=>n.id===id);if(!item)return;
+  const text=prompt('Edit North Star principle:',item.text);
+  if(text===null)return;
+  item.text=text.trim()||item.text;
+  save();render();
+}
+function deleteTeamNorthStar(id){
+  if(!S.teamOkrs)return;
+  S.teamOkrs.northStar=(S.teamOkrs.northStar||[]).filter(n=>n.id!==id);
+  save();render();
+}
+function addTeamYearly(){
+  const text=prompt('Enter yearly goal:','');
+  if(!text||!text.trim())return;
+  if(!S.teamOkrs)S.teamOkrs={northStar:[],yearly:[]};
+  if(!S.teamOkrs.yearly)S.teamOkrs.yearly=[];
+  S.teamOkrs.yearly.push({id:uid(),text:text.trim(),done:false});
+  save();render();
+}
+function toggleTeamYearly(id){
+  if(!S.teamOkrs)return;
+  const item=(S.teamOkrs.yearly||[]).find(y=>y.id===id);
+  if(item){item.done=!item.done;save();render();}
+}
+function deleteTeamYearly(id){
+  if(!S.teamOkrs)return;
+  S.teamOkrs.yearly=(S.teamOkrs.yearly||[]).filter(y=>y.id!==id);
+  save();render();
+}
+
+// ── Event (project) OKR KR toggle ──
+function toggleEventOkrKR(projectId,okrId,krId){
+  const p=getProject(projectId);if(!p||!p.okrs)return;
+  const okr=p.okrs.find(o=>o.id===okrId);if(!okr)return;
+  const kr=(okr.keyResults||[]).find(k=>k.id===krId);
+  if(kr){kr.done=!kr.done;save();render();}
+}
+
+// ── Member OKR KR toggle ──
+function toggleMemberKR(memberId,okrId,krId){
+  const m=getMember(memberId);if(!m||!m.okrs)return;
+  const okr=m.okrs.find(o=>o.id===okrId);if(!okr)return;
+  const kr=(okr.keyResults||[]).find(k=>k.id===krId);
+  if(kr){kr.done=!kr.done;save();render();}
+}
+
+// ── Project modal OKR DOM helpers ──
+function addPmOkr(){
+  const inp=el('pm-new-okr-obj');if(!inp)return;
+  const obj=inp.value.trim();if(!obj)return;
+  const list=el('pm-okr-list');if(!list)return;
+  const oi=list.querySelectorAll('.pm-okr-item').length;
+  const div=document.createElement('div');
+  div.className='pm-okr-item';div.dataset.okrIdx=oi;
+  div.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:7px;';
+  div.innerHTML=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span><button onclick="this.closest('.pm-okr-item').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button></div><input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Grow community awareness" value="${obj}" id="pm-okr-obj-${oi}"><div id="pm-okr-krs-${oi}"></div><button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addPmKr(${oi})">+ Key result</button>`;
+  list.appendChild(div);
+  inp.value='';inp.focus();
+}
+function addPmKr(oi){
+  const krs=el(`pm-okr-krs-${oi}`);if(!krs)return;
+  const ki=krs.querySelectorAll('input').length;
+  const d=document.createElement('div');d.style.cssText='display:flex;gap:5px;margin-bottom:4px;';
+  d.innerHTML=`<span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="pm-okr-kr-${oi}-${ki}"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>`;
+  krs.appendChild(d);d.querySelector('input').focus();
+}
+function removePmOkr(oi){
+  const item=el('pm-okr-list')?.querySelectorAll('.pm-okr-item')[oi];
+  if(item)item.remove();
+}
+function removePmKr(oi,ki){
+  const krs=el(`pm-okr-krs-${oi}`);if(!krs)return;
+  const rows=krs.querySelectorAll('div');
+  if(rows[ki])rows[ki].remove();
+}
 
 function tryDomain(url){try{return new URL(url).hostname;}catch{return url;}}
 
@@ -4865,6 +5010,27 @@ ${(()=>{
 </div>`;
 })()}
 
+
+<!-- EVENT OKRs -->
+<div style="margin-bottom:18px;" id="detail-okr-${p.id}">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="(function(){const b=el('ev-okr-body-${p.id}');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Event Objectives</span></div>
+    <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')">Edit</button>
+  </div>
+  <div id="ev-okr-body-${p.id}">
+  ${(()=>{
+    const okrs=p.okrs||[];
+    if(okrs.length===0)return`<div style="font-size:.75rem;color:var(--muted);padding:4px 0;">No objectives set for this event yet. Use the Edit button to add them.</div>`;
+    return okrs.map(okr=>`<div style="margin-bottom:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
+      <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:6px;">◈ ${okr.objective}</div>
+      ${(okr.keyResults||[]).map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:3px 0;border-left:2px solid ${kr.done?'var(--green)':'var(--border2)'};padding-left:8px;margin-bottom:3px;">
+        <div class="ti-check${kr.done?' done':''}" onclick="toggleEventOkrKR('${p.id}','${okr.id}','${kr.id}')" style="width:13px;height:13px;flex-shrink:0;margin-top:2px;cursor:pointer;"></div>
+        <span style="font-size:.75rem;color:${kr.done?'var(--muted)':'var(--text2)'};${kr.done?'text-decoration:line-through;':''}">${kr.text}</span>
+      </div>`).join('')}
+    </div>`).join('');
+  })()}
+  </div>
+</div>
 <!-- PROJECT QUICK LINKS -->
 <div style="margin-bottom:18px;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
@@ -7556,7 +7722,25 @@ function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
   const newSponsors=readProjSponsorRows();
   const isAirCon=!!el('pm-aircon')?.value;
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors};
+  // Read event OKRs from modal
+  const newOkrs=(()=>{
+    const items=el('pm-okr-list')?.querySelectorAll('.pm-okr-item')||[];
+    const list=[];
+    items.forEach((item,oi)=>{
+      const objInp=el(`pm-okr-obj-${oi}`);
+      const obj=objInp?objInp.value.trim():'';
+      if(!obj)return;
+      const krInputs=item.querySelectorAll('[id^="pm-okr-kr-"]');
+      const krs=[];
+      krInputs.forEach(inp=>{const t=inp.value.trim();if(t)krs.push({id:uid(),text:t,done:false});});
+      list.push({id:uid(),objective:obj,keyResults:krs});
+    });
+    // New objective row
+    const newObj=el('pm-new-okr-obj')?.value.trim();
+    if(newObj)list.push({id:uid(),objective:newObj,keyResults:[]});
+    return list;
+  })();
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -7574,6 +7758,18 @@ function saveProject(eid){
       // Find newly added sponsors
       const oldSpIds=(old.sponsors||[]).map(s=>s.id);
       const addedSponsors=proj.sponsors.filter(s=>!oldSpIds.includes(s.id));
+      // Preserve OKR ids and done states when editing
+      if(proj.okrs&&proj.okrs.length>0&&old.okrs&&old.okrs.length>0){
+        proj.okrs=proj.okrs.map((okr,oi)=>{
+          const existing=(old.okrs||[]).find(o=>o.id===okr.id)||(old.okrs||[])[oi];
+          return{...okr,id:existing?.id||okr.id,keyResults:(okr.keyResults||[]).map((kr,ki)=>{
+            const existKR=existing?(existing.keyResults||[]).find(k=>k.id===kr.id)||(existing.keyResults||[])[ki]:null;
+            return{...kr,id:existKR?.id||kr.id,done:existKR?.done||false};
+          })};
+        });
+      } else if(!proj.okrs||proj.okrs.length===0){
+        proj.okrs=old.okrs||[];
+      }
       S.projects[i]={...old,...proj};
       addedSponsors.forEach(sp=>autoGenerateSponsorTasks(eid,sp));
     }
@@ -7661,7 +7857,39 @@ function projectModalHtml(id){
   <div id="pm-sponsors-list">${renderProjSponsorsEdit(p?.sponsors||[],p?.id||'')}</div>
   ${S.sponsors.length>0?`<button class="add-row-btn" onclick="addProjSponsorRow()">+ Add sponsor</button>`:`<div style="font-size:.73rem;color:var(--muted);">No sponsors yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('sponsors')">Add sponsors \u2192</span></div>`}
 
-  <div style="margin-top:20px;"></div>
+
+  <!-- EVENT OKRs -->
+  <hr class="div" style="margin:16px 0 12px 0;">
+  <div style="margin-bottom:14px;">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+      <label class="flbl" style="margin:0;">Event Objectives <span style="font-weight:400;color:var(--muted);">(OKR)</span></label>
+    </div>
+    <div id="pm-okr-list">
+      ${(p?.okrs||[]).map((okr,oi)=>`
+      <div class="pm-okr-item" data-okr-idx="${oi}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:7px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">Objective</span>
+          <button onclick="removePmOkr(${oi})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button>
+        </div>
+        <input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Grow community awareness" value="${okr.objective||''}" id="pm-okr-obj-${oi}">
+        <div id="pm-okr-krs-${oi}">
+          ${(okr.keyResults||[]).map((kr,ki)=>`
+          <div style="display:flex;gap:5px;margin-bottom:4px;" data-kr-idx="${ki}">
+            <span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span>
+            <input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" value="${kr.text||''}" id="pm-okr-kr-${oi}-${ki}">
+            <button onclick="removePmKr(${oi},${ki})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>
+          </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addPmKr(${oi})">+ Key result</button>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:6px;">
+      <input class="inp" id="pm-new-okr-obj" style="flex:1;font-size:.8rem;" placeholder="New objective…" onkeydown="if(event.key==='Enter'){addPmOkr();event.preventDefault();}">
+      <button class="btn btn-ghost btn-xs" onclick="addPmOkr()">+ Add objective</button>
+    </div>
+  </div>
+
+  <div style="margin-top:8px;"></div>
   <div class="field"><label class="flbl">Colour</label><div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${defColor===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}</div><input type="hidden" id="pm-clr" value="${defColor}"></div>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveProject('${p?.id||''}')">
@@ -8991,6 +9219,36 @@ function memberProfileModalHtml(id,tab){
     </div>`).join('')}
   </div>
 
+
+  <!-- OKRs -->
+  <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px;">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">My Objectives <span style="font-weight:400;">(OKRs)</span></div>
+    <div id="mp-okr-list">
+      ${(m.okrs||[]).map((okr,oi)=>`
+      <div class="mp-okr-item" data-okr-idx="${oi}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px;">
+        <div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;">
+          <span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span>
+          <button onclick="removeMpOkr(${oi})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button>
+        </div>
+        <input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Become a confident presenter" value="${okr.objective||''}" id="mp-okr-obj-${oi}">
+        <div id="mp-okr-krs-${oi}">
+          ${(okr.keyResults||[]).map((kr,ki)=>`
+          <div style="display:flex;gap:5px;margin-bottom:4px;">
+            <span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span>
+            <input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" value="${kr.text||''}" id="mp-okr-kr-${oi}-${ki}">
+            <button onclick="removeMpKr(${oi},${ki})" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>
+          </div>`).join('')}
+        </div>
+        <button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addMpKr(${oi})">+ Key result</button>
+      </div>`).join('')}
+    </div>
+    <div style="display:flex;align-items:center;gap:7px;margin-top:6px;">
+      <input class="inp" id="mp-new-okr-obj" style="flex:1;font-size:.8rem;" placeholder="New objective…" onkeydown="if(event.key===\'Enter\'){addMpOkr();event.preventDefault();}">
+      <button class="btn btn-ghost btn-xs" onclick="addMpOkr()">+ Add objective</button>
+    </div>
+  </div>
+
+
 </div>
 <div class="mo-ft">
   <button class="btn btn-ghost btn-sm" onclick="closeModal();openModal('member','${id}')">Edit profile</button>
@@ -9006,7 +9264,61 @@ function saveMemberProfile(id){
     const inp=el(`mp-${k}`);
     if(inp)m[k]=inp.value.trim();
   });
+  // Save OKRs
+  const existingOkrs=m.okrs||[];
+  const savedOkrs=existingOkrs.map((okr,oi)=>{
+    const objInp=el(`mp-okr-obj-${oi}`);
+    const newObj=objInp?objInp.value.trim():okr.objective;
+    const krCount=el(`mp-okr-krs-${oi}`)?.querySelectorAll('input').length||0;
+    const newKRs=okr.keyResults?okr.keyResults.map((kr,ki)=>{
+      const krInp=el(`mp-okr-kr-${oi}-${ki}`);
+      return krInp?{...kr,text:krInp.value.trim()}:kr;
+    }).filter(kr=>kr.text):[];
+    return{...okr,objective:newObj,keyResults:newKRs};
+  }).filter(okr=>okr.objective);
+  // New objective
+  const newObjInp=el('mp-new-okr-obj');
+  if(newObjInp&&newObjInp.value.trim()){
+    savedOkrs.push({id:uid(),objective:newObjInp.value.trim(),keyResults:[]});
+  }
+  m.okrs=savedOkrs;
   save();closeModal();showToast('Profile saved');
+}
+
+// Member OKR DOM helpers (used inside memberProfileModal)
+function addMpOkr(){
+  const inp=el('mp-new-okr-obj');if(!inp)return;
+  const obj=inp.value.trim();if(!obj)return;
+  const list=el('mp-okr-list');if(!list)return;
+  const oi=list.querySelectorAll('.mp-okr-item').length;
+  const div=document.createElement('div');
+  div.className='mp-okr-item';div.dataset.okrIdx=oi;
+  div.style.cssText='background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:8px;';
+  div.innerHTML=`<div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span><button onclick="this.closest('.mp-okr-item').remove();renumberMpOkrs()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button></div><input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Become a confident presenter" value="${obj}" id="mp-okr-obj-${oi}"><div id="mp-okr-krs-${oi}"></div><button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addMpKrDyn(${oi})">+ Key result</button>`;
+  list.appendChild(div);
+  inp.value='';inp.focus();
+}
+function addMpKr(oi){
+  const krs=el(`mp-okr-krs-${oi}`);if(!krs)return;
+  const ki=krs.querySelectorAll('input').length;
+  const d=document.createElement('div');d.style.cssText='display:flex;gap:5px;margin-bottom:4px;';
+  d.innerHTML=`<span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="mp-okr-kr-${oi}-${ki}"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>`;
+  krs.appendChild(d);d.querySelector('input').focus();
+}
+function addMpKrDyn(oi){addMpKr(oi);}
+function removeMpOkr(oi){
+  const item=el('mp-okr-list')?.querySelectorAll('.mp-okr-item')[oi];
+  if(item)item.remove();
+  renumberMpOkrs();
+}
+function removeMpKr(oi,ki){
+  const krs=el(`mp-okr-krs-${oi}`);if(!krs)return;
+  const rows=krs.querySelectorAll('div[data-kr-idx]');
+  if(rows[ki])rows[ki].remove();
+}
+function renumberMpOkrs(){
+  const list=el('mp-okr-list');if(!list)return;
+  list.querySelectorAll('.mp-okr-item').forEach((item,i)=>{item.dataset.okrIdx=i;});
 }
 
 
