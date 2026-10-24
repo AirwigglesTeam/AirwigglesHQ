@@ -504,7 +504,11 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 
 /* ── Blocked kanban card ── */
 .kcard-blocked{border-color:rgba(244,63,94,.35)!important;background:rgba(244,63,94,.06)!important;}
-.kcard-blocked .kcard-name{color:var(--text2);}
+.kcard-blocked .kb-phase-pills{display:flex;gap:5px;align-items:center;flex-wrap:wrap;}
+.kb-phase-pill{background:transparent;border:1.5px solid;border-radius:20px;padding:3px 10px;font-size:.67rem;font-weight:600;cursor:pointer;transition:background .15s,color .15s;letter-spacing:.04em;}
+.kb-phase-pill:hover{opacity:.85;}
+.kb-phase-pill.active{font-weight:700;}
+.kcard-name{color:var(--text2);}
 .kcard-blocked-badge{display:inline-flex;align-items:center;gap:4px;font-size:.6rem;font-weight:700;color:#f43f5e;background:rgba(244,63,94,.12);border:1px solid rgba(244,63,94,.25);border-radius:4px;padding:1px 6px;margin-bottom:6px;}
 .kb-blocker-tip{position:absolute;top:calc(100% + 6px);left:0;right:0;background:var(--surface);border:1px solid rgba(244,63,94,.4);border-radius:8px;padding:8px 10px;z-index:600;box-shadow:0 6px 20px rgba(0,0,0,.5);pointer-events:none;}
 .kb-blocker-tip-title{font-size:.6rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:#f43f5e;margin-bottom:5px;}
@@ -1947,7 +1951,7 @@ function _applyDefaults(){
   if(!S.finance.finAuth)S.finance.finAuth=false;
   if(!S.finance.assets)S.finance.assets=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
-  if(!S.kbFilter)S.kbFilter={project:'',member:'',label:''};
+  if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
   if(!S.taskSort)S.taskSort='default';
   if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
   if(!S.coworkDays)S.coworkDays=[];
@@ -4788,9 +4792,9 @@ function _qaPinMeta(barId){
   else meta.classList.remove('pinned');
 }
 
-function qaKeyDown(e,barId,projectId){
+function qaKeyDown(e,barId,projectId,forcedPhase){
   if(!el(barId)._qaInited){el(barId)._qaInited=true;qaInitBar(barId);}
-  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();qaSubmit(barId,projectId);}
+  if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();qaSubmit(barId,projectId,forcedPhase);}
   if(e.key==='Escape'){
     // Esc on name: close desc if empty, blur bar
     const desc=el(`${barId}-desc`);
@@ -4803,7 +4807,7 @@ function qaAutoDesc(e,barId){
   // Description only opens via Shift+Enter - this handler is kept for future use
 }
 
-function qaSubmit(barId,projectId){
+function qaSubmit(barId,projectId,forcedPhase){
   const nameEl=el(`${barId}-name`);
   const name=nameEl?.value.trim();
   if(!name)return;
@@ -4813,7 +4817,7 @@ function qaSubmit(barId,projectId){
   const proj=projectId||el(`${barId}-proj`)?.value||'';
   const assignees=[...(window._qaAssignees[barId]||[])];
   // Read meta row values
-  const activePhase=document.querySelector(`#${barId}-meta .qa-phase-pill.active`)?.dataset.phase||'';
+  const activePhase=forcedPhase||(document.querySelector(`#${barId}-meta .qa-phase-pill.active`)?.dataset.phase)||'';
   const activeLabels=Array.from(document.querySelectorAll(`#${barId}-meta .qa-label-dot.active`)).map(d=>d.dataset.lid);
   const endDate=el(`${barId}-date`)?.value||'';
   saveWithUndo('Add task');
@@ -5374,12 +5378,9 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
 <hr class="div">
 <div class="detail-layout">
 
-<!-- TASKS SECTION — column 1 (wider) -->
-<div class="detail-sec">
-  <div class="detail-sec-title">Tasks</div>
-  ${quickAddBarHtml(p.id)}
-  ${top.length===0?`<div class="empty" style="margin-top:4px;"><div class="empty-ico">${ICO.task}</div><div class="empty-txt">No tasks yet — add one above.</div></div>`:
-  `<div>${taskSortBarHtml('detail')}<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(top).map(t=>renderTaskRow(t,0,false)).join('')}</div></div>`}
+<!-- TASKS SECTION — column 1 (wider), split by phase -->
+<div class="detail-sec" style="grid-column:1 / -1;">
+  ${renderDetailPhaseSections(p,top)}
 </div>
 
 <!-- EXPENSES SECTION — column 2 -->
@@ -5406,17 +5407,118 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
 </div>`;
 }
 
+/* ════ PHASE SECTIONS (project detail) ════ */
+function renderDetailPhaseSections(p,top){
+  // Group top-level tasks by phase
+  const byPhase={};
+  PHASES.forEach(ph=>{byPhase[ph]=[];});
+  const unphased=[];
+  top.forEach(t=>{
+    if(t.phase&&byPhase[t.phase])byPhase[t.phase].push(t);
+    else unphased.push(t);
+  });
+
+  const totalCount=top.length;
+  let html='<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Tasks';
+  if(totalCount>0)html+=`<span style="font-size:.68rem;color:var(--muted);font-weight:400;">${totalCount} total</span>`;
+  html+='</div>';
+
+  // Phase sections
+  PHASES.forEach(ph=>{
+    const tasks=byPhase[ph]||[];
+    const phKey=ph.toLowerCase().replace(/[^a-z0-9]/g,'');
+    const pd=(p.phaseDates||{})[ph]||{};
+    const phColor=phaseColor(ph);
+    const phaseBgColor=phaseBg(ph);
+    const sectionId='phase-sec-'+p.id+'-'+phKey;
+    const bodyId='phase-body-'+p.id+'-'+phKey;
+    const isCollapsed=window._phaseCollapsed&&window._phaseCollapsed[sectionId];
+    let dateRange='';
+    if(pd.start||pd.end){
+      dateRange=`<span style="font-size:.62rem;color:var(--muted);margin-left:6px;">${pd.start?fmtD(pd.start):''}${pd.start&&pd.end?' → ':''}${pd.end?fmtD(pd.end):''}</span>`;
+    }
+    html+=`<div style="margin-bottom:16px;border:1px solid var(--border);border-left:3px solid ${phColor};border-radius:10px;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 13px;background:${phaseBgColor};cursor:pointer;" onclick="togglePhaseSection('${sectionId}','${bodyId}')">
+        <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:${phColor};">${ph}</span>
+        ${dateRange}
+        <span style="font-size:.62rem;color:var(--muted);margin-left:auto;">${tasks.length} task${tasks.length!==1?'s':''}</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="${phColor}" stroke-width="2.5" stroke-linecap="round" id="${sectionId}-chev" style="transition:transform .2s;${isCollapsed?'transform:rotate(-90deg);':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div id="${bodyId}" style="${isCollapsed?'display:none;':''}padding:8px 10px;">
+        ${quickAddBarPhaseHtml(p.id,ph)}
+        ${tasks.length===0?`<div style="color:var(--muted);font-size:.73rem;padding:6px 4px;text-align:center;opacity:.6;">No ${ph} tasks yet</div>`
+        :`<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(tasks).map(t=>renderTaskRow(t,0,false)).join('')}</div>`}
+      </div>
+    </div>`;
+  });
+
+  // Unphased tasks (tasks without a phase)
+  if(unphased.length>0){
+    const bodyId2='phase-body-'+p.id+'-unphased';
+    const sectionId2='phase-sec-'+p.id+'-unphased';
+    const isCollapsed2=window._phaseCollapsed&&window._phaseCollapsed[sectionId2];
+    html+=`<div style="margin-bottom:16px;border:1px solid var(--border);border-radius:10px;overflow:hidden;">
+      <div style="display:flex;align-items:center;gap:8px;padding:9px 13px;background:var(--surface2);cursor:pointer;" onclick="togglePhaseSection('${sectionId2}','${bodyId2}')">
+        <span style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.09em;color:var(--muted);">Unassigned Phase</span>
+        <span style="font-size:.62rem;color:var(--muted);margin-left:auto;">${unphased.length} task${unphased.length!==1?'s':''}</span>
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" id="${sectionId2}-chev" style="transition:transform .2s;${isCollapsed2?'transform:rotate(-90deg);':''}"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div id="${bodyId2}" style="${isCollapsed2?'display:none;':''}padding:8px 10px;">
+        ${quickAddBarHtml(p.id)}
+        <div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(unphased).map(t=>renderTaskRow(t,0,false)).join('')}</div>
+      </div>
+    </div>`;
+  }
+
+  return html;
+}
+
+function togglePhaseSection(sectionId,bodyId){
+  if(!window._phaseCollapsed)window._phaseCollapsed={};
+  const body=el(bodyId);
+  const chev=el(sectionId+'-chev');
+  const isNowCollapsed=body&&body.style.display!=='none';
+  window._phaseCollapsed[sectionId]=isNowCollapsed;
+  if(body)body.style.display=isNowCollapsed?'none':'';
+  if(chev)chev.style.transform=isNowCollapsed?'rotate(-90deg)':'rotate(0deg)';
+}
+
+// Quick-add bar pre-tagged with a phase
+function quickAddBarPhaseHtml(projectId,phase){
+  const barId='qap-'+phase.toLowerCase().replace(/[^a-z0-9]/g,'')+'-'+uid();
+  if(!window._qaAssignees[barId])window._qaAssignees[barId]=[];
+  const hasMems=S.members.length>0;
+  return`<div class="qa-bar" id="${barId}" style="margin-bottom:6px;">
+  <div class="qa-bar-main">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <input class="qa-bar-input" id="${barId}-name" placeholder="Add ${phase} task…"
+      onkeydown="qaKeyDown(event,'${barId}','${projectId}','${phase}')"
+      onfocus="qaOpenDesc('${barId}')">
+    ${hasMems?`<div id="${barId}-members" style="display:flex;gap:3px;align-items:center;flex-shrink:0;">${qaAvatarRowHtml(barId)}</div>`:''}
+    <button class="qa-prio-btn Medium" id="${barId}-prio" data-prio="Medium" onclick="qaTogglePrio(this)" title="Priority" style="flex-shrink:0;">M</button>
+    <button class="qa-add-btn" onclick="qaSubmit('${barId}','${projectId}','${phase}')" title="Add task (Enter)" style="flex-shrink:0;">+</button>
+  </div>
+  <div class="qa-desc-row" id="${barId}-meta" style="display:none;">
+    <textarea class="qa-desc" id="${barId}-desc" placeholder="Description…" rows="2"></textarea>
+    <input class="inp" type="date" id="${barId}-date" style="font-size:.7rem;">
+  </div>
+</div>`;
+}
+
+
 /* ════ KANBAN ════ */
 function renderKanban(){
   const projects=S.projects.filter(p=>p.status==='active');
   const {project:kProj,member:kMem,label:kLbl}=S.kbFilter||{};
   const tasksByCol={};KB_COLS.forEach(c=>{tasksByCol[c.id]=[];});
   // Include ALL tasks (top-level and subtasks)
+  const kPh=S.kbFilter?.phase||'';
   S.tasks.filter(t=>{
     const p=getProject(t.projectId);if(!p||p.status!=='active')return false;
     if(kProj&&t.projectId!==kProj)return false;
     if(kMem&&(!t.assignees||!t.assignees.includes(kMem)))return false;
     if(kLbl&&(!t.labels||!t.labels.includes(kLbl)))return false;
+    if(kPh&&t.phase!==kPh)return false;
     return true;
   }).forEach(t=>{
     const st=t.kStatus||'todo';
@@ -5439,7 +5541,10 @@ function renderKanban(){
     <option value="">All labels</option>
     ${S.labels.map(l=>`<option value="${l.id}" ${kLbl===l.id?'selected':''}>${l.name}</option>`).join('')}
   </select>
-  ${(kProj||kMem||kLbl)?`<button class="btn btn-ghost btn-sm" onclick="S.kbFilter={project:'',member:'',label:''};save();render()">Clear filters</button>`:''}
+  <div class="kb-phase-pills">
+    ${PHASES.map(ph=>`<button class="kb-phase-pill${kPh===ph?' active':''}" onclick="S.kbFilter.phase=S.kbFilter.phase===\'${ph}\'?\'\':\'${ph}\';save();render()" style="border-color:${phaseColor(ph)};${kPh===ph?`background:${phaseColor(ph)};color:#fff;`:`color:${phaseColor(ph)};`}">${ph}</button>`).join('')}
+  </div>
+  ${(kProj||kMem||kLbl||kPh)?`<button class="btn btn-ghost btn-sm" onclick="S.kbFilter={project:'',member:'',label:'',phase:''};save();render()">Clear filters</button>`:''}
 </div>
 <div class="kb-wrap">
 ${KB_COLS.map(col=>`
@@ -7874,7 +7979,15 @@ function saveProject(eid){
     if(newObj)list.push({id:uid(),objective:newObj,keyResults:[]});
     return list;
   })();
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs};
+  // Read phase date overrides
+  const phaseDates={};
+  PHASES.forEach(ph=>{
+    const phKey=ph.toLowerCase().replace(/[^a-z0-9]/g,'');
+    const s=el('pm-phase-s-'+phKey)?.value||'';
+    const e=el('pm-phase-e-'+phKey)?.value||'';
+    if(s||e)phaseDates[ph]={start:s,end:e};
+  });
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs,phaseDates};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -8023,6 +8136,29 @@ function projectModalHtml(id){
     </div>
   </div>
 
+  <div style="margin-top:8px;"></div>
+  <!-- PHASE DURATIONS -->
+  <hr class="div">
+  <div class="field"><label class="flbl">Phase Dates <span style="font-size:.68rem;color:var(--muted);font-weight:400;">(optional — overrides defaults)</span></label>
+  <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-top:4px;">
+    ${PHASES.map(ph=>{
+      const pd=(p?.phaseDates||{})[ph]||{};
+      const phKey=ph.toLowerCase().replace(/[^a-z0-9]/g,'');
+      return`<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;">
+        <div style="font-size:.65rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:${phaseColor(ph)};margin-bottom:7px;">${ph}</div>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:6px;">
+          <div>
+            <label style="font-size:.65rem;color:var(--muted);display:block;margin-bottom:3px;">Start</label>
+            <input class="inp" type="date" id="pm-phase-s-${phKey}" value="${pd.start||''}" style="font-size:.72rem;padding:5px 7px;">
+          </div>
+          <div>
+            <label style="font-size:.65rem;color:var(--muted);display:block;margin-bottom:3px;">End</label>
+            <input class="inp" type="date" id="pm-phase-e-${phKey}" value="${pd.end||''}" style="font-size:.72rem;padding:5px 7px;">
+          </div>
+        </div>
+      </div>`;
+    }).join('')}
+  </div></div>
   <div style="margin-top:8px;"></div>
   <div class="field"><label class="flbl">Colour</label><div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${defColor===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}</div><input type="hidden" id="pm-clr" value="${defColor}"></div>
 </div>
