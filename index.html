@@ -7983,7 +7983,11 @@ function saveProject(eid){
   const newSponsors=readProjSponsorRows();
   const newOkrs=readPmOkrs();
   const isAirCon=!!el('pm-aircon')?.value;
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs};
+  const _pwP=el('pm-pw-planning')?.value.trim();
+  const _pwPre=el('pm-pw-prelaunch')?.value.trim();
+  const _pwPost=el('pm-pw-postEvent')?.value.trim();
+  const newPhaseWeeks={planning:_pwP!==''?Number(_pwP):null,prelaunch:_pwPre!==''?Number(_pwPre):null,postEvent:_pwPost!==''?Number(_pwPost):null};
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs,phaseWeeks:newPhaseWeeks};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -8074,6 +8078,16 @@ function projectModalHtml(id){
   <div class="field"><label class="flbl">Status</label><select class="sel" id="pm-status"><option value="active" ${(!p||p.status==='active')?'selected':''}>Active</option><option value="backlog" ${p?.status==='backlog'?'selected':''}>Backlog</option><option value="completed" ${p?.status==='completed'?'selected':''}>Completed</option></select></div>
   <div class="field"><label class="flbl">Graphics Folder URL (Google Drive, Dropbox, etc.)</label><input class="inp" id="pm-graphics" type="url" placeholder="https://drive.google.com/..." value="${p?.graphicsUrl||''}" style="margin-bottom:2px;"></div>
   <div class="field"><label class="flbl">Event URL</label><input class="inp" id="pm-eventurl" type="url" placeholder="https://airwiggles.com/c/conference/aircon26" value="${p?.eventUrl||''}"></div>
+
+  <!-- PHASE OVERRIDES -->
+  <hr class="div" style="margin:10px 0;">
+  <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Phase Duration Overrides</div>
+  <div style="font-size:.7rem;color:var(--muted);margin-bottom:10px;">Leave blank to use global defaults (Planning: ${S.settings?.phaseDefaults?.planning??2}w, Pre-launch: ${S.settings?.phaseDefaults?.prelaunch??6}w, Post-event: ${S.settings?.phaseDefaults?.postEvent??2}w)</div>
+  <div class="inp-row" style="gap:8px;">
+    <div class="field" style="flex:1;"><label class="flbl">Planning (weeks)</label><input class="inp" id="pm-pw-planning" type="number" min="0" max="52" placeholder="e.g. 4" value="${p?.phaseWeeks?.planning!=null?p.phaseWeeks.planning:''}"></div>
+    <div class="field" style="flex:1;"><label class="flbl">Pre-launch (weeks)</label><input class="inp" id="pm-pw-prelaunch" type="number" min="0" max="52" placeholder="e.g. 6" value="${p?.phaseWeeks?.prelaunch!=null?p.phaseWeeks.prelaunch:''}"></div>
+    <div class="field" style="flex:1;"><label class="flbl">Post-event (weeks)</label><input class="inp" id="pm-pw-postEvent" type="number" min="0" max="52" placeholder="e.g. 2" value="${p?.phaseWeeks?.postEvent!=null?p.phaseWeeks.postEvent:''}"></div>
+  </div>
 
   <!-- EVENT OBJECTIVES -->
   <hr class="div" style="margin:10px 0;">
