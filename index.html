@@ -1,3 +1,4 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -1487,6 +1488,623 @@ async function _tryTokenRefresh(){
 async function sbGet(){return pbGet();}
 async function sbUpsert(d,t){return pbUpsert(d,t);}
 
+/* ════ SYNC ENGINE (PFSync) — 3-way merge sync; see header comment inside ════ */
+/*PFSYNC:BEGIN*/
+/* ═══════════════════════════════════════════════════════════════════
+   PFSync — conflict-free sync engine for ProjectFlow
+   ───────────────────────────────────────────────────────────────────
+   Replaces "upload whole state / overwrite with whole remote state"
+   (last-write-wins) with a 3-way merge:
+
+     base   = last server state this client has confirmed it incorporated
+     local  = what the user has on screen now (live S, synced keys only)
+     remote = latest server state
+
+   Per entity / per field:
+     only local changed  -> keep local
+     only remote changed -> take remote
+     both changed        -> field-level merge (same field: local wins)
+   Deletes are tombstoned so stale clients can never resurrect items.
+   Every write is preceded by fetch+merge, all work is serialised, and
+   writes carry a lineage so a clobbered write is detected and re-asserted.
+   ═══════════════════════════════════════════════════════════════════ */
+(function(root){
+'use strict';
+
+/* ── helpers ── */
+const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
+const hasId=x=>isObj(x)&&(typeof x.id==='string'||typeof x.id==='number');
+const isIdArr=a=>Array.isArray(a)&&a.length>0&&a.every(hasId);
+const clone=v=>(v===undefined||v===null||typeof v!=='object')?v:
+  (typeof structuredClone==='function'?structuredClone(v):JSON.parse(JSON.stringify(v)));
+
+/* deterministic stringify — key order independent, undefined-safe */
+function stable(v){
+  if(v===undefined)return'~';
+  if(v===null||typeof v!=='object')return JSON.stringify(v);
+  if(Array.isArray(v)){let s='[';for(let i=0;i<v.length;i++){if(i)s+=',';s+=stable(v[i]);}return s+']';}
+  const ks=Object.keys(v).filter(k=>v[k]!==undefined).sort();
+  let s='{';for(let i=0;i<ks.length;i++){if(i)s+=',';s+=JSON.stringify(ks[i])+':'+stable(v[ks[i]]);}
+  return s+'}';
+}
+const eq=(a,b)=>a===b||stable(a)===stable(b);
+
+/* ── 3-way merge ── */
+function merge3(b,l,r){
+  if(eq(l,r))return clone(l);
+  if(eq(l,b))return clone(r);   // only remote changed
+  if(eq(r,b))return clone(l);   // only local changed
+  if(isObj(l)&&isObj(r)){
+    const bb=isObj(b)?b:{};
+    const out={};
+    const keys=new Set([...Object.keys(l),...Object.keys(r),...Object.keys(bb)]);
+    for(const k of keys){const m=merge3(bb[k],l[k],r[k]);if(m!==undefined)out[k]=m;}
+    return out;
+  }
+  if(Array.isArray(l)&&Array.isArray(r)){
+    const bb=Array.isArray(b)?b:[];
+    return(isIdArr(l)||isIdArr(r))?mergeColl(bb,l,r):mergeSet(bb,l,r);
+  }
+  return clone(l); // both changed an atomic value: local (the active user) wins
+}
+
+/* arrays of {id} objects: merge entity by entity. A delete always wins. */
+function mergeColl(b,l,r){
+  const idx=a=>{const m=new Map();for(const x of a)if(hasId(x))m.set(x.id,x);return m;};
+  const B=idx(b),L=idx(l),R=idx(r);
+  const out=new Map();
+  const ids=new Set([...B.keys(),...L.keys(),...R.keys()]);
+  for(const id of ids){
+    const bi=B.get(id),li=L.get(id),ri=R.get(id);
+    if(li&&ri)out.set(id,merge3(bi,li,ri));
+    else if(li&&!ri){if(!bi)out.set(id,clone(li));}      // added locally (else: remote deleted -> gone)
+    else if(!li&&ri){if(!bi)out.set(id,clone(ri));}      // added remotely (else: local deleted -> gone)
+  }
+  const lIds=l.filter(hasId).map(x=>x.id),bIds=b.filter(hasId).map(x=>x.id);
+  const bSet=new Set(bIds),lSet=new Set(lIds);
+  const localReordered=stable(lIds.filter(i=>bSet.has(i)))!==stable(bIds.filter(i=>lSet.has(i)));
+  const first=(localReordered?l:r).filter(hasId).map(x=>x.id);
+  const second=(localReordered?r:l).filter(hasId).map(x=>x.id);
+  const order=[];const seen=new Set();
+  for(const id of [...first,...second]){if(!seen.has(id)){seen.add(id);order.push(id);}}
+  return order.filter(id=>out.has(id)).map(id=>out.get(id));
+}
+
+/* arrays of primitives / id-less objects: set semantics by content */
+function mergeSet(b,l,r){
+  const key=x=>(x!==null&&typeof x==='object')?'o'+stable(x):typeof x+':'+String(x);
+  const B=new Set(b.map(key));
+  const L=new Map(l.map(x=>[key(x),x])),R=new Map(r.map(x=>[key(x),x]));
+  const out=[];
+  for(const[k,x]of L){if(R.has(k)||!B.has(k))out.push(clone(x));}
+  for(const[k,x]of R){if(!L.has(k)&&!B.has(k))out.push(clone(x));}
+  return out;
+}
+
+/* tombstones: per-key last-writer-wins. +ts = deleted at ts, -ts = re-added at ts */
+function mergeTomb(a,b){
+  const o={};
+  for(const src of[a,b]){
+    if(!isObj(src))continue;
+    for(const k in src){
+      const v=src[k];if(typeof v!=='number')continue;
+      const c=o[k];
+      if(c===undefined||Math.abs(v)>Math.abs(c)||(Math.abs(v)===Math.abs(c)&&v>0))o[k]=v;
+    }
+  }
+  return o;
+}
+
+function applyTombs(M){
+  const t=isObj(M._tomb)?M._tomb:{};
+  for(const k of Object.keys(M)){
+    if(k==='_tomb')continue;
+    if(isIdArr(M[k])){const f=M[k].filter(x=>!(t[k+':'+x.id]>0));if(f.length!==M[k].length)M[k]=f;}
+  }
+  return M;
+}
+
+/* ── in-place reconcile: keep object identity so open handlers/modals stay valid ── */
+function reconcile(parent,key,val){
+  const cur=parent[key];
+  if(Array.isArray(val)&&Array.isArray(cur)&&isIdArr(val)){
+    const byId=new Map();for(const x of cur)if(hasId(x))byId.set(x.id,x);
+    const next=val.map(v=>{const ex=byId.get(v.id);if(ex&&isObj(ex)){reconcileObj(ex,v);return ex;}return v;});
+    cur.length=0;for(const x of next)cur.push(x);
+  }else if(isObj(val)&&isObj(cur)){reconcileObj(cur,val);}
+  else parent[key]=val;
+}
+function reconcileObj(cur,val){
+  for(const k of Object.keys(val))reconcile(cur,k,val[k]);
+  for(const k of Object.keys(cur))if(!(k in val))delete cur[k];
+}
+
+/* compact persistence: store a state as a diff against another (they differ only by recent edits) */
+function encodeDiff(t,ref){
+  const d={};
+  for(const k of new Set([...Object.keys(t),...Object.keys(ref)])){
+    const tv=t[k],rv=ref[k];
+    if(eq(tv,rv))continue;
+    if(tv===undefined){d[k]={x:1};continue;}
+    if(isIdArr(tv)&&Array.isArray(rv)){
+      const rm=new Map();for(const e of rv)if(hasId(e))rm.set(e.id,e);
+      const ent=[];for(const e of tv)if(!(rm.has(e.id)&&eq(rm.get(e.id),e)))ent.push([e.id,e]);
+      d[k]={o:tv.map(e=>e.id),e:ent};
+    }else d[k]={v:tv};
+  }
+  return d;
+}
+function decodeDiff(d,ref){
+  const out={};
+  for(const k of Object.keys(ref))if(!(k in d))out[k]=clone(ref[k]);
+  for(const k of Object.keys(d)){
+    const x=d[k];
+    if(x.x)continue;
+    if(x.o){
+      const rm=new Map();if(Array.isArray(ref[k]))for(const e of ref[k])if(hasId(e))rm.set(e.id,e);
+      const em=new Map(x.e);
+      out[k]=x.o.map(id=>{const e=em.has(id)?em.get(id):rm.get(id);if(e===undefined)throw new Error('diff references missing entity');return clone(e);});
+    }else out[k]=clone(x.v);
+  }
+  return out;
+}
+
+const withTimeout=(p,ms)=>new Promise((res,rej)=>{
+  const t=setTimeout(()=>rej(Object.assign(new Error('timeout'),{timeout:true})),ms);
+  p.then(v=>{clearTimeout(t);res(v);},e=>{clearTimeout(t);rej(e);});
+});
+
+/* ═════════════════════════ engine ═════════════════════════
+ env = {
+   getState():S, replaceState(o), normalize(o) (apply defaults, detached),
+   localKeys:[...]  keys that are per-device and never synced,
+   transport:{ head()->{id,token}|null, get()->{id,token,data}|null,
+               put(str,id)->{token} },
+   readStored()->rec|null, writeStored(rec)->bool, stash(str),
+   validate(snap)->{ok,reason}, status(kind,msg), onApplied(), onSaved(snap),
+   clientId, debounceMs, loadTimeoutMs, log
+ }
+
+ Ancestor history H (newest first): the last few server states this client has merged or written,
+ each tagged with the write id that produced it. A remote's lineage tells us which of them it descends
+ from, so the merge base is always the most recent state BOTH sides share — never a guess.
+*/
+function create(env){
+  const LOCAL=new Set([...(env.localKeys||[]),'_clientId','_spSearch']);
+  const T=env.transport;
+  const DEBOUNCE=env.debounceMs===undefined?500:env.debounceMs;
+  const LINEAGE_CAP=60,HORIZON=40,HMAX=5;
+
+  let H=[];                 // ancestor history [{wid,seq,proj}], newest first
+  let rc=null;              // remote cache {token,proj,meta,str}
+  let lineage=[];           // write ids this client's state descends from (newest first)
+  let running=false,again=false,timer=null,persistTimer=null,backoff=0,stopped=false;
+  let lastErr=null;
+  let seqNow=0;             // highest write sequence number seen/written
+  let revive=false;         // set by undo/restore: let the next sync re-add items someone else deleted
+
+  const S=()=>env.getState();
+  const LOG=(...a)=>{if(env.log)env.log(...a);};
+  const newWid=()=>Math.random().toString(36).slice(2,10)+Date.now().toString(36);
+
+  function project(st){
+    const o={};
+    for(const k of Object.keys(st)){if(LOCAL.has(k)||st[k]===undefined)continue;o[k]=st[k];}
+    if(isObj(o.finance))o.finance={...o.finance,finAuth:false};
+    return o;
+  }
+
+  function parseRemote(full){
+    const d=typeof full.data==='string'?JSON.parse(full.data):clone(full.data);
+    if(!isObj(d))throw new Error('Remote state is not an object');
+    const meta={wid:d._wid||null,seq:typeof d._seq==='number'?d._seq:0,lineage:Array.isArray(d._lineage)?d._lineage.slice():(d._wid?[d._wid]:[])};
+    delete d._wid;delete d._lineage;delete d._clientId;delete d._seq;
+    env.normalize(d);
+    const seed={};
+    for(const k of LOCAL){if(k in d){seed[k]=d[k];delete d[k];}}
+    if(isObj(d.finance))d.finance.finAuth=false;
+    return{proj:d,meta,seed};
+  }
+  function emptyBase(){
+    const d={};env.normalize(d);
+    for(const k of LOCAL)delete d[k];
+    if(isObj(d.finance))d.finance.finAuth=false;
+    return d;
+  }
+  const toR=(full)=>{const p=parseRemote(full);return{token:full.token,proj:p.proj,meta:p.meta,seed:p.seed,str:null};};
+
+  function pushH(e){
+    if(H[0]&&(H[0].proj===e.proj||(e.wid&&H[0].wid===e.wid)))return;
+    H.unshift(e);
+    if(H.length>HMAX)H.length=HMAX;
+  }
+
+  /* Most recent state that both local history and this remote descend from. */
+  function ancestorFor(R){
+    if(!H.length)return null;
+    const m=R.meta;
+    const ids=new Set(m.lineage||[]);if(m.wid)ids.add(m.wid);
+    for(const c of H)if(c.wid&&ids.has(c.wid))return c.proj;
+    if((m.seq||0)>H[0].seq+HORIZON)return H[0].proj;   // remote is far ahead: our newest view is the best ancestor
+    return H[H.length-1].proj;                          // looks concurrent / overwritten: most conservative ancestor
+  }
+
+  /* Deletions are recorded as tombstones against our NEWEST view, so they hold whichever ancestor is used. */
+  function stampTombs(st,newest,remoteTomb){
+    if(!isObj(st._tomb))st._tomb={};
+    const tomb=st._tomb,now=Date.now();
+    if(newest){
+      for(const k of Object.keys(st)){
+        if(LOCAL.has(k)||k==='_tomb')continue;
+        const cur=st[k],bs=newest[k];
+        if(!Array.isArray(cur)&&!Array.isArray(bs))continue;
+        const curIds=new Set(),baseIds=new Set();
+        if(Array.isArray(cur))for(const x of cur)if(hasId(x))curIds.add(x.id);
+        if(Array.isArray(bs))for(const x of bs)if(hasId(x))baseIds.add(x.id);
+        for(const id of baseIds)if(!curIds.has(id)){const key=k+':'+id;if(!(tomb[key]>0))tomb[key]=now;}
+        for(const id of curIds)if(!baseIds.has(id)){
+          const key=k+':'+id;
+          // A genuine re-add (undo / restore) — never inferred from sync alone, or absorbed items could be un-deleted
+          if(tomb[key]>0||(revive&&remoteTomb&&remoteTomb[key]>0))tomb[key]=-now;
+        }
+      }
+    }
+    revive=false;
+    const cutoff=now-90*864e5;
+    for(const k of Object.keys(tomb))if(Math.abs(tomb[k])<cutoff)delete tomb[k];
+  }
+
+  function adopt(M){
+    const st=S();
+    const fin=isObj(st.finance)?st.finance.finAuth:false;
+    for(const k of Object.keys(M))reconcile(st,k,M[k]);
+    for(const k of Object.keys(st))if(!LOCAL.has(k)&&!(k in M))delete st[k];
+    if(isObj(st.finance))st.finance.finAuth=fin||false;
+  }
+
+  /* The heart of it: merge a remote snapshot into live local state.
+     Synchronous — nothing can interleave between reading S and adopting. */
+  function mergeStep(R){
+    if(env.prepare)env.prepare();          // normalise live state (defaults) so it compares like-for-like with remote
+    const st=S();
+    const b=ancestorFor(R);
+    stampTombs(st,H.length?H[0].proj:null,R.proj._tomb);
+    const Lp=project(st);
+    const ls=stable(Lp);
+    const rs=R.str||(R.str=stable(R.proj));
+    let M=null,changed=false,needWrite=false;
+    if(b===null){                         // no shared history at all: remote is the truth
+      M=applyTombs(clone(R.proj));
+    }else{
+      const bs=stable(b);
+      if(ls===rs)M=null;
+      else if(ls===bs)M=clone(R.proj);
+      else if(rs===bs)M=clone(Lp);
+      else M=merge3(b,Lp,R.proj);
+      if(M){
+        M._tomb=mergeTomb(Lp._tomb,R.proj._tomb);
+        applyTombs(M);
+      }
+    }
+    LOG('merge',{rWid:R.meta.wid,rSeq:R.meta.seq,anc:b===null?'none':(H.findIndex(c=>c.proj===b)),H:H.map(c=>c.wid&&c.wid.slice(0,4)+'@'+c.seq),local:(Lp.tasks||[]).map(t=>t.id).join(','),remote:(R.proj.tasks||[]).map(t=>t.id).join(',')});
+    if(M){
+      const ms=stable(M);
+      changed=ms!==ls;
+      needWrite=ms!==rs;
+      if(changed)adopt(M);
+    }
+    lineage=[...new Set([...(R.meta.lineage||[]),...lineage])].slice(0,LINEAGE_CAP);
+    seqNow=Math.max(seqNow,R.meta.seq||0);
+    pushH({wid:R.meta.wid,seq:R.meta.seq||0,proj:R.proj});
+    return{changed,needWrite};
+  }
+
+  /* One sync cycle: fetch → merge → (write if needed). */
+  async function cycle(){
+    const head=await T.head();
+    let R=null;
+    if(head){
+      if(rc&&rc.token===head.token)R=rc;
+      else{const full=await T.get();if(full){R=rc=toR(full);}}
+    }
+    if(!R&&!H.length)pushH({wid:null,seq:0,proj:emptyBase()});   // server is empty: everything local is a genuine addition
+    if(R){
+      if(!H.length&&env.stash){
+        // first contact with no shared history: remote wins; keep a copy of local just in case
+        const loc=project(S());
+        if(stable(loc)!==(R.str||(R.str=stable(R.proj)))){try{env.stash(JSON.stringify(loc));}catch(_){}}
+      }
+      const r=mergeStep(R);
+      if(r.changed){try{env.onApplied();}catch(e){console.error(e);}}
+      if(!r.needWrite){persistNow();env.status('synced');return;}
+    }
+    // ── write ──
+    if(env.prepare)env.prepare();
+    const snap=clone(project(S()));
+    const v=env.validate?env.validate(snap):{ok:true};
+    if(!v.ok){env.status('error','⚠ Save blocked: '+v.reason);persistNow();return;}
+    const wid=newWid();
+    const seq=Math.max(seqNow,R?R.meta.seq||0:0)+1;
+    const lin=[wid,...lineage.filter(x=>x!==wid)].slice(0,LINEAGE_CAP);
+    LOG('put',{wid:wid.slice(0,4),seq});
+    const payload={...snap,_wid:wid,_seq:seq,_lineage:lin,_clientId:env.clientId};
+    // Record the write as an ancestor BEFORE sending: if the request errors or its response is lost it may
+    // still have landed, and anything we do next must be judged against what we tried to write.
+    seqNow=seq;
+    lineage=lin;
+    pushH({wid,seq,proj:snap});
+    persistNow();
+    const res=await T.put(JSON.stringify(payload),head?head.id:null);
+    rc={token:res.token,proj:snap,meta:{wid,seq,lineage:lin},seed:{},str:null};
+    persistNow();
+    try{env.onSaved(snap);}catch(e){console.error(e);}
+    if(stable(project(S()))!==stable(snap))again=true; // edited while writing
+  }
+
+  async function run(){
+    if(stopped)return;
+    if(running){again=true;return;}
+    running=true;
+    try{
+      let n=0;
+      do{again=false;await cycle();n++;}while(again&&n<6);
+      backoff=0;lastErr=null;
+      if(again)schedule(1500);
+    }catch(e){
+      lastErr=e;
+      if(e&&e.retry){schedule(30);}                 // e.g. record was created by someone else meanwhile
+      else{
+        if(e&&e.fatal){env.status('error','⚠ '+(e.message||'Save failed'));backoff=Math.min(Math.max(backoff*2,15000),120000);}
+        else{env.status('offline');backoff=Math.min(backoff?backoff*2:3000,60000);}
+        schedule(backoff);
+      }
+      persistNow();
+    }finally{running=false;}
+  }
+
+  function schedule(ms){
+    if(stopped)return;
+    if(timer)clearTimeout(timer);
+    timer=setTimeout(()=>{timer=null;run();},ms);
+  }
+
+  /* ── persistence: local state + ancestor history as ONE consistent record (history stored as diffs) ── */
+  function persistNow(){
+    if(persistTimer){clearTimeout(persistTimer);persistTimer=null;}
+    if(!env.writeStored)return;
+    try{
+      const st=S();
+      const s={...st};delete s._spSearch;delete s._clientId;
+      const ps=project(s);
+      const rec={v:5,s,h:H.map(e=>({w:e.wid,q:e.seq,d:encodeDiff(e.proj,ps)})),sq:seqNow,ts:Date.now()};
+      if(!env.writeStored(rec))env.writeStored({v:5,s,h:[],sq:seqNow,ts:Date.now()});
+    }catch(e){console.warn('persist failed',e);}
+  }
+  function persistSoon(){if(!persistTimer)persistTimer=setTimeout(persistNow,150);}
+
+  /* ── public API ── */
+  const api={
+    markDirty(){persistSoon();env.status('saving');if(running)again=true;schedule(DEBOUNCE);},
+    saveNow(){persistNow();env.status('saving');if(running){again=true;return;}if(timer){clearTimeout(timer);timer=null;}run();},
+    flush:persistNow,
+    allowRevive(){revive=true;},
+    requestSync(ms){if(running){again=true;return;}schedule(ms||0);},
+    async poll(){
+      if(stopped||running||timer)return;
+      try{
+        const h=await T.head();
+        if(h&&(!rc||rc.token!==h.token))run();
+      }catch(_){}
+    },
+    isBusy(){return running||!!timer;},
+    lastError(){return lastErr;},
+    stop(){stopped=true;if(timer)clearTimeout(timer);if(persistTimer)clearTimeout(persistTimer);timer=persistTimer=null;},
+    reset(){api.stop();H=[];rc=null;lineage=[];stopped=false;running=false;again=false;backoff=0;},
+    start(){stopped=false;},
+
+    /* initial load: reconcile stored local state with the server */
+    async load(){
+      const stored=env.readStored?env.readStored():null;
+      let R=null,failed=false;
+      try{
+        const full=await withTimeout(T.get(),env.loadTimeoutMs||25000);
+        if(full)R=toR(full);
+      }catch(e){failed=true;lastErr=e;}
+      const localState=stored&&stored.s&&isObj(stored.s)?(()=>{const o=clone(stored.s);env.normalize(o);return o;})():null;
+      // restore the ancestor history saved alongside the local state — only trusted as a consistent pair
+      let hist=null;
+      if(localState&&stored.v===5&&Array.isArray(stored.h)&&stored.h.length){
+        try{
+          const ref=project(localState);
+          hist=stored.h.map(e=>({wid:e.w||null,seq:e.q||0,proj:decodeDiff(e.d,ref)}));
+        }catch(e){hist=null;console.warn('stored sync state unreadable — server wins',e);}
+      }
+      LOG('load',{hasRemote:!!R,restoredHistory:hist?hist.length:0,remoteSeq:R&&R.meta.seq,remoteWid:R&&R.meta.wid&&R.meta.wid.slice(0,4)});
+      if(R){
+        rc=R;
+        if(hist){
+          env.replaceState(localState);
+          H=hist;seqNow=Math.max(seqNow,stored.sq||0);
+          const r=mergeStep(R);
+          if(r.needWrite)schedule(0);
+        }else{
+          // no trustworthy history → server is the truth; keep any local copy as an orphan backup
+          if(localState&&env.stash){
+            const lp=project(localState);
+            if(stable(lp)!==stable(R.proj)){try{env.stash(JSON.stringify(localState));}catch(_){}}
+          }
+          const ns=clone(R.proj);
+          const seedFrom=localState||R.seed||{};
+          for(const k of LOCAL)if(k in seedFrom)ns[k]=clone(seedFrom[k]);
+          env.normalize(ns);
+          env.replaceState(ns);
+          H=[];pushH({wid:R.meta.wid,seq:R.meta.seq||0,proj:R.proj});
+          lineage=[...(R.meta.lineage||[]).slice(0,LINEAGE_CAP)];
+          seqNow=Math.max(seqNow,R.meta.seq||0);
+        }
+        persistNow();
+      }else{
+        if(localState)env.replaceState(localState);
+        if(hist){H=hist;seqNow=Math.max(seqNow,stored.sq||0);}
+        // Server empty (or unreachable) and this device holds no earlier server state: everything created here
+        // is genuinely new, so merge it against an empty baseline instead of letting a later remote replace it.
+        if(!H.length&&!localState)pushH({wid:null,seq:0,proj:emptyBase()});
+        else if(!H.length&&!failed)pushH({wid:null,seq:0,proj:emptyBase()});
+        schedule(failed?4000:0);
+      }
+      return{remote:!!R,failed};
+    },
+    /* test hooks */
+    _debug(){return{H,rc,lineage,running,again,projectNow:()=>project(S())};}
+  };
+  return api;
+}
+
+const PFSync={create,merge3,stable,mergeColl,mergeSet,mergeTomb,applyTombs,clone,eq,isIdArr,encodeDiff,decodeDiff};
+if(typeof module!=='undefined'&&module.exports)module.exports=PFSync;
+else root.PFSync=PFSync;
+})(typeof window!=='undefined'?window:globalThis);
+
+/*PFSYNC:END*/
+
+/* ── Sync glue: PocketBase transport, local persistence, UI hooks ── */
+const PF_LOCAL_KEYS=['detailId','activeMember','projFilter','kbFilter','dashFilters','campaignFilter','taskSort','expandedTasks','expandedGantt','hideDone'];
+const PF_STORE_KEY='pf6';
+const _PB_Q='/api/collections/workspace_state/records?filter='+encodeURIComponent('(workspace="'+PB_WORKSPACE+'")')+'&perPage=1';
+const _pbTok=r=>(r.updated||'')+'|'+(r.updated_at||'');
+
+async function _pbReq(path,opts,ms,_retried){
+  if(!_pbToken)throw new Error('Not signed in');
+  let r;
+  try{
+    r=await fetchWithTimeout(PB_URL+path,{...(opts||{}),headers:{...((opts&&opts.headers)||{}),Authorization:_pbToken},cache:'no-store'},ms||20000);
+  }catch(e){throw new Error(e&&e.name==='AbortError'?'timeout':'Network error');}
+  if(r.status===401&&!_retried){
+    if(await _tryTokenRefresh())return _pbReq(path,opts,ms,true);
+    throw Object.assign(new Error('Session expired — please sign in again'),{fatal:true});
+  }
+  return r;
+}
+async function _pbHead(){            // light request: just "has the record changed?"
+  const r=await _pbReq(_PB_Q+'&fields=id,updated,updated_at',{},12000);
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json(),it=d.items&&d.items[0];
+  if(!it)return null;
+  _pbRecordId=it.id;
+  return{id:it.id,token:_pbTok(it)};
+}
+async function _pbGetFull(){
+  const r=await _pbReq(_PB_Q,{},25000);
+  if(!r.ok)throw new Error('HTTP '+r.status);
+  const d=await r.json(),it=d.items&&d.items[0];
+  if(!it)return null;
+  _pbRecordId=it.id;
+  return{id:it.id,token:_pbTok(it),data:it.data};
+}
+async function _pbPut(str,id){
+  if(str.length>9000000)throw Object.assign(new Error('Data too large ('+(str.length/1e6).toFixed(1)+'M chars, limit 10M) — remove base64 images'),{fatal:true});
+  const body=JSON.stringify({workspace:PB_WORKSPACE,data:str,updated_at:new Date().toISOString()});
+  const hd={'Content-Type':'application/json'};
+  let r;
+  if(id){
+    r=await _pbReq('/api/collections/workspace_state/records/'+id+'?fields=id,updated,updated_at',{method:'PATCH',headers:hd,body},40000);
+    if(r.status===404){_pbRecordId=null;throw Object.assign(new Error('record missing'),{retry:true});}
+  }else{
+    if(await _pbHead())throw Object.assign(new Error('record created elsewhere'),{retry:true}); // never create a 2nd record
+    r=await _pbReq('/api/collections/workspace_state/records?fields=id,updated,updated_at',{method:'POST',headers:hd,body},40000);
+  }
+  if(!r.ok){
+    let m='';try{const eb=await r.json();m=eb.message||JSON.stringify(eb.data||{}).slice(0,120);}catch(_){}
+    if(r.status>=500||r.status===429||r.status===408)throw new Error('Server unavailable ('+r.status+')');
+    throw Object.assign(new Error('HTTP '+r.status+(m?': '+m:'')),{fatal:true});
+  }
+  const rec=await r.json();
+  _pbRecordId=rec.id;
+  return{token:_pbTok(rec)};
+}
+
+function _pfReadStored(){
+  try{const r=localStorage.getItem(PF_STORE_KEY);if(r){const o=JSON.parse(r);if(o&&o.s)return o;}}catch(_){}
+  try{const r=localStorage.getItem('pf4');if(r){const s=JSON.parse(r);if(s&&typeof s==='object')return{v:4,s,h:[],sq:0};}}catch(_){}
+  return null;
+}
+function _pfWriteStored(rec){
+  let str;try{str=JSON.stringify(rec);}catch(_){return false;}
+  const put=()=>{try{localStorage.setItem(PF_STORE_KEY,str);return true;}catch(_){return false;}};
+  if(put()){try{localStorage.removeItem('pf4');}catch(_){}return true;}
+  // Quota full: shed rolling backups (the server holds the real history) until the live record fits.
+  try{
+    let b=JSON.parse(localStorage.getItem(PF_BACKUP_KEY)||'[]');
+    while(b.length>1){b=b.slice(Math.ceil(b.length/2));localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(b));if(put())return true;}
+    localStorage.removeItem(PF_BACKUP_KEY);
+    if(put())return true;
+  }catch(_){}
+  return false;
+}
+function _pfStash(str){            // a local copy that lost to the server on first contact — keep it restorable
+  try{
+    let b=JSON.parse(localStorage.getItem(PF_BACKUP_KEY)||'[]');
+    b.push({ts:new Date().toISOString(),data:str,label:'Unsynced local copy'});
+    localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(b.slice(-PF_MAX_BACKUPS)));
+  }catch(_){}
+}
+
+/* Render after a remote merge without yanking the screen from under someone who is typing */
+let _pfRenderWait=null;
+function _pfSafeRender(){
+  if(_pfRenderWait)return;
+  const t0=Date.now();
+  const tryRender=()=>{
+    const a=document.activeElement;
+    const typing=a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'||a.isContentEditable);
+    if(typing&&Date.now()-t0<20000){_pfRenderWait=setTimeout(tryRender,700);return;}
+    _pfRenderWait=null;
+    try{render();}catch(e){console.warn('render after sync failed',e);}
+  };
+  tryRender();
+}
+
+const PF=PFSync.create({
+  getState:()=>S,
+  replaceState:o=>{const old=S;if(old)for(const k of PF_LOCAL_KEYS)if(!(k in o)&&k in old)o[k]=old[k];S=o;},
+  normalize:o=>{const prev=S;S=o;try{_applyDefaults();}finally{S=prev;}},
+  prepare:()=>_applyDefaults(),
+  localKeys:PF_LOCAL_KEYS,
+  transport:{head:_pbHead,get:_pbGetFull,put:_pbPut},
+  readStored:_pfReadStored,
+  writeStored:_pfWriteStored,
+  stash:_pfStash,
+  validate:()=>_validateBeforeSave(),
+  status:(k,m)=>{
+    if(k==='synced'){_online=true;_consecutiveSaveFailures=0;_setSyncStatus('synced','Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · '+(S.tasks||[]).length+'t '+(S.projects||[]).length+'p');}
+    else if(k==='offline'){_online=false;_consecutiveSaveFailures++;_setSyncStatus('offline');}
+    else if(k==='error'){_consecutiveSaveFailures++;_setSyncStatus('error',m||'');}
+    else _setSyncStatus('saving');
+  },
+  onApplied:()=>{
+    _lastKnownCounts={projects:(S.projects||[]).length,tasks:(S.tasks||[]).length,members:(S.members||[]).length,sponsors:(S.sponsors||[]).length};
+    _pfSafeRender();
+    _showSyncToast();
+  },
+  onSaved:()=>{
+    _lastSavedAt=new Date().toISOString();_saveCount++;
+    _lastSavePayloadCounts={tasks:(S.tasks||[]).length,projects:(S.projects||[]).length,members:(S.members||[]).length,labels:(S.labels||[]).length};
+    _online=true;_consecutiveSaveFailures=0;
+    _setSyncStatus('synced','Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · '+_lastSavePayloadCounts.tasks+'t '+_lastSavePayloadCounts.projects+'p');
+    if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
+  },
+  clientId:_myClientId,
+  debounceMs:500,
+  loadTimeoutMs:25000
+});
+
+/* Restoring older data (undo, backups, snapshots, import): keep today's tombstones and let the sync re-add what was deleted */
+function _pfRestoreInto(restored){
+  delete restored._tomb;delete restored._clientId;delete restored._wid;delete restored._seq;delete restored._lineage;
+  PF.allowRevive();
+  Object.assign(S,restored);
+}
+
 /* ── Sync state ── */
 let _lastSavedAt=null;       // ISO string of last save we wrote
 let _syncChannel=null;       // Supabase realtime channel
@@ -1517,37 +2135,10 @@ function _setSyncStatus(status,msg=''){
   ind.innerHTML=`<span style="color:${colors[status]};display:flex;align-items:center;gap:4px;">${icons[status]}<span style="font-size:.65rem;font-family:'DM Mono',monospace;">${msg||labels[status]}</span></span>`;
 }
 
-/* ── Core save — debounced, queued ── */
+/* ── Save API — thin wrappers over the sync engine (PF). Every save merges with the server before writing. ── */
 let _lsDirty=true;
-function save(){
-  // Write localStorage on first call, then only when debounce fires (not rapid calls)
-  if(_lsDirty){
-    _lsDirty=false;
-    setTimeout(()=>{
-      try{
-        const _lsData={...S};delete _lsData._clientId;
-        const _lsStr=JSON.stringify(_lsData);
-        if(_lsStr.length<4500000){ // ~4.5MB safety margin for 5MB quota
-          localStorage.setItem('pf4',_lsStr);
-        }
-      }catch(e){} // quota exceeded — PocketBase is source of truth
-    },0);
-  }
-  // Debounce remote saves — don't hammer Supabase on every keystroke
-  if(_saveDebounce)clearTimeout(_saveDebounce);
-  _saveDebounce=setTimeout(_doSave,600);
-  _setSyncStatus('saving');
-}
-
-
-/* Immediate save — bypasses debounce. Use for destructive actions like deletions
-   so Supabase is updated before the user can refresh and get stale data. */
-function saveNow(){
-  try{const _lsData={...S};delete _lsData._clientId;localStorage.setItem('pf4',JSON.stringify(_lsData));}catch(e){}
-  if(_saveDebounce){clearTimeout(_saveDebounce);_saveDebounce=null;}
-  _setSyncStatus('saving');
-  _doSave();
-}
+function save(){PF.markDirty();}
+function saveNow(){PF.saveNow();}
 
 
 /* ── Pre-save validation ─────────────────────────────
@@ -1704,8 +2295,7 @@ async function restoreHistorySnapshot(id){
     if(!Array.isArray(restored.projects)||!Array.isArray(restored.tasks)){
       throw new Error('Snapshot data appears corrupt');
     }
-    delete restored._clientId;
-    Object.assign(S,restored);
+    _pfRestoreInto(restored);
     _applyDefaults();
     _lastKnownCounts={
       projects:(S.projects||[]).length,
@@ -1721,70 +2311,7 @@ async function restoreHistorySnapshot(id){
   }
 }
 
-async function _doSave(){
-  if(_saving){_saveQueue=true;return;}
-  _saving=true;
-  _saveQueue=false;
-
-  // Validate before sending to PocketBase
-  const _validation=_validateBeforeSave();
-  if(!_validation.ok){
-    console.error('SAVE BLOCKED:',_validation.reason);
-    _setSyncStatus('error',`⚠ Save blocked: ${_validation.reason}`);
-    _saving=false;
-    // Still save to localStorage as a safety net
-    try{const _lsData={...S};delete _lsData._clientId;localStorage.setItem('pf4',JSON.stringify(_lsData));}catch(e){}
-    if(_saveQueue)_doSave();
-    return;
-  }
-
-  const now=new Date().toISOString();
-  _myLastSave=now;
-  let ok=false;
-  try{
-    const _syncPayload={...S,finance:{...S.finance,finAuth:false},_clientId:_myClientId};
-    delete _syncPayload._spSearch;
-    ok=await sbUpsert(JSON.stringify(_syncPayload),now);
-  }catch(e){
-    _lastSaveError='Serialisation error: '+(e.message||String(e));
-    console.error('Save error:',e);
-    ok=false;
-  }
-  _saving=false; // ALWAYS reset — never get stuck
-  if(ok){
-    _lastSavedAt=now;
-    _pollLastAt=now; // prevent SSE echo from re-applying our own save
-    _saveCount++;
-    _consecutiveSaveFailures=0;
-    // Record what counts were actually written so we can spot payload drift later
-    _lastSavePayloadCounts={
-      tasks:(S.tasks||[]).length,
-      projects:(S.projects||[]).length,
-      members:(S.members||[]).length,
-      labels:(S.labels||[]).length,
-    };
-    if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
-    const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    _online=true; // reset on successful save — connection is back
-    _setSyncStatus('synced',`Saved ${ts} · ${_lastSavePayloadCounts.tasks}t ${_lastSavePayloadCounts.projects}p`);
-    try{_saveLocalBackup();}catch(e){console.warn('Local backup failed:',e);}
-  } else {
-    _consecutiveSaveFailures++;
-    if(_lastSaveError){ // only show error if we have a real reason
-      _setSyncStatus('error','⚠ '+_lastSaveError);
-    } else {
-      _setSyncStatus('saving'); // stay in "saving" state — will retry
-    }
-    _online=false;
-    // Alert loudly after 3 consecutive failures so data loss is visible
-    if(_consecutiveSaveFailures===3){
-      console.error('ProjectFlow: 3 consecutive save failures. Last error:',_lastSaveError||'(unknown)');
-      const el=document.getElementById('sync-status');
-      if(el)el.title='Save failing repeatedly — check network and PocketBase connection';
-    }
-  }
-  if(_saveQueue)_doSave();
-}
+function _doSave(){PF.saveNow();} // legacy entry point
 
 /* ── Save health diagnostic (call window._pfDiag() from browser console) ──
  * Runs a full round-trip: saves current state, reads it back from PocketBase,
@@ -1799,7 +2326,7 @@ async function _pfDiag(){
 
   // 1. localStorage check
   try{
-    const ls=JSON.parse(localStorage.getItem('pf4')||'{}');
+    const ls=(JSON.parse(localStorage.getItem('pf6')||'{}')).s||{};
     const lsCounts={tasks:(ls.tasks||[]).length,projects:(ls.projects||[]).length,
                     members:(ls.members||[]).length,labels:(ls.labels||[]).length};
     const lsMatch=lsCounts.tasks===mem.tasks&&lsCounts.projects===mem.projects;
@@ -1825,8 +2352,8 @@ async function _pfDiag(){
   saveNow();
   // Wait for the async save to complete (up to 8s)
   let waited=0;
-  while(_saving&&waited<8000){await new Promise(r=>setTimeout(r,200));waited+=200;}
-  if(_saving){console.error('❌ Save still in flight after 8s — possible hang');console.groupEnd();return;}
+  while(PF.isBusy()&&waited<8000){await new Promise(r=>setTimeout(r,200));waited+=200;}
+  if(PF.isBusy()){console.error('❌ Save still in flight after 8s — possible hang');console.groupEnd();return;}
   try{
     const row=await pbGet();
     if(!row||!row.data){console.error('❌ PocketBase read returned nothing');console.groupEnd();return;}
@@ -2063,10 +2590,10 @@ async function _pfTest(){
   // ── 7. Save integrity (delegates to _pfDiag) ─────────────────
   console.group('7. Save chain (quick check — run _pfDiag() for full round-trip)');
   try{
-    const lsRaw=localStorage.getItem('pf4');
-    if(!lsRaw){warn('localStorage backup','pf4 key not set yet (saved recently? normal on first load)');}
+    const lsRaw=localStorage.getItem('pf6');
+    if(!lsRaw){warn('localStorage backup','pf6 key not set yet (saved recently? normal on first load)');}
     else{
-      const ls=JSON.parse(lsRaw);
+      const ls=JSON.parse(lsRaw).s||{};
       const tasksMatch=(ls.tasks||[]).length===S.tasks.length;
       const projsMatch=(ls.projects||[]).length===S.projects.length;
       if(tasksMatch&&projsMatch)ok('localStorage matches memory',S.tasks.length+'t '+S.projects.length+'p');
@@ -2154,7 +2681,7 @@ function restoreLocalBackup(ts){
   if(!confirm('Restore this backup? Current unsaved changes will be lost.'))return;
   try{
     const restored=JSON.parse(snap.data);
-    Object.assign(S,restored);
+    _pfRestoreInto(restored);
     _applyDefaults();
     save();
     render();
@@ -2211,7 +2738,7 @@ function undo(){
   if(!_undoStack.length)return;
   const entry=_undoStack.pop();
   _redoStack.push(_snapCapture(entry.label));
-  Object.assign(S,_snapRestore(entry));
+  _pfRestoreInto(_snapRestore(entry));
   save();render();
   showUndoToast(`Undone: ${entry.label}`,true);
 }
@@ -2220,46 +2747,32 @@ function redo(){
   if(!_redoStack.length)return;
   const entry=_redoStack.pop();
   _undoStack.push(_snapCapture(entry.label));
-  Object.assign(S,_snapRestore(entry));
+  _pfRestoreInto(_snapRestore(entry));
   save();render();
   showUndoToast(`Redone: ${entry.label}`,false);
 }
 
-/* ── load — fetches from Supabase, falls back to localStorage ── */
+/* ── load — reconcile this device's stored copy with the server (merge, never overwrite) ── */
 async function load(){
-  // Fetch from PocketBase with a hard 10s timeout
-  // If unreachable, fall through to localStorage so the app still loads
-  let row=null;
-  try{
-    const rowPromise=sbGet();
-    const timeout=new Promise(res=>setTimeout(()=>res(null),25000));
-    row=await Promise.race([rowPromise,timeout]);
-  }catch(e){row=null;}
-  if(row&&row.data){
-    try{
-      const p=typeof row.data==='string'?JSON.parse(row.data):row.data;
-      delete p._clientId; // don't let remote session ID pollute local state
-      S={...S,...p};
-      _lastSavedAt=row.updated_at||null;
-      _applyDefaults();
-      // Seed known counts from loaded data so validation has a baseline
-      _lastKnownCounts={
-        projects:(S.projects||[]).length,
-        tasks:(S.tasks||[]).length,
-        members:(S.members||[]).length,
-        sponsors:(S.sponsors||[]).length
-      };
-      return;
-    }catch(e){console.warn('Failed to parse Supabase data:',e);}
-  }
-  // Fallback: localStorage (first time, or if offline)
-  try{
-    const r=localStorage.getItem('pf4');
-    if(r){const p=JSON.parse(r);S={...S,...p};_applyDefaults();}
-  }catch(e){}
+  try{await PF.load();}catch(e){console.warn('Sync load failed:',e);}
+  _applyDefaults();
+  _lastKnownCounts={
+    projects:(S.projects||[]).length,
+    tasks:(S.tasks||[]).length,
+    members:(S.members||[]).length,
+    sponsors:(S.sponsors||[]).length
+  };
 }
 
 function _applyDefaults(){
+  ['labels','areas','sponsors','projectTemplates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];});
+  if(S.slackWebhook===undefined)S.slackWebhook='';
+  if(S.detailId===undefined)S.detailId=null;
+  if(S.activeMember===undefined)S.activeMember=null;
+  if(!S.projFilter)S.projFilter='all';
+  if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
+  if(S.hideDone===undefined)S.hideDone=false;
+  if(!S._tomb||typeof S._tomb!=='object'||Array.isArray(S._tomb))S._tomb={}; // delete markers (sync)
   if(!S.expandedTasks)S.expandedTasks=[];
   if(!S.expandedGantt)S.expandedGantt=[];
   if(!S.taskTemplates)S.taskTemplates=[];
@@ -2288,15 +2801,15 @@ function _applyDefaults(){
   if(!S.settings.phaseDefaults)S.settings.phaseDefaults={planning:2,prelaunch:6,postEvent:2};
   if(!S.settings.shortcuts)S.settings.shortcuts={};
   (S.tasks||[]).forEach(t=>{if(t.phase===undefined)t.phase='';});
-  // Migrate existing subtasks: if labels is an empty array and task has a parent,
-  // treat as "inherit" (null) so they pick up parent labels automatically.
-  (S.tasks||[]).forEach(t=>{if(t.parentId&&Array.isArray(t.labels)&&t.labels.length===0)t.labels=null;});
 }
 
-/* ── Real-time polling (checks every 15s for changes from other users) ── */
+/* ── Real-time: events and polls only say "something changed" — PF then fetches, merges, and writes if needed.
+      Nothing from the network is ever applied to the screen directly, so an old payload can't overwrite new work. ── */
 let _pollTimer=null;
-let _pollLastAt=null;
 let _pbEventSource=null;
+let _fallbackTimer=null;
+let _pbReconnectTimer=null;   // prevents stacked SSE reconnects
+let _pbRtRetry=null;
 
 function startPolling(){
   _startPBRealtime();
@@ -2304,193 +2817,54 @@ function startPolling(){
 
 function _startPBRealtime(){
   if(_pbEventSource){_pbEventSource.close();_pbEventSource=null;}
+  if(_pbRtRetry){clearTimeout(_pbRtRetry);_pbRtRetry=null;}
   if(!_pbToken)return;
-
-  // If no record ID yet, do ONE lookup then start — never loop
-  if(!_pbRecordId){
-    if(_pbRealtimeWaiting)return; // already waiting — don't stack
-    _pbRealtimeWaiting=true;
-    sbGet().then(row=>{
-      _pbRealtimeWaiting=false;
-      if(row&&row!=='unchanged'&&row.id){
-        _pbRecordId=row.id;
-        _pollLastAt=row.updated||row.updated_at;
-      }
-      if(_pbToken)_startPBRealtime();
-    }).catch(()=>{
-      _pbRealtimeWaiting=false;
-      // Retry once after 10s if lookup failed
-      if(_pbToken)setTimeout(_startPBRealtime,10000);
-    });
-    return;
-  }
+  // The record id is learnt by the first sync; wait for it rather than loop
+  if(!_pbRecordId){_pbRtRetry=setTimeout(_startPBRealtime,5000);return;}
 
   const es=new EventSource(PB_URL+'/api/realtime');
   _pbEventSource=es;
+  const topic='workspace_state/'+_pbRecordId;
 
-  let _sseClientId='';
   es.addEventListener('PB_CONNECT',e=>{
     try{
       const d=JSON.parse(e.data);
-      _sseClientId=d.clientId;
-      const topic='workspace_state/'+_pbRecordId;
       fetch(PB_URL+'/api/realtime',{
         method:'POST',
         headers:{Authorization:_pbToken,'Content-Type':'application/json'},
-        body:JSON.stringify({clientId:_sseClientId,subscriptions:[topic]})
-      });
+        body:JSON.stringify({clientId:d.clientId,subscriptions:[topic]})
+      }).then(()=>PF.requestSync(0)).catch(()=>{}); // (re)connected: catch up on anything missed while away
     }catch(err){}
   });
 
-  function _handleSSEMessage(msg){
-    try{
-      if(!msg.action||!msg.record)return;
-      if(msg.action!=='update'&&msg.action!=='create')return;
-      const row=msg.record;
-      if(row.workspace&&row.workspace!==PB_WORKSPACE)return;
-      try{
-        const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
-        if(_d&&_d._clientId===_myClientId)return;
-      }catch(_){}
-      const remoteTs=row.updated||row.updated_at;
-      if(remoteTs===_pollLastAt)return;
-      _pendingRemote={row,remoteTs};
-      _applyPendingRemote();
-    }catch(err){}
-  }
-
-  es.onmessage=e=>{
-    try{_handleSSEMessage(JSON.parse(e.data));}catch(err){}
+  const onMsg=e=>{
+    try{const m=JSON.parse(e.data);if(m&&m.record&&m.record.workspace&&m.record.workspace!==PB_WORKSPACE)return;}catch(_){}
+    PF.requestSync(80);
   };
-
-  // Named topic listener for specific record subscription
-  const topic='workspace_state/'+_pbRecordId;
-  es.addEventListener(topic,e=>{
-    try{_handleSSEMessage(JSON.parse(e.data));}catch(err){}
-  });
+  es.onmessage=onMsg;
+  es.addEventListener(topic,onMsg);
 
   es.onerror=()=>{
     es.close();_pbEventSource=null;
-    // Reconnect once after backoff — guard against stacking
     if(_pbToken&&!_pbReconnectTimer){
-      _pbReconnectTimer=setTimeout(()=>{
-        _pbReconnectTimer=null;
-        _startPBRealtime();
-      },8000);
+      _pbReconnectTimer=setTimeout(()=>{_pbReconnectTimer=null;_startPBRealtime();},8000);
     }
   };
 }
 
-
-
-/* ── Conflict resolution ── */
-let _conflictRemote=null;
-
-function _showConflictBanner(row,remoteTs){
-  _conflictRemote={row,remoteTs};
-  const banner=document.getElementById('conflict-banner');
-  if(banner)banner.style.display='block';
-}
-
-function _conflictKeepMine(){
-  // Dismiss — our save will fire normally when debounce completes
-  _conflictRemote=null;
-  const banner=document.getElementById('conflict-banner');
-  if(banner)banner.style.display='none';
-}
-
-function _conflictTakeRemote(){
-  const banner=document.getElementById('conflict-banner');
-  if(banner)banner.style.display='none';
-  if(!_conflictRemote)return;
-  // Cancel pending save and apply remote state
-  if(_saveDebounce){clearTimeout(_saveDebounce);_saveDebounce=null;}
-  const {row,remoteTs}=_conflictRemote;
-  _conflictRemote=null;
-  _pollLastAt=remoteTs;
-  if(row.updated_at===_myLastSave)return;
-  try{
-    const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
-    delete remote._clientId; // strip — only meaningful in PocketBase, not in local state
-    Object.assign(S,remote);
-    _applyDefaults();
-    render();
-    _setSyncStatus('synced','Switched to latest');
-  }catch(err){console.warn('Failed to apply remote:',err);}
-}
-
-let _pendingRemote=null;
-let _myLastSave=null;
-let _fallbackTimer=null;
-let _pbRealtimeWaiting=false; // prevents stacked record-ID lookups
-let _pbReconnectTimer=null;   // prevents stacked SSE reconnects
-
-// Fallback poll every 30s — in case SSE drops silently
+/* Safety-net poll — a tiny "has it changed?" request every 20s, in case SSE drops silently */
 function _startFallbackPoll(){
   if(_fallbackTimer)clearInterval(_fallbackTimer);
-  _fallbackTimer=setInterval(async()=>{
-    if(!_pbToken||_saving)return;
-    try{
-      const row=await pbGet();
-      if(!row||row==='unchanged')return;
-      // Skip own saves via client ID
-      try{
-        const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
-        if(_d&&_d._clientId===_myClientId)return;
-      }catch(_){}
-      const remoteTs=row.updated||row.updated_at;
-      if(remoteTs===_pollLastAt)return;
-      _pendingRemote={row,remoteTs};
-      _applyPendingRemote();
-    }catch(e){}
-  },30000);
+  _fallbackTimer=setInterval(()=>{
+    if(!_pbToken||document.hidden)return;
+    PF.poll();
+  },20000);
 }
 
-function _applyPendingRemote(){
-  if(!_pendingRemote)return;
-  const {row,remoteTs}=_pendingRemote;
-  // FINAL safety net: skip own saves via client ID, regardless of which listener queued this
-  try{
-    const _d=typeof row.data==='string'?JSON.parse(row.data):row.data;
-    if(_d&&_d._clientId===_myClientId){
-      _pendingRemote=null;
-      _pollLastAt=remoteTs;
-      return;
-    }
-  }catch(_){}
-  // Legacy timestamp check (secondary)
-  if(row.updated_at&&_myLastSave&&row.updated_at===_myLastSave){
-    _pendingRemote=null;
-    _pollLastAt=remoteTs;
-    return;
-  }
-  if(_saveDebounce||_saving){
-    // Local save is pending or in-flight — don't let remote overwrite unsaved changes
-    _showConflictBanner(row,remoteTs);
-    _pendingRemote=null;
-    return;
-  }
-  _pendingRemote=null;
-  _pollLastAt=remoteTs;
-  try{
-    const remote=typeof row.data==='string'?JSON.parse(row.data):row.data;
-    delete remote._clientId;
-    Object.assign(S,remote);
-    _applyDefaults();
-    // Update known counts so validation doesn't flag legitimate remote deletions
-    _lastKnownCounts={
-      projects:(S.projects||[]).length,
-      tasks:(S.tasks||[]).length,
-      members:(S.members||[]).length,
-      sponsors:(S.sponsors||[]).length
-    };
-    render();
-    const ts=new Date(remoteTs).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
-    _setSyncStatus('synced',`Updated ${ts}`);
-    _showSyncToast();
-  }catch(err){console.warn('Failed to apply remote state:',err);}
-}
-
+/* Merging replaced the old "keep mine / take latest" prompt — kept as no-ops for any stale markup */
+function _showConflictBanner(){}
+function _conflictKeepMine(){const b=document.getElementById('conflict-banner');if(b)b.style.display='none';}
+function _conflictTakeRemote(){_conflictKeepMine();}
 
 function _showSyncToast(){
   let t=document.getElementById('sync-toast');
@@ -2502,19 +2876,17 @@ function _showSyncToast(){
   setTimeout(()=>{t.style.opacity='0';},3000);
 }
 
-/* ── Online/offline detection ── */
-
-/* Poll immediately when tab becomes visible */
+/* ── Visibility / connectivity ── */
 document.addEventListener('visibilitychange',()=>{
-  if(!document.hidden&&_pbToken)startPolling();
+  if(document.hidden){PF.saveNow();}                 // leaving the tab: persist + push anything pending
+  else if(_pbToken){PF.requestSync(0);if(!_pbEventSource)_startPBRealtime();}
 });
-
-window.addEventListener('online',()=>{
-  _online=true;
-  _setSyncStatus('saving');
-  save(); // this will set _online=false again if still failing, or show saved on success
-});
+window.addEventListener('pagehide',()=>{try{PF.flush();}catch(_){}});
+window.addEventListener('beforeunload',()=>{try{PF.flush();}catch(_){}});
+window.addEventListener('focus',()=>{if(_pbToken)PF.requestSync(0);});
+window.addEventListener('online',()=>{_online=true;_setSyncStatus('saving');PF.requestSync(0);});
 window.addEventListener('offline',()=>{_online=false;_setSyncStatus('offline');});
+
 const COLORS=['#62D0AA','#14b8a6','#06b6d4','#22d3ee','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#ef4444','#f97316','#fb923c','#f59e0b','#84cc16'];
 const PRIOS=['High','Medium','Low'];
 const KB_COLS=[{id:'todo',name:'To Do',color:'#888'},{id:'blocked',name:'Blocked',color:'#f43f5e'},{id:'in-progress',name:'In Progress',color:'#62D0AA'},{id:'review',name:'In Review',color:'#f59e0b'},{id:'done',name:'Done',color:'#1fba7a'}];
@@ -3730,6 +4102,7 @@ async function handleLogout(){
   if(_tokenRefreshTimer){clearTimeout(_tokenRefreshTimer);_tokenRefreshTimer=null;}
   if(_presenceTimer){clearInterval(_presenceTimer);_presenceTimer=null;}
   if(_pbEventSource){_pbEventSource.close();_pbEventSource=null;}
+  try{PF.flush();PF.reset();}catch(_){}
   _pbToken=null;_pbUser=null;_pbRecordId=null;_pbEtag=null;
   sessionStorage.removeItem('pb_token');sessionStorage.removeItem('pb_user');
   el('app').style.display='none';
@@ -8229,7 +8602,7 @@ function importData(input){
       }
       if(!confirm('This will replace all current data with the imported file. Continue?'))return;
 
-      Object.assign(S,imported);
+      _pfRestoreInto(imported);
 
       // Members
       if(!S.members)S.members=[];
@@ -11688,21 +12061,25 @@ function autoGenerateSponsorTasks(projectId,sponsorAssignment){
 /* ── Ensure built-in sponsor task templates exist ── */
 function ensureBuiltInSponsorTemplates(){
   if(!S.taskTemplates)S.taskTemplates=[];
+  let added=false;
   Object.entries(SP_TYPES).forEach(([type,def])=>{
     const exists=S.taskTemplates.some(t=>t.sponsorType===type&&t._builtIn);
     if(exists)return;
-    const subtasks=(SP_TYPE_SUBTASKS[type]||[]).map(name=>({
-      id:uid(),name,priority:'Medium',subtasks:[]
+    // Fixed ids: every device creates the identical template, so syncing can never duplicate it
+    const subtasks=(SP_TYPE_SUBTASKS[type]||[]).map((name,i)=>({
+      id:'bi_'+type+'_'+i,name,priority:'Medium',subtasks:[]
     }));
     S.taskTemplates.push({
-      id:uid(),
+      id:'bi_'+type,
       name:`${def.label} Sponsorship (Built-in)`,
       description:`Auto-generated template for ${def.label.toLowerCase()} sponsorships`,
       sponsorType:type,
       _builtIn:true,
       tasks:subtasks
     });
+    added=true;
   });
+  if(added)save();
 }
 
 /* ── Pointer-based Drag & Drop ── */
@@ -12343,3 +12720,5 @@ function pickC(swatchId,inputId,color,el2){
 
 </body>
 </html>
+
+</body></html>
