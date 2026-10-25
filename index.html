@@ -1963,6 +1963,9 @@ function _applyDefaults(){
   if(!S.settings.phaseDefaults)S.settings.phaseDefaults={planning:2,prelaunch:6,postEvent:2};
   if(!S.settings.shortcuts)S.settings.shortcuts={};
   (S.tasks||[]).forEach(t=>{if(t.phase===undefined)t.phase='';});
+  // Migrate existing subtasks: if labels is an empty array and task has a parent,
+  // treat as "inherit" (null) so they pick up parent labels automatically.
+  (S.tasks||[]).forEach(t=>{if(t.parentId&&Array.isArray(t.labels)&&t.labels.length===0)t.labels=null;});
 }
 
 /* ── Real-time polling (checks every 15s for changes from other users) ── */
@@ -2246,6 +2249,18 @@ const getTask=id=>S.tasks.find(t=>t.id===id);
 const kids=id=>S.tasks.filter(t=>t.parentId===id);
 
 function lcHtml(id){const l=getLabel(id);if(!l)return'';return`<span class="lchip" style="background:${l.color}22;color:${l.color};border:1px solid ${l.color}44;">${l.name}</span>`;}
+
+/* Returns the labels that should be DISPLAYED for a task.
+   If a task has labels:null (or labels:undefined) AND has a parent,
+   it inherits the parent's effective labels (recursive, so grandchild → child → parent).
+   labels:[] means "explicitly no labels" (overridden to nothing).        */
+function effectiveLabels(t){
+  if(t.labels!==null&&t.labels!==undefined)return t.labels;
+  if(t.parentId){const p=getTask(t.parentId);if(p)return effectiveLabels(p);}
+  return[];
+}
+/* True when this task is displaying inherited (not its own) labels */
+function labelsInherited(t){return(t.labels===null||t.labels===undefined)&&!!t.parentId;}
 
 /* ── Blocker helpers ── */
 function syncBlockedStatus(id){
@@ -4241,7 +4256,7 @@ function getDashTasks(){
     if(t.projectId && !activeIds.includes(t.projectId))return false;
     if(S.dashFilters.project&&t.projectId!==S.dashFilters.project)return false;
     if(S.dashFilters.member&&(!t.assignees||!t.assignees.includes(S.dashFilters.member)))return false;
-    if(S.dashFilters.label&&(!t.labels||!t.labels.includes(S.dashFilters.label)))return false;
+    if(S.dashFilters.label&&!effectiveLabels(t).includes(S.dashFilters.label))return false;
     if(S.activeMember&&(!t.assignees||!t.assignees.includes(S.activeMember)))return false;
     if(S.hideDone&&taskComp(t)===100)return false;
     return true;
@@ -4385,7 +4400,7 @@ function renderTaskRow(t,depth=0,showProj=false){
   <div class="ti-meta-zone">
   <div class="ti-col ti-col-labels">
     ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phaseBg(t.phase)};color:${phaseColor(t.phase)};white-space:nowrap;">${t.phase}</span>`:''}
-    ${(t.labels||[]).map(id=>lcHtml(id)).join('')}
+    ${effectiveLabels(t).map(id=>lcHtml(id)).join('')}
   </div>
   <div class="ti-col ti-col-proj">
     ${proj?`<span class="ti-proj-chip"><span style="width:6px;height:6px;border-radius:50%;background:${proj.color};flex-shrink:0;"></span><span class="ti-proj-name">${proj.name}</span></span>`:''}
@@ -4656,7 +4671,9 @@ function _commitInlineSub(inp,parentId,projectId,subAddEl){
   const prioBtn=subAddEl?.querySelector('.qa-prio-btn');
   const prio=prioBtn?.dataset.prio||'Medium';
   const phase=subAddEl?.querySelector('.qa-phase-pill.active')?.dataset.phase||'';
-  const labels=Array.from(subAddEl?.querySelectorAll('.qa-label-dot.active')||[]).map(d=>d.dataset.lid);
+  const rawLabels=Array.from(subAddEl?.querySelectorAll('.qa-label-dot.active')||[]).map(d=>d.dataset.lid);
+  // null = inherit parent labels; only store explicit array when user picked something
+  const labels=rawLabels.length>0?rawLabels:null;
   const endDate=subAddEl?.querySelector('input[type="date"]')?.value||'';
   const assignees=Array.from(subAddEl?.querySelectorAll('[data-mid]')||[]).filter(d=>d.style.opacity==='1').map(d=>d.dataset.mid);
   const description=subAddEl?.querySelector('.inline-sub-desc')?.value.trim()||'';
@@ -5570,7 +5587,7 @@ function renderKanban(){
     const p=getProject(t.projectId);if(!p||p.status!=='active')return false;
     if(kProj&&t.projectId!==kProj)return false;
     if(kMem&&(!t.assignees||!t.assignees.includes(kMem)))return false;
-    if(kLbl&&(!t.labels||!t.labels.includes(kLbl)))return false;
+    if(kLbl&&!effectiveLabels(t).includes(kLbl))return false;
     if(kPh&&t.phase!==kPh)return false;
     return true;
   }).forEach(t=>{
@@ -5617,7 +5634,7 @@ ${KB_COLS.map(col=>`
 ${parentTask?`<div style="font-size:.58rem;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="color:var(--border2);">↳</span>${parentTask.name}</div>`:''}
 ${kBlocked?`<div class="kcard-blocked-badge"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Blocked</div>`:''}<div class="kcard-name${t.done?' done':''}" style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${t.name}</div>
 <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:7px;">
-  ${(t.labels||[]).slice(0,2).map(id=>lcHtml(id)).join('')}
+  ${effectiveLabels(t).slice(0,2).map(id=>lcHtml(id)).join('')}
   ${t.recur?.enabled?`<span style="font-size:.58rem;color:var(--purple);display:inline-flex;align-items:center;" title="Recurring"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg></span>`:''}
 </div>
 <div class="kcard-meta">
@@ -5887,7 +5904,7 @@ function renderCampaign(){
   const groups={}; // labelId -> {label, tasks[]}
   const noLabel=[];
   tasks.forEach(t=>{
-    const tLabels=(t.labels||[]).filter(id=>labelMap[id]);
+    const tLabels=effectiveLabels(t).filter(id=>labelMap[id]);
     if(tLabels.length===0){noLabel.push(t);}
     else{tLabels.forEach(lid=>{if(!groups[lid])groups[lid]={label:labelMap[lid],tasks:[]};groups[lid].tasks.push(t);});}
   });
@@ -8409,7 +8426,7 @@ function deleteProjExp(projId,expId){const p=getProject(projId);if(!p)return;p.e
 
 function taskModalHtml(data){
   let task=null,defProj='',defParent=null,defAssignees=[],defLabels=[],defFromTmpl=null,isQuickSub=false;
-  if(typeof data==='string'&&data){task=getTask(data);if(task){defProj=task.projectId||'';defParent=task.parentId||null;defAssignees=task.assignees||[];defLabels=task.labels||[];}}
+  if(typeof data==='string'&&data){task=getTask(data);if(task){defProj=task.projectId||'';defParent=task.parentId||null;defAssignees=task.assignees||[];defLabels=effectiveLabels(task);}}
   else if(data&&typeof data==='object'){
     defProj=data.projectId||'';defParent=data.parentId||null;
     defAssignees=data.assignees||[];
@@ -8462,7 +8479,7 @@ function taskModalHtml(data){
 
   ${S.members.length>0?`<div class="field"><label class="flbl">Assignees</label><div class="av-toggle-grid" id="tm-av-grid">${S.members.map(m=>`<div class="av-toggle${defAssignees.includes(m.id)?' active':''}" onclick="this.classList.toggle('active')" data-id="${m.id}">${avHtml(m.id,18)}<span>${m.name.split(' ')[0]}</span></div>`).join('')}</div></div>`:''}
 
-  ${S.labels.length>0?`<div class="field"><label class="flbl">Labels</label><div class="pill-sel" id="tm-lb-pills">${S.labels.map(l=>`<span class="pill-opt${defLabels.includes(l.id)?' active':''}" style="border-color:${l.color}44;color:${l.color}88;${defLabels.includes(l.id)?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':''}" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
+  ${S.labels.length>0?`<div class="field"><label class="flbl">Labels${(task&&labelsInherited(task))?'<span id="tm-lb-inherit-note" style="font-size:.62rem;font-weight:400;color:var(--muted);margin-left:6px;">(inherited from parent)</span>':''}</label><div class="pill-sel" id="tm-lb-pills" data-inherited="${(task&&labelsInherited(task))?'1':'0'}">${S.labels.map(l=>`<span class="pill-opt${defLabels.includes(l.id)?' active':''}" style="border-color:${l.color}44;color:${l.color}88;${defLabels.includes(l.id)?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':''}" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';document.getElementById('tm-lb-pills').dataset.inherited='0';const n=document.getElementById('tm-lb-inherit-note');if(n)n.style.display='none';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
 
   ${parentOpts?`<div>
     <button type="button" onclick="const b=el('tm-parent-body');const ico=el('tm-parent-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'flex';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;">
@@ -8514,10 +8531,14 @@ function tmPickPhase(el,val){
 function saveTask(eid,defParent,tmplId){
   const name=el('tm-name')?.value.trim();if(!name){if(el('tm-name'))el('tm-name').style.borderColor='var(--red)';return;}
   const assignees=Array.from(document.querySelectorAll('#tm-av-grid .av-toggle.active')).map(e=>e.dataset.id).filter(Boolean);
-  const labels=Array.from(document.querySelectorAll('#tm-lb-pills .pill-opt.active')).map(e=>e.dataset.id).filter(Boolean);
+  const rawTmLabels=Array.from(document.querySelectorAll('#tm-lb-pills .pill-opt.active')).map(e=>e.dataset.id).filter(Boolean);
+  const tmLbStillInherited=document.getElementById('tm-lb-pills')?.dataset.inherited==='1';
   const recurOn=el('recur-sw')?.dataset.on==='1'||el('tm-recur-body')?.style.display!=='none';
   const parentVal=el('tm-parent')?.value||defParent||null;
   const oldTask=eid?getTask(eid):null;
+  // null = inherit from parent. Only set explicit labels when user actually picked some.
+  // tmLbStillInherited: user opened an inheriting subtask and didn't touch labels → keep null.
+  const labels=tmLbStillInherited?null:(rawTmLabels.length>0?rawTmLabels:(parentVal?null:[]));
   const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
   if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   if(eid){const i=S.tasks.findIndex(t=>t.id===eid);if(i>=0)S.tasks[i]=task;}else S.tasks.push(task);
@@ -8861,7 +8882,6 @@ function labelModalHtml(id){
     +'<div class="mo-body">'
     +'<div class="field"><label class="flbl">Name *</label>'
     +'<input class="inp" id="lm-name" value="'+(l?.name||'')+'" placeholder="Bug, Feature, Urgent\u2026"></div>'
-    +accountPicker
     +'<div class="field"><label class="flbl">Colour</label>'
     +'<div class="clr-grid" id="lm-clrs">'+colorDots+'</div>'
     +'<input type="hidden" id="lm-clr" value="'+(l?.color||COLORS[0])+'"></div>'
