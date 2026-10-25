@@ -4524,7 +4524,7 @@ function toggleExp(id){const i=S.expandedTasks.indexOf(id);i>=0?S.expandedTasks.
 
 function toggleDone(id){
   const t=getTask(id);if(!t)return;
-  const ch=kids(id);if(ch.length>0)return;
+  const ch=kids(id);
   // Snapshot for undo ONLY if needed — defer for perf
   const prevDone=t.done;
   t.done=!t.done;
@@ -4532,15 +4532,25 @@ function toggleDone(id){
   else{syncBlockedStatus(id);}
   const didSpawn=t.done&&t.recur?.enabled;
   if(didSpawn)spawnRecurring(t);
-  if(t.done)cascadeChildrenDone(id);
+  // Cascade done/undone state to all children
+  if(t.done){
+    cascadeChildrenDone(id);
+  } else {
+    // When un-ticking a parent, also un-tick all children
+    const cascadeUndone=pid=>{kids(pid).forEach(c=>{c.done=false;syncBlockedStatus(c.id);cascadeUndone(c.id);});};
+    cascadeUndone(id);
+  }
   const blockedByThis=S.tasks.filter(x=>(x.blockedBy||[]).includes(id));
   blockedByThis.forEach(x=>syncBlockedStatus(x.id));
-  save(); // single save — debounced, async
-  // Always update in-place — never trigger a full render from a task toggle
-  _updateTaskRowInPlace(id);
-  // Update blocker rows in-place too
-  blockedByThis.forEach(x=>_updateTaskRowInPlace(x.id));
-  if(didSpawn)render(); // only full render if a new recurring task was spawned
+  saveNow(); // immediate save — task completion must persist even if user navigates away quickly
+  // Full render when: parent task toggled (children states changed), recurring spawned,
+  // or currently on kanban board (so the card moves to the correct column)
+  if(ch.length>0||didSpawn||V==='kanban'){render();}else{
+    // Always update in-place — never trigger a full render from a task toggle
+    _updateTaskRowInPlace(id);
+    // Update blocker rows in-place too
+    blockedByThis.forEach(x=>_updateTaskRowInPlace(x.id));
+  }
 }
 
 function _updateTaskRowInPlace(id){
@@ -4552,8 +4562,11 @@ function _updateTaskRowInPlace(id){
     return;
   }
   rows.forEach(row=>{
+    const ch2=kids(id);
+    const comp2=taskComp(t);
+    const checkCls2=ch2.length>0?(t.done||comp2===100?'done':comp2>0?'partial':''):(t.done?'done':'');
     const check=row.querySelector('.ti-check');
-    if(check)check.className='ti-check'+(t.done?' done':'');
+    if(check)check.className='ti-check'+(checkCls2?' '+checkCls2:'');
     const name=row.querySelector('.ti-name');
     if(name)name.className='ti-name'+(t.done?' done':'');
     const prog=row.querySelector('.ti-prog-fill');
@@ -4680,7 +4693,7 @@ function _commitInlineSub(inp,parentId,projectId,subAddEl){
   saveWithUndo('Add subtask');
   if(!S.expandedTasks.includes(parentId))S.expandedTasks.push(parentId);
   S.tasks.unshift({id:uid(),name,description,projectId,parentId,priority:prio,phase,assignees,labels,blockedBy:[],startDate:'',endDate,kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}});
-  save();
+  saveNow();
   inp.value='';
   if(prioBtn){prioBtn.dataset.prio='Medium';prioBtn.className='qa-prio-btn Medium';prioBtn.textContent='M';}
   // Reset meta fields
@@ -4880,7 +4893,7 @@ function qaSubmit(barId,projectId,forcedPhase){
   const endDate=el(`${barId}-date`)?.value||'';
   saveWithUndo('Add task');
   S.tasks.unshift({id:uid(),name,description:desc,projectId:proj,parentId:null,priority:prio,phase:activePhase,assignees,labels:activeLabels,blockedBy:[],startDate:'',endDate,kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}});
-  save();
+  saveNow();
   // Clear name and desc but KEEP assignees and priority sticky
   if(nameEl)nameEl.value='';
   const descEl=el(`${barId}-desc`);
@@ -5666,7 +5679,7 @@ function toggleKanbanDone(id){
   if(t.done&&t.recur?.enabled)spawnRecurring(t);
   if(t.done)cascadeChildrenDone(id);
   S.tasks.filter(x=>(x.blockedBy||[]).includes(id)).forEach(x=>syncBlockedStatus(x.id));
-  save();render();
+  saveNow();render();
 }
 // initKanbanDnD replaced by pointer DnD
 let draggedTaskId=null;
@@ -8541,8 +8554,9 @@ function saveTask(eid,defParent,tmplId){
   const labels=tmLbStillInherited?null:(rawTmLabels.length>0?rawTmLabels:(parentVal?null:[]));
   const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
   if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
+  saveWithUndo(eid?'Edit task':'Add task');
   if(eid){const i=S.tasks.findIndex(t=>t.id===eid);if(i>=0)S.tasks[i]=task;}else S.tasks.push(task);
-  save();
+  saveNow();
   if(tmplId){applyTmpl(tmplId,task.id,task.projectId);}
   closeModal();render();
 }
