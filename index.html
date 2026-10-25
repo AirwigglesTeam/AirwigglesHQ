@@ -8172,6 +8172,7 @@ function openModal(type,data){
   }
   mc.innerHTML=`<div class=\"mo\" onclick=\"if(event.target.classList.contains('mo'))closeModal()\">${html}</div>`;
   if(type==='taskTmpl')renderTtBuf();
+  if(type==='label')requestAnimationFrame(_initLabelWheel);
 }
 
 async function uploadLogo(input){
@@ -9207,26 +9208,154 @@ function importProductsFromHtml(input){
 
 function labelModalHtml(id){
   const l=id?getLabel(id):null;
-  const colorDots=COLORS.map(c=>{
-    const sel=(l?.color||COLORS[0])===c;
-    return '<svg class="clr-dot'+(sel?' sel':'')+'" width="26" height="26" viewBox="0 0 26 26" onclick="pickC(\'lm-clrs\',\'lm-clr\',\''+c+'\',this)" style="cursor:pointer;flex:none;">'
-      +'<circle cx="13" cy="13" r="10" fill="'+c+'"/>'
-      +'<circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/>'
-      +'</svg>';
-  }).join('');
-  return '<div class="mo-box" style="max-width:360px;">'
+  const initColor=l?.color||'#62D0AA';
+  return '<div class="mo-box" style="max-width:300px;">'
     +'<div class="mo-hd"><span class="mo-title">'+(l?'Edit Label':'New Label')+'</span>'
     +'<button class="mo-close" onclick="closeModal()">&#215;</button></div>'
     +'<div class="mo-body">'
     +'<div class="field"><label class="flbl">Name *</label>'
     +'<input class="inp" id="lm-name" value="'+(l?.name||'')+'" placeholder="Bug, Feature, Urgent\u2026"></div>'
     +'<div class="field"><label class="flbl">Colour</label>'
-    +'<div class="clr-grid" id="lm-clrs">'+colorDots+'</div>'
-    +'<input type="hidden" id="lm-clr" value="'+(l?.color||COLORS[0])+'"></div>'
+    +'<div style="display:flex;flex-direction:column;align-items:center;gap:10px;">'
+    +'<canvas id="lm-wheel" width="220" height="220" style="border-radius:50%;cursor:crosshair;touch-action:none;display:block;"></canvas>'
+    +'<canvas id="lm-bright" width="220" height="18" style="border-radius:9px;cursor:crosshair;touch-action:none;display:block;"></canvas>'
+    +'<div style="display:flex;align-items:center;gap:8px;width:220px;">'
+    +'<div id="lm-preview" style="width:34px;height:34px;border-radius:7px;border:1.5px solid var(--border2);flex-shrink:0;background:'+initColor+';"></div>'
+    +'<input class="inp" id="lm-hex" maxlength="7" style="font-family:DM Mono,monospace;font-size:.82rem;letter-spacing:.04em;flex:1;" placeholder="#62D0AA" value="'+initColor+'">'
+    +'</div>'
+    +'</div>'
+    +'<input type="hidden" id="lm-clr" value="'+initColor+'">'
+    +'</div>'
     +'</div>'
     +'<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
     +'<button class="btn btn-acc" onclick="saveLabel(\''+( l?.id||'')+'\')">'+( l?'Save':'Create')+'</button></div>'
     +'</div>';
+}
+
+function _initLabelWheel(){
+  const wheel=document.getElementById('lm-wheel');
+  const bright=document.getElementById('lm-bright');
+  if(!wheel||!bright)return;
+  const wCtx=wheel.getContext('2d');
+  const bCtx=bright.getContext('2d');
+  const W=220,R=W/2;
+  let _h=0,_s=0,_v=1;
+
+  function hsvToRgb(h,s,v){
+    let r,g,b;
+    const i=Math.floor(h*6),f=h*6-i,p=v*(1-s),q=v*(1-f*s),t=v*(1-(1-f)*s);
+    switch(i%6){case 0:r=v;g=t;b=p;break;case 1:r=q;g=v;b=p;break;
+      case 2:r=p;g=v;b=t;break;case 3:r=p;g=q;b=v;break;
+      case 4:r=t;g=p;b=v;break;case 5:r=v;g=p;b=q;break;}
+    return[Math.round(r*255),Math.round(g*255),Math.round(b*255)];
+  }
+  function rgbToHex(r,g,b){return'#'+[r,g,b].map(x=>x.toString(16).padStart(2,'0')).join('');}
+  function hexToRgb(hex){const m=(hex||'').replace('#','').match(/.{2}/g);if(!m||m.length<3)return null;return m.slice(0,3).map(x=>parseInt(x,16));}
+  function rgbToHsv(r,g,b){
+    r/=255;g/=255;b/=255;
+    const max=Math.max(r,g,b),min=Math.min(r,g,b),d=max-min;
+    let h=0,s=max===0?0:d/max,v=max;
+    if(d){switch(max){case r:h=(g-b)/d+(g<b?6:0);break;case g:h=(b-r)/d+2;break;case b:h=(r-g)/d+4;break;}h/=6;}
+    return[h,s,v];
+  }
+
+  function drawWheel(){
+    const img=wCtx.createImageData(W,W);
+    for(let y=0;y<W;y++){for(let x=0;x<W;x++){
+      const dx=x-R,dy=y-R,dist=Math.sqrt(dx*dx+dy*dy);
+      const i=(y*W+x)*4;
+      if(dist>R){img.data[i+3]=0;continue;}
+      const angle=(Math.atan2(dy,dx)+Math.PI)/(2*Math.PI);
+      const [r,g,b]=hsvToRgb(angle,dist/R,_v);
+      img.data[i]=r;img.data[i+1]=g;img.data[i+2]=b;img.data[i+3]=255;
+    }}
+    wCtx.putImageData(img,0,0);
+    const cx=R+Math.cos(_h*2*Math.PI-Math.PI)*_s*R;
+    const cy=R+Math.sin(_h*2*Math.PI-Math.PI)*_s*R;
+    wCtx.beginPath();wCtx.arc(cx,cy,8,0,Math.PI*2);
+    wCtx.strokeStyle='white';wCtx.lineWidth=2.5;wCtx.stroke();
+    wCtx.beginPath();wCtx.arc(cx,cy,7,0,Math.PI*2);
+    wCtx.strokeStyle='rgba(0,0,0,.35)';wCtx.lineWidth=1;wCtx.stroke();
+  }
+  function drawBright(){
+    const [r,g,b]=hsvToRgb(_h,_s,1);
+    const grad=bCtx.createLinearGradient(0,0,220,0);
+    grad.addColorStop(0,'#000');
+    grad.addColorStop(1,'rgb('+r+','+g+','+b+')');
+    bCtx.fillStyle=grad;bCtx.fillRect(0,0,220,18);
+    const cx=_v*220;
+    bCtx.beginPath();bCtx.arc(cx,9,7,0,Math.PI*2);
+    bCtx.strokeStyle='white';bCtx.lineWidth=2.5;bCtx.stroke();
+    bCtx.beginPath();bCtx.arc(cx,9,6,0,Math.PI*2);
+    bCtx.strokeStyle='rgba(0,0,0,.35)';bCtx.lineWidth=1;bCtx.stroke();
+  }
+  function apply(){
+    const [r,g,b]=hsvToRgb(_h,_s,_v);
+    const hex=rgbToHex(r,g,b);
+    const hexInp=document.getElementById('lm-hex');
+    const hid=document.getElementById('lm-clr');
+    const prev=document.getElementById('lm-preview');
+    if(hexInp)hexInp.value=hex;
+    if(hid)hid.value=hex;
+    if(prev)prev.style.background=hex;
+    drawWheel();drawBright();
+  }
+  function fromHex(hex){
+    const rgb=hexToRgb(hex);if(!rgb)return;
+    [_h,_s,_v]=rgbToHsv(rgb[0],rgb[1],rgb[2]);
+    apply();
+  }
+
+  // init
+  fromHex(document.getElementById('lm-clr')?.value||'#62D0AA');
+
+  // wheel drag
+  let _wDrag=false;
+  function wheelPick(e){
+    const rect=wheel.getBoundingClientRect();
+    const px=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+    const py=(e.touches?e.touches[0].clientY:e.clientY)-rect.top;
+    const dx=px-R,dy=py-R,dist=Math.sqrt(dx*dx+dy*dy);
+    _h=(Math.atan2(dy,dx)+Math.PI)/(2*Math.PI);
+    _s=Math.min(dist/R,1);
+    apply();
+  }
+  wheel.addEventListener('mousedown',e=>{_wDrag=true;wheelPick(e);e.preventDefault();});
+  wheel.addEventListener('touchstart',e=>{e.preventDefault();_wDrag=true;wheelPick(e);},{passive:false});
+  window.addEventListener('mousemove',e=>{if(_wDrag)wheelPick(e);});
+  window.addEventListener('mouseup',()=>{_wDrag=false;});
+  wheel.addEventListener('touchmove',e=>{e.preventDefault();wheelPick(e);},{passive:false});
+  wheel.addEventListener('touchend',()=>{_wDrag=false;});
+
+  // brightness drag
+  let _bDrag=false;
+  function brightPick(e){
+    const rect=bright.getBoundingClientRect();
+    const x=(e.touches?e.touches[0].clientX:e.clientX)-rect.left;
+    _v=Math.max(0,Math.min(1,x/220));
+    apply();
+  }
+  bright.addEventListener('mousedown',e=>{_bDrag=true;brightPick(e);e.preventDefault();});
+  bright.addEventListener('touchstart',e=>{e.preventDefault();_bDrag=true;brightPick(e);},{passive:false});
+  window.addEventListener('mousemove',e=>{if(_bDrag)brightPick(e);});
+  window.addEventListener('mouseup',()=>{_bDrag=false;});
+  bright.addEventListener('touchmove',e=>{e.preventDefault();brightPick(e);},{passive:false});
+  bright.addEventListener('touchend',()=>{_bDrag=false;});
+
+  // hex input
+  const hexInp=document.getElementById('lm-hex');
+  if(hexInp){
+    hexInp.addEventListener('input',()=>{
+      let v=hexInp.value.trim();
+      if(!v.startsWith('#'))v='#'+v;
+      if(/^#[0-9a-fA-F]{6}$/.test(v))fromHex(v);
+    });
+    hexInp.addEventListener('blur',()=>{
+      let v=hexInp.value.trim();
+      if(!v.startsWith('#'))v='#'+v;
+      if(!/^#[0-9a-fA-F]{6}$/.test(v)){const hid=document.getElementById('lm-clr');hexInp.value=hid?.value||'#62D0AA';}
+    });
+  }
 }
 
 function saveLabel(eid){const name=el('lm-name')?.value.trim();if(!name)return;const label={id:eid||uid(),name,color:el('lm-clr')?.value||COLORS[0]};saveWithUndo(eid?'Edit label':'Add label');if(eid){const i=S.labels.findIndex(l=>l.id===eid);if(i>=0)S.labels[i]=label;}else S.labels.push(label);saveNow();closeModal();render();}
