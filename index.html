@@ -1493,8 +1493,10 @@ let _syncChannel=null;       // Supabase realtime channel
 let _saveDebounce=null;      // debounce timer for rapid saves
 let _saveQueue=null;         // pending save while one is in flight
 let _saving=false;           // save in flight flag
-let _saveCount=0;
-let _initStarted=false;      // prevents double-init            // counts successful saves, triggers history snapshots
+let _saveCount=0;            // counts successful saves, triggers history snapshots
+let _consecutiveSaveFailures=0; // alert user after repeated failures
+let _lastSavePayloadCounts=null; // {tasks,projects,members} written on last successful save
+let _initStarted=false;      // prevents double-init
 let _online=true;            // connectivity flag
 
 /* ── Undo/redo ── */
@@ -1752,21 +1754,100 @@ async function _doSave(){
   if(ok){
     _lastSavedAt=now;
     _saveCount++;
+    _consecutiveSaveFailures=0;
+    // Record what counts were actually written so we can spot payload drift later
+    _lastSavePayloadCounts={
+      tasks:(S.tasks||[]).length,
+      projects:(S.projects||[]).length,
+      members:(S.members||[]).length,
+      labels:(S.labels||[]).length,
+    };
     if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
     const ts=new Date(now).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
     _online=true; // reset on successful save — connection is back
-    _setSyncStatus('synced',`Saved ${ts}`);
+    _setSyncStatus('synced',`Saved ${ts} · ${_lastSavePayloadCounts.tasks}t ${_lastSavePayloadCounts.projects}p`);
     try{_saveLocalBackup();}catch(e){console.warn('Local backup failed:',e);}
   } else {
+    _consecutiveSaveFailures++;
     if(_lastSaveError){ // only show error if we have a real reason
       _setSyncStatus('error','⚠ '+_lastSaveError);
     } else {
       _setSyncStatus('saving'); // stay in "saving" state — will retry
     }
     _online=false;
+    // Alert loudly after 3 consecutive failures so data loss is visible
+    if(_consecutiveSaveFailures===3){
+      console.error('ProjectFlow: 3 consecutive save failures. Last error:',_lastSaveError||'(unknown)');
+      const el=document.getElementById('sync-status');
+      if(el)el.title='Save failing repeatedly — check network and PocketBase connection';
+    }
   }
   if(_saveQueue)_doSave();
 }
+
+/* ── Save health diagnostic (call window._pfDiag() from browser console) ──
+ * Runs a full round-trip: saves current state, reads it back from PocketBase,
+ * compares counts, checks localStorage backup. Logs a pass/fail report.
+ * Safe to call at any time — won't modify your data.
+ */
+async function _pfDiag(){
+  console.group('%c ProjectFlow Save Diagnostic','color:#4ea8de;font-weight:700;font-size:13px;');
+  const mem={tasks:(S.tasks||[]).length,projects:(S.projects||[]).length,
+              members:(S.members||[]).length,labels:(S.labels||[]).length};
+  console.log('In-memory counts:',mem);
+
+  // 1. localStorage check
+  try{
+    const ls=JSON.parse(localStorage.getItem('pf4')||'{}');
+    const lsCounts={tasks:(ls.tasks||[]).length,projects:(ls.projects||[]).length,
+                    members:(ls.members||[]).length,labels:(ls.labels||[]).length};
+    const lsMatch=lsCounts.tasks===mem.tasks&&lsCounts.projects===mem.projects;
+    console.log(lsMatch?'✅':'⚠️ ','localStorage counts:',lsCounts,lsMatch?'(matches memory)':'(DRIFT — stale or not yet flushed)');
+  }catch(e){console.error('❌ localStorage read failed:',e);}
+
+  // 2. Backup check
+  try{
+    const bk=JSON.parse(localStorage.getItem('pf4_backups')||'[]');
+    if(bk.length>0){
+      const latest=bk[bk.length-1];
+      const latestD=JSON.parse(latest.data||'{}');
+      console.log('✅ Rolling backup: '+bk.length+' snapshots, latest at '+latest.ts
+        +' ('+( (latestD.tasks||[]).length )+'t '+( (latestD.projects||[]).length )+'p)');
+    } else {
+      console.warn('⚠️  No rolling backups found in localStorage');
+    }
+  }catch(e){console.error('❌ Backup read failed:',e);}
+
+  // 3. PocketBase round-trip
+  if(!_pbToken){console.warn('⚠️  Not signed in — cannot verify PocketBase');console.groupEnd();return;}
+  console.log('🔄 Triggering saveNow() then reading back from PocketBase…');
+  saveNow();
+  // Wait for the async save to complete (up to 8s)
+  let waited=0;
+  while(_saving&&waited<8000){await new Promise(r=>setTimeout(r,200));waited+=200;}
+  if(_saving){console.error('❌ Save still in flight after 8s — possible hang');console.groupEnd();return;}
+  try{
+    const row=await pbGet();
+    if(!row||!row.data){console.error('❌ PocketBase read returned nothing');console.groupEnd();return;}
+    const pb=typeof row.data==='string'?JSON.parse(row.data):row.data;
+    const pbCounts={tasks:(pb.tasks||[]).length,projects:(pb.projects||[]).length,
+                    members:(pb.members||[]).length,labels:(pb.labels||[]).length};
+    const allMatch=pbCounts.tasks===mem.tasks&&pbCounts.projects===mem.projects
+                  &&pbCounts.members===mem.members&&pbCounts.labels===mem.labels;
+    console.log(allMatch?'✅':'❌ ','PocketBase counts:',pbCounts,allMatch?'(matches memory)':'(MISMATCH — data may not have saved!)');
+    if(!allMatch){
+      console.error('Mismatch detail — memory:',mem,'  PocketBase:',pbCounts);
+      console.error('This means the last save did not persist all data. Check _lastSaveError:',_lastSaveError||'(none)');
+    }
+    console.log('Last saved at:',_lastSavedAt,'  PB record updated:',row.updated||row.updated_at);
+  }catch(e){console.error('❌ PocketBase read failed:',e);}
+
+  console.log('─── Summary ───');
+  console.log('Consecutive failures:',_consecutiveSaveFailures,'  Last payload counts:',_lastSavePayloadCounts);
+  console.log('Token present:',!!_pbToken,'  Record ID:',_pbRecordId||'(none)');
+  console.groupEnd();
+}
+window._pfDiag=_pfDiag; // expose to browser console
 
 /* ── Local rolling backup ── */
 function _saveLocalBackup(){
