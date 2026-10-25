@@ -1,4 +1,3 @@
-<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -2119,7 +2118,7 @@ const PF=PFSync.create({
   readStored:_pfReadStored,
   writeStored:_pfWriteStored,
   stash:_pfStash,
-  validate:()=>_validateBeforeSave(),
+  validate:()=>_pfSchemaTooNew?{ok:false,reason:'This workspace was saved by a newer version of ProjectFlow — refresh the page'}:_validateBeforeSave(),
   status:(k,m)=>_pfConn(k,m),
   author:()=>_pbUser?(_pbUser.id||_pbUser.email||null):null,
   authorName:()=>_pbUser?(_pbUser.name||_pbUser.email||null):null,
@@ -2317,6 +2316,7 @@ function _pfConn(k,m){
     _online=true;_consecutiveSaveFailures=0;
     _setSyncStatus('synced','Saved '+_pfTime(Date.now())+' · '+(S.tasks||[]).length+'t '+(S.projects||[]).length+'p');
     _pfBanner(null);
+    _pfCheckSizeOnce();
   }else if(k==='saving'){
     _pfUnsynced=true;
     if(_pfBadSince){const n=_pfPending().n;_setSyncStatus(_pfLastKind==='error'?'error':'offline',_pfLastKind==='error'?(_pfLastMsg||'Save failed'):'Offline · '+n+' waiting');}
@@ -2358,6 +2358,7 @@ function _pfBanner(k,m){
 
 function showSyncDetails(){
   const p=_pfPending(true);
+  const sz=_pfSizeReport();
   const bad=!!_pfBadSince;
   const state=bad?(_pfLastKind==='error'?'Not saving':'Offline'):(_pfUnsynced?'Saving…':'All changes saved');
   const colour=bad?(_pfLastKind==='error'?'var(--red)':'var(--yellow)'):'var(--green)';
@@ -2371,9 +2372,12 @@ function showSyncDetails(){
     +(bad?'<div style="color:var(--text2)">Problem since '+_pfTime(_pfBadSince)+': '+_pfEsc(_pfLastMsg||'cannot reach the server')+'</div>':'')
     +'<div style="color:var(--text2)">Waiting to sync: <b>'+p.n+'</b>'+(p.n?'<ul style="margin:6px 0 0 18px;padding:0">'+items+(p.n>8?'<li>…and '+(p.n-8)+' more</li>':'')+'</ul>':'')+'</div>'
     +(p.n?'<div style="color:var(--muted);font-size:.72rem">These are stored on this device and will be merged with your team’s changes when the connection returns.</div>':'')
+    +'<div style="color:var(--text2)">Workspace size: <b>'+_pfKB(sz.total)+'</b> ('+sz.pct+'% of the 10 MB limit) · '+sz.counts.tasks+' tasks · '+sz.counts.projects+' events'+(sz.images.count?' · '+sz.images.count+' embedded image(s) '+_pfKB(sz.images.bytes):'')+'</div>'
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'
     +'<button class="btn btn-acc btn-sm" onclick="PF.saveNow();closeModal()">Retry now</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="_pfRunHealth()">Run health check</button>'
     +'<button class="btn btn-ghost btn-sm" onclick="_pfDownloadCopy()">Save a copy to this computer</button></div>'
+    +'<div id="pf-health" style="font-size:.74rem;color:var(--text2);line-height:1.5"></div>'
     +'</div></div></div>';
   mc.style.display='flex';
 }
@@ -2394,6 +2398,161 @@ function _pfStartConn(){
   st.textContent='#pf-conn{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:950;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1.5px solid var(--yellow);color:var(--text2);border-radius:11px;padding:9px 14px;font-size:.74rem;line-height:1.45;box-shadow:0 8px 32px rgba(0,0,0,.45);width:min(560px,calc(100vw - 24px))}';
   document.head.appendChild(st);
 })();
+
+async function _pfRunHealth(){
+  const out=document.getElementById('pf-health');if(!out)return;
+  out.textContent='Checking…';
+  try{
+    const r=await _pfHealth();
+    window._pfLastHealth=r;
+    out.innerHTML='<b>'+(r.problems.length?'Needs attention':'All good')+'</b>'
+      +'<ul style="margin:6px 0 0 18px;padding:0">'
+      +(r.problems.map(x=>'<li>'+_pfEsc(x)+'</li>').join(''))
+      +'<li>Server: '+_pfEsc(r.server)+'</li><li>Waiting to sync: '+r.pending+'</li></ul>'
+      +'<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="_pfCopyDiag()">Copy diagnostics</button>';
+  }catch(e){out.textContent='Health check failed: '+e.message;}
+}
+function _pfCopyDiag(){
+  const txt=JSON.stringify(window._pfLastHealth||{},null,1);
+  (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>showToast('Diagnostics copied')).catch(()=>{window.prompt('Copy these diagnostics:',txt.slice(0,2000));});
+}
+let _pfSizeChecked=false;
+function _pfCheckSizeOnce(){
+  if(_pfSizeChecked)return;_pfSizeChecked=true;
+  setTimeout(()=>{try{const r=_pfSizeReport();if(r.pct>=70)showToast('Workspace is '+r.pct+'% of its size limit — see the sync details',6000);}catch(_){}},4000);
+}
+
+/* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
+const PF_SCHEMA=1;              // bump when adding a migration below
+let _pfSchemaTooNew=false;
+
+/* One-time migrations. Each runs exactly once per workspace (the version is stored in the data itself). */
+const _PF_MIGRATIONS=[
+  /* v1: baseline — stamps existing workspaces; nothing to change */
+];
+function _pfMigrate(){
+  const cur=typeof S._schema==='number'?S._schema:0;
+  if(cur>PF_SCHEMA){_pfSchemaTooNew=true;return;}      // data written by a NEWER app: never touch it
+  _pfSchemaTooNew=false;
+  if(cur===PF_SCHEMA)return;
+  for(let v=cur+1;v<=PF_SCHEMA;v++){const m=_PF_MIGRATIONS[v-1];if(m){try{m();}catch(e){console.error('migration '+v+' failed',e);return;}}}
+  S._schema=PF_SCHEMA;
+}
+
+/* Rules that keep every view agreeing with every other view. Deterministic and idempotent, so every device
+   reaches the same answer; they only ever repair links — nothing is deleted. Runs on every merge. */
+function _pfRepairState(){
+  const tasks=S.tasks;
+  if(!Array.isArray(tasks)||!tasks.length)return;
+  const byId=new Map();
+  for(const t of tasks)byId.set(t.id,t);
+  // 1. dangling / self parent links -> top level; dangling blockers dropped
+  for(const t of tasks){
+    if(t.parentId&&(t.parentId===t.id||!byId.has(t.parentId)))t.parentId=null;
+    if(Array.isArray(t.blockedBy)&&t.blockedBy.length){
+      const f=t.blockedBy.filter(b=>b!==t.id&&byId.has(b));
+      if(f.length!==t.blockedBy.length)t.blockedBy=f;
+    }
+  }
+  // 2. parent loops (two people re-parenting at once): cut at the smallest id in the loop
+  for(const t of tasks){
+    const seen=new Set();let cur=t;
+    while(cur&&cur.parentId&&!seen.has(cur.id)){seen.add(cur.id);cur=byId.get(cur.parentId);}
+    if(cur&&cur.parentId&&seen.has(cur.id)){
+      const loop=[];let x=cur;
+      do{loop.push(x);x=byId.get(x.parentId);}while(x&&x!==cur&&loop.length<=tasks.length);
+      loop.sort((a,b)=>String(a.id)<String(b.id)?-1:1)[0].parentId=null;
+    }
+  }
+  // 3. a subtask lives in its parent's event (parent first, so grandchildren follow)
+  const depth=new Map();
+  const dOf=t=>{if(depth.has(t.id))return depth.get(t.id);let d=0,c=t;while(c&&c.parentId&&d<50){c=byId.get(c.parentId);d++;}depth.set(t.id,d);return d;};
+  tasks.slice().sort((a,b)=>dOf(a)-dOf(b)).forEach(t=>{
+    if(t.parentId){const p=byId.get(t.parentId);if(p&&t.projectId!==p.projectId)t.projectId=p.projectId;}
+  });
+  // 4. done and kanban column always agree (completion wins; un-ticked tasks return to To Do / Blocked)
+  const kidsOf=new Map();
+  for(const t of tasks)if(t.parentId){let a=kidsOf.get(t.parentId);if(!a)kidsOf.set(t.parentId,a=[]);a.push(t);}
+  const open=d=>{const k=kidsOf.get(d.id);return k&&k.length?!k.every(c=>c.done):!d.done;};
+  const cols=new Set(['todo','blocked','in-progress','review','done']);
+  for(const t of tasks){
+    if(t.done&&t.kStatus!=='done')t.kStatus='done';
+    else if(!t.done&&t.kStatus==='done')t.kStatus=(t.blockedBy||[]).some(b=>{const d=byId.get(b);return d&&open(d);})?'blocked':'todo';
+    else if(!cols.has(t.kStatus))t.kStatus=t.done?'done':'todo';
+  }
+}
+
+/* ── Edit only what the user changed ──
+   A modal remembers the item as it was when opened. On save, only fields the user actually altered are applied,
+   so a teammate's change to a different field (made while the modal was open) can never be rolled back. */
+const _pfOpenSnap={};
+function _pfSnapOpen(type,data){
+  const coll={task:'tasks',project:'projects',member:'members'}[type];
+  if(!coll||typeof data!=='string'||!data)return;
+  const o=(S[coll]||[]).find(x=>x.id===data);
+  if(o)_pfOpenSnap[coll+':'+data]=PFSync.clone(o);
+}
+const _pfBlank=v=>v===undefined||v===null||v==='';
+const _pfSame=(a,b)=>(_pfBlank(a)&&_pfBlank(b))||PFSync.eq(a,b);
+function _pfApplyEdit(coll,id,next){
+  const list=S[coll]||[];
+  const cur=list.find(x=>x.id===id);
+  if(!cur){showToast('That item was deleted by someone else — your edit was not applied',4000);return false;}
+  const snap=_pfOpenSnap[coll+':'+id];
+  if(!snap){const i=list.indexOf(cur);list[i]=next;return true;}     // no record of the opening state: replace as before
+  for(const k of Object.keys(next)){
+    if(k==='id')continue;
+    if(!_pfSame(next[k],snap[k])&&!_pfSame(next[k],cur[k]))cur[k]=PFSync.clone(next[k]);
+  }
+  _pfOpenSnap[coll+':'+id]=PFSync.clone(cur);                          // later saves from the same open modal diff against this
+  return true;
+}
+
+/* ── Workspace size: so growth never surprises us ── */
+function _pfSizeReport(){
+  const proj=PF._debug().projectNow();
+  const out={total:0,keys:[],images:{count:0,bytes:0},counts:{tasks:(S.tasks||[]).length,projects:(S.projects||[]).length,members:(S.members||[]).length,activity:(S.activity||[]).length,tombstones:Object.keys(S._tomb||{}).length}};
+  for(const k of Object.keys(proj)){const n=JSON.stringify(proj[k]).length;out.keys.push([k,n]);out.total+=n;}
+  out.keys.sort((a,b)=>b[1]-a[1]);
+  const walk=v=>{if(typeof v==='string'){if(v.length>1000&&v.startsWith('data:')){out.images.count++;out.images.bytes+=v.length;}}else if(v&&typeof v==='object')for(const k in v)walk(v[k]);};
+  walk(proj);
+  out.limit=10000000;out.pct=Math.round(out.total/out.limit*100);
+  return out;
+}
+const _pfKB=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':Math.round(n/1000)+' KB';
+
+/* ── Health check: rules, size, and does the server agree with this screen? ── */
+const _pfErrors=[];
+function _pfNoteErr(m){_pfErrors.push({t:Date.now(),m:String(m).slice(0,300)});if(_pfErrors.length>20)_pfErrors.shift();}
+window.addEventListener('error',e=>_pfNoteErr(e.message));
+window.addEventListener('unhandledrejection',e=>_pfNoteErr('promise: '+(e.reason&&e.reason.message||e.reason)));
+
+async function _pfHealth(){
+  const rep={at:new Date().toISOString(),schema:{data:S._schema||0,app:PF_SCHEMA},problems:[],size:_pfSizeReport(),pending:PF.pending().length,errors:_pfErrors.slice(-8)};
+  // rule violations (would be repaired on the next sync)
+  const snap=PFSync.clone(S.tasks||[]);
+  const before=PFSync.stable(snap);
+  const saveS=S;S={tasks:snap,projects:[],_t:1};try{_pfRepairState();}finally{S=saveS;}
+  if(PFSync.stable(snap)!==before)rep.problems.push('Some tasks break the consistency rules (they will be repaired automatically on the next sync)');
+  if(rep.size.pct>=70)rep.problems.push('Workspace is '+rep.size.pct+'% of the 10 MB limit');
+  if(rep.size.images.count)rep.problems.push(rep.size.images.count+' embedded image(s) using '+_pfKB(rep.size.images.bytes));
+  if(_pfSchemaTooNew)rep.problems.push('This workspace was saved by a newer version of ProjectFlow — refresh the page');
+  // does the server hold what this screen shows?
+  try{
+    const full=await _pbGetFull();
+    if(!full){rep.server='no record yet';}
+    else{
+      const d=typeof full.data==='string'?JSON.parse(full.data):full.data;
+      ['_wid','_seq','_lineage','_clientId','_by','_byName'].forEach(k=>delete d[k]);
+      const loc=PF._debug().projectNow();
+      const diff=PFSync.diffEnt(d,loc,new Set(PF_LOCAL_KEYS));
+      rep.server=diff.length?diff.length+' difference(s) between this screen and the server (unsent changes or a teammate\'s newer edit)':'matches this screen';
+      rep.serverDiffs=diff.slice(0,10).map(c=>c.c+':'+c.i+':'+c.t);
+    }
+  }catch(e){rep.server='could not reach the server ('+e.message+')';rep.problems.push('Server unreachable: '+e.message);}
+  return rep;
+}
+window._pfHealth=_pfHealth;window._pfSize=()=>{const r=_pfSizeReport();console.table(r.keys.slice(0,10).map(([k,n])=>({key:k,size:_pfKB(n)})));return r;};
 
 /* ── Sync state ── */
 let _lastSavedAt=null;       // ISO string of last save we wrote
@@ -3092,6 +3251,8 @@ function _applyDefaults(){
   if(!S.settings.phaseDefaults)S.settings.phaseDefaults={planning:2,prelaunch:6,postEvent:2};
   if(!S.settings.shortcuts)S.settings.shortcuts={};
   (S.tasks||[]).forEach(t=>{if(t.phase===undefined)t.phase='';});
+  _pfMigrate();
+  _pfRepairState();
 }
 
 /* ── Real-time: events and polls only say "something changed" — PF then fetches, merges, and writes if needed.
@@ -3229,15 +3390,28 @@ let S={
 const uid=()=>Math.random().toString(36).slice(2,10);
 const toISO=d=>d instanceof Date?d.toISOString().slice(0,10):d;
 const doy=d=>{const s=new Date(d.getFullYear(),0,0);return Math.floor((d-s)/86400000);}
-const fmtD=s=>{if(!s)return'';const d=new Date(s+'T00:00:00');return d.toLocaleDateString('en-GB',{day:'numeric',month:'short',year:'numeric'});}
+const _fdFmt=new Intl.DateTimeFormat('en-GB',{day:'numeric',month:'short',year:'numeric'});const _fdMemo=new Map();
+const fmtD=s=>{if(!s)return'';let r=_fdMemo.get(s);if(r===undefined){r=_fdFmt.format(new Date(s+'T00:00:00'));if(_fdMemo.size>5000)_fdMemo.clear();_fdMemo.set(s,r);}return r;}
 const fmtGBP=n=>{if(n===null||n===undefined)return'£0';const abs=Math.abs(n);const str=abs>=1000?(abs/1000).toFixed(1).replace(/\.0$/,'')+'k':abs.toFixed(2).replace(/\.00$/,'');return(n<0?'-£':'£')+str;}
 const fmtS=n=>n<0?`-£${Math.abs(n).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})}`:`£${n.toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2})}`;
 const overdue=d=>{if(!d)return false;return new Date(d+'T00:00:00')<new Date(new Date().toDateString());}
-const getProject=id=>S.projects.find(p=>p.id===id);
-const getMember=id=>S.members.find(m=>m.id===id);
+/* Lookups are indexed only while a render pass is running (nothing mutates data mid-render), so a screen with
+   thousands of tasks costs one scan instead of one scan per row. Outside render they behave exactly as before. */
+let _rcDepth=0,_rcK=null,_rcT=null,_rcP=null,_rcM=null;
+function _rcOn(){_rcDepth++;}
+function _rcOff(){if(--_rcDepth<=0){_rcDepth=0;_rcK=_rcT=_rcP=_rcM=null;}}
+const _rcIdx=(list)=>{const m=new Map();for(const x of list)if(!m.has(x.id))m.set(x.id,x);return m;};
+const getProject=id=>{if(_rcDepth){if(!_rcP)_rcP=_rcIdx(S.projects);return _rcP.get(id);}return S.projects.find(p=>p.id===id);};
+const getMember=id=>{if(_rcDepth){if(!_rcM)_rcM=_rcIdx(S.members);return _rcM.get(id);}return S.members.find(m=>m.id===id);};
 const getLabel=id=>S.labels.find(l=>l.id===id);
-const getTask=id=>S.tasks.find(t=>t.id===id);
-const kids=id=>S.tasks.filter(t=>t.parentId===id);
+const getTask=id=>{if(_rcDepth){if(!_rcT)_rcT=_rcIdx(S.tasks);return _rcT.get(id);}return S.tasks.find(t=>t.id===id);};
+const kids=id=>{
+  if(_rcDepth&&id!=null){
+    if(!_rcK){_rcK=new Map();for(const t of S.tasks){if(t.parentId){let a=_rcK.get(t.parentId);if(!a)_rcK.set(t.parentId,a=[]);a.push(t);}}}
+    const a=_rcK.get(id);return a?a.slice():[];
+  }
+  return S.tasks.filter(t=>t.parentId===id);
+};
 
 function lcHtml(id){const l=getLabel(id);if(!l)return'';return`<span class="lchip" style="background:${l.color}22;color:${l.color};border:1px solid ${l.color}44;">${l.name}</span>`;}
 
@@ -3256,6 +3430,7 @@ function labelsInherited(t){return(t.labels===null||t.labels===undefined)&&!!t.p
 /* ── Blocker helpers ── */
 function syncBlockedStatus(id){
   const t=getTask(id);if(!t)return;
+  if(!t.done&&t.kStatus==='done')t.kStatus='todo'; // un-ticked tasks leave the Done column
   const hasActiveBlocker=(t.blockedBy||[]).some(bid=>{const d=getTask(bid);return d&&taskComp(d)<100;});
   if(hasActiveBlocker&&t.kStatus!=='blocked'&&t.kStatus!=='done'){t.kStatus='blocked';}
   else if(!hasActiveBlocker&&t.kStatus==='blocked'){t.kStatus=t.done?'done':'todo';}
@@ -4637,7 +4812,8 @@ document.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[
 document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx,dy=Math.abs(e.changedTouches[0].clientY-sy);if(dy>40)return;if(sx<60&&dx>55&&!el('panel').classList.contains('open'))togglePanel();if(dx<-55&&el('panel').classList.contains('open'))closePanel();},{passive:true});
 
 /* ════ RENDER DISPATCH ════ */
-function render(){
+function render(){_rcOn();try{return _renderImpl();}finally{_rcOff();}}
+function _renderImpl(){
   const c=el('content');
   if(!c)return;
   hideBlockTooltip();
@@ -4675,6 +4851,7 @@ function ecToggle(projId){
   if(!window._ecTab[projId])window._ecTab[projId]='tasks';
   const card=document.querySelector(`.ec-card[data-proj="${projId}"]`);
   if(!card)return;
+  if(window._ecExpanded[projId]&&card.querySelector('.ec-pane[data-lazy="1"]')){render();return;} // task rows are only built for expanded events
   card.classList.toggle('expanded',!!window._ecExpanded[projId]);
   const body=card.querySelector('.ec-body');
   const chev=card.querySelector('.ec-chevron');
@@ -4863,9 +5040,9 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
           </div>
 
           <!-- Tasks pane -->
-          <div class="ec-pane${curTab==='tasks'?' active':''}" data-pane="tasks">
-            ${quickAddBarHtml(p.id)}
-            ${top.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">${mf?`No tasks assigned to ${getMember(mf)?.name?.split(' ')[0]||'them'} in this project.`:'No tasks yet.'}</div>`:`<div>${taskSortBarHtml('ec')}<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(top).map(t=>renderTaskRow(t,0,false)).join('')}</div></div>`}
+          <div class="ec-pane${curTab==='tasks'?' active':''}" data-pane="tasks"${actuallyExp?'':' data-lazy="1"'}>
+            ${actuallyExp?quickAddBarHtml(p.id):''}
+            ${actuallyExp?(top.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">${mf?`No tasks assigned to ${getMember(mf)?.name?.split(' ')[0]||'them'} in this project.`:'No tasks yet.'}</div>`:`<div>${taskSortBarHtml('ec')}<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(top).map(t=>renderTaskRow(t,0,false)).join('')}</div></div>`):''}
           </div>
 
           <!-- Sponsors pane -->
@@ -8825,6 +9002,7 @@ function _closeAllMs(){
 }
 
 function openModal(type,data){
+  _pfSnapOpen(type,data);
   _pfSetEditing(type==='task'&&typeof data==='string'&&data?data:null);
   const mc=el('mc');let html='';
   switch(type){
@@ -9073,7 +9251,7 @@ function saveProject(eid){
       // Find newly added sponsors
       const oldSpIds=(old.sponsors||[]).map(s=>s.id);
       const addedSponsors=proj.sponsors.filter(s=>!oldSpIds.includes(s.id));
-      S.projects[i]={...old,...proj};
+      _pfApplyEdit('projects',eid,{...old,...proj});
       addedSponsors.forEach(sp=>autoGenerateSponsorTasks(eid,sp));
     }
   } else {
@@ -9560,7 +9738,7 @@ function saveTask(eid,defParent,tmplId){
   const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
   if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   saveWithUndo(eid?'Edit task':'Add task');
-  if(eid){const i=S.tasks.findIndex(t=>t.id===eid);if(i>=0)S.tasks[i]=task;}else S.tasks.push(task);
+  if(eid){_pfApplyEdit('tasks',eid,task);}else S.tasks.push(task);
   saveNow();
   if(tmplId){applyTmpl(tmplId,task.id,task.projectId);}
   closeModal();render();
@@ -10137,13 +10315,13 @@ function saveMember(eid){
         await new Promise(res=>{const r=new FileReader();r.onload=ev=>{member.photoUrl=ev.target.result;res();};r.readAsDataURL(photoFile);});
       }
       saveWithUndo(eid?'Edit member':'Add member');
-      if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);
+      if(eid){_pfApplyEdit('members',eid,member);}else S.members.push(member);
       saveNow();closeModal();render();
     })();
     return;
   }
   saveWithUndo(eid?'Edit member':'Add member');
-  if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);
+  if(eid){_pfApplyEdit('members',eid,member);}else S.members.push(member);
   saveNow();closeModal();render();
   }
 
@@ -13028,5 +13206,3 @@ function pickC(swatchId,inputId,color,el2){
 
 </body>
 </html>
-
-</body></html>
