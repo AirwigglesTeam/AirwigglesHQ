@@ -3514,6 +3514,30 @@ function _onSignedIn(user){
   if(app)app.style.display='none';
 })();
 
+// Pre-auth branding fetch — shows custom logo/name on login screen before user signs in
+(function _preAuthBranding(){
+  try{
+    fetch(PB_URL+'/api/collections/workspace_state/records?filter=(workspace%3D"'+PB_WORKSPACE+'")&perPage=1&fields=data',{cache:'no-store'})
+      .then(r=>r.ok?r.json():null)
+      .then(d=>{
+        if(!d||!d.items||!d.items.length)return;
+        let s;try{s=JSON.parse(d.items[0].data||'{}');}catch(e){return;}
+        const logo=(s.settings||{}).logoUrl;
+        const name=(s.settings||{}).brandName;
+        const pwLogo=document.getElementById('pw-logo');
+        if(pwLogo&&logo){
+          pwLogo.classList.add('custom-logo');
+          pwLogo.style.background='transparent';
+          pwLogo.innerHTML=`<img src="${logo}" style="width:142%;height:142%;object-fit:cover;transform:rotate(-45deg);flex-shrink:0;display:block;" alt="">`;
+        }
+        if(name){
+          const bn=document.getElementById('pw-brand-name');
+          if(bn)bn.textContent=name.split('—')[0].trim()||name;
+        }
+      }).catch(()=>{});
+  }catch(e){}
+})();
+
 // Keyboard: Enter navigates email→password→submit, also handles forgot panel
 document.addEventListener('keydown',function(e){
   if(e.key==='Enter'&&el('pw-screen').style.display!=='none'){
