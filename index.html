@@ -4730,7 +4730,7 @@ function renderTaskRow(t,depth=0,showProj=false){
     ${proj?`<span class="ti-proj-chip"><span style="width:6px;height:6px;border-radius:50%;background:${proj.color};flex-shrink:0;"></span><span class="ti-proj-name">${proj.name}</span></span>`:''}
   </div>
   <div class="ti-col ti-col-av">
-    ${(t.assignees||[]).slice(0,3).map(id=>avHtml(id,18)).join('')}
+    ${(t.assignees||[]).slice(0,10).map(id=>avHtml(id,18)).join('')}
   </div>
   <div class="ti-col ti-col-date">
     ${t.endDate?`<span class="ti-date${od?' od':''}">${od?`<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:2px;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`:''} ${fmtD(t.endDate)}</span>`:''}
@@ -4947,7 +4947,7 @@ function quickAddSub(parentId){
     <span style="color:var(--muted);font-size:.75rem;flex-shrink:0;">↳</span>
     <input class="inline-sub-inp" placeholder="Subtask name…" data-parent="${parentId}" data-proj="${parent.projectId||''}"
       onfocus="this.closest('.inline-sub-add').querySelector('.inline-sub-desc')?.classList.add('open')">
-    ${hasMems?`<div style="display:flex;gap:3px;align-items:center;">${S.members.map(m=>`<div onclick="isub_toggleMember(this,'${m.id}')" data-mid="${m.id}" title="${m.name}" style="cursor:pointer;border-radius:50%;opacity:.4;transition:all .12s;">${m.photoUrl?`<img src="${m.photoUrl}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;display:block;">`:`<div class="av" style="width:18px;height:18px;background:${m.color};font-size:.4rem;">${m.initials}</div>`}</div>`).join('')}</div>`:''}
+    ${hasMems?`<div style="display:flex;gap:3px;align-items:center;">${S.members.map(m=>{const inh=(parent.assignees||[]).includes(m.id);return`<div onclick="isub_toggleMember(this,'${m.id}')" data-mid="${m.id}" title="${m.name}" style="cursor:pointer;border-radius:50%;opacity:${inh?'1':'.4'};transition:all .12s;${inh?'outline:2px solid var(--acc);outline-offset:1px;':''}">${m.photoUrl?`<img src="${m.photoUrl}" style="width:18px;height:18px;border-radius:50%;object-fit:cover;display:block;">`:`<div class="av" style="width:18px;height:18px;background:${m.color};font-size:.4rem;">${m.initials}</div>`}</div>`;}).join('')}</div>`:''}
     <button class="qa-prio-btn Medium" data-prio="Medium" onclick="qaTogglePrio(this)" title="Priority">M</button>
     <button class="qa-add-btn" style="width:22px;height:22px;font-size:.9rem;" onclick="_commitInlineSubFromBtn(this)" title="Add subtask (Enter)">+</button>
   </div>
@@ -4957,10 +4957,10 @@ function quickAddSub(parentId){
       onmousedown="event.preventDefault()"
       onclick="isub_togglePhase(this)">${ph}</span>`).join(''):''}
     ${hasPhases&&hasLabels?'<div style="width:1px;height:12px;background:var(--border2);flex-shrink:0;"></div>':''}
-    ${hasLabels?S.labels.map(l=>`<span class="qa-label-dot" data-lid="${l.id}" data-name="${l.name}"
-      style="background:${l.color};--label-c:${l.color};"
+    ${hasLabels?S.labels.map(l=>{const parentLabels=effectiveLabels(parent);const inh=parentLabels.some(pl=>pl.id===l.id);return`<span class="qa-label-dot${inh?' active':''}" data-lid="${l.id}" data-name="${l.name}"
+      style="background:${l.color};--label-c:${l.color};${inh?'opacity:1;box-shadow:0 0 0 2px var(--acc);':'opacity:.55;'}"
       onmousedown="event.preventDefault()"
-      onclick="this.classList.toggle('active')" title="${l.name}">${l.name}</span>`).join(''):''}
+      onclick="this.classList.toggle('active');this.style.opacity=this.classList.contains('active')?'1':'0.55';this.style.boxShadow=this.classList.contains('active')?'0 0 0 2px var(--acc)':'none';" title="${l.name}">${l.name}</span>`;}).join(''):''}
     <div style="width:1px;height:12px;background:var(--border2);flex-shrink:0;"></div>
     <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
     <input type="date" class="qa-date-inp" style="color-scheme:dark;" placeholder="Due date">
