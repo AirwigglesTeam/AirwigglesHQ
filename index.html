@@ -1753,6 +1753,7 @@ async function _doSave(){
   _saving=false; // ALWAYS reset — never get stuck
   if(ok){
     _lastSavedAt=now;
+    _pollLastAt=now; // prevent SSE echo from re-applying our own save
     _saveCount++;
     _consecutiveSaveFailures=0;
     // Record what counts were actually written so we can spot payload drift later
@@ -2463,8 +2464,8 @@ function _applyPendingRemote(){
     _pollLastAt=remoteTs;
     return;
   }
-  if(_saveDebounce){
-    // User has unsaved changes — show conflict banner instead of silently waiting
+  if(_saveDebounce||_saving){
+    // Local save is pending or in-flight — don't let remote overwrite unsaved changes
     _showConflictBanner(row,remoteTs);
     _pendingRemote=null;
     return;
