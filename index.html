@@ -1241,6 +1241,9 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
     <button class="rbtn" data-v="templates" data-tip="Templates" onclick="nav('templates')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="2" y="2" width="11" height="14" rx="1.5"/><rect x="7" y="6" width="11" height="12" rx="1.5" fill="var(--surface)" stroke="currentColor"/><path d="M10 10h5M10 13h3"/></svg>
     </button>
+    <button class="rbtn" data-v="activity" data-tip="Activity" onclick="showActivity()">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="7.5"/><path d="M10 5.5V10l3 2"/></svg>
+    </button>
     <button class="rbtn" data-v="settings" data-tip="Settings" onclick="nav('settings')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><circle cx="10" cy="10" r="3"/><path d="M10 2v2M10 16v2M2 10h2M16 10h2M4.2 4.2l1.4 1.4M14.4 14.4l1.4 1.4M4.2 15.8l1.4-1.4M14.4 5.6l1.4-1.4"/></svg>
     </button>
@@ -1649,6 +1652,36 @@ function decodeDiff(d,ref){
   return out;
 }
 
+/* entity-level summary of what differs going from state a to state b (used for change notices + activity log) */
+function diffEnt(a,b,skip){
+  const out=[];
+  const nm=x=>x&&(x.name||x.title||x.label)||null;
+  for(const k of new Set([...Object.keys(a),...Object.keys(b)])){
+    if(k==='_tomb'||k==='activity'||(skip&&skip.has(k)))continue;
+    const av=a[k],bv=b[k];
+    if(eq(av,bv))continue;
+    if(isIdArr(av)||isIdArr(bv)){
+      const am=new Map((Array.isArray(av)?av:[]).filter(hasId).map(x=>[x.id,x]));
+      const bm=new Map((Array.isArray(bv)?bv:[]).filter(hasId).map(x=>[x.id,x]));
+      for(const id of new Set([...am.keys(),...bm.keys()])){
+        const x=am.get(id),y=bm.get(id);
+        if(!x)out.push({c:k,i:id,t:'add',n:nm(y),f:[],v:stable(y)});
+        else if(!y)out.push({c:k,i:id,t:'del',n:nm(x),f:[],v:''});
+        else if(!eq(x,y)){
+          const f=[...new Set([...Object.keys(x),...Object.keys(y)])].filter(q=>!eq(x[q],y[q]));
+          const d={};for(const q of f.slice(0,6)){const w=y[q];if(typeof w==='boolean'||typeof w==='number'||(typeof w==='string'&&w.length<=40))d[q]=w;}
+          out.push({c:k,i:id,t:'mod',n:nm(y),f,v:stable(f.map(q=>y[q])),d});
+        }
+        if(out.length>=200)return out;
+      }
+    }else{
+      const f=isObj(av)&&isObj(bv)?[...new Set([...Object.keys(av),...Object.keys(bv)])].filter(q=>!eq(av[q],bv[q])):[];
+      out.push({c:k,i:null,t:'mod',n:null,f,v:stable(bv)});
+    }
+  }
+  return out;
+}
+
 const withTimeout=(p,ms)=>new Promise((res,rej)=>{
   const t=setTimeout(()=>rej(Object.assign(new Error('timeout'),{timeout:true})),ms);
   p.then(v=>{clearTimeout(t);res(v);},e=>{clearTimeout(t);rej(e);});
@@ -1681,6 +1714,7 @@ function create(env){
   let running=false,again=false,timer=null,persistTimer=null,backoff=0,stopped=false;
   let lastErr=null;
   let seqNow=0;             // highest write sequence number seen/written
+  let wrote=false;           // a write happened this run: schedule a cheap verification afterwards
   let revive=false;         // set by undo/restore: let the next sync re-add items someone else deleted
 
   const S=()=>env.getState();
@@ -1697,8 +1731,8 @@ function create(env){
   function parseRemote(full){
     const d=typeof full.data==='string'?JSON.parse(full.data):clone(full.data);
     if(!isObj(d))throw new Error('Remote state is not an object');
-    const meta={wid:d._wid||null,seq:typeof d._seq==='number'?d._seq:0,lineage:Array.isArray(d._lineage)?d._lineage.slice():(d._wid?[d._wid]:[])};
-    delete d._wid;delete d._lineage;delete d._clientId;delete d._seq;
+    const meta={wid:d._wid||null,seq:typeof d._seq==='number'?d._seq:0,lineage:Array.isArray(d._lineage)?d._lineage.slice():(d._wid?[d._wid]:[]),by:d._by||null,byName:d._byName||null,client:d._clientId||null};
+    delete d._wid;delete d._lineage;delete d._clientId;delete d._seq;delete d._by;delete d._byName;
     env.normalize(d);
     const seed={};
     for(const k of LOCAL){if(k in d){seed[k]=d[k];delete d[k];}}
@@ -1772,7 +1806,7 @@ function create(env){
     const Lp=project(st);
     const ls=stable(Lp);
     const rs=R.str||(R.str=stable(R.proj));
-    let M=null,changed=false,needWrite=false;
+    let M=null,changed=false,needWrite=false,changes=null;
     if(b===null){                         // no shared history at all: remote is the truth
       M=applyTombs(clone(R.proj));
     }else{
@@ -1791,12 +1825,12 @@ function create(env){
       const ms=stable(M);
       changed=ms!==ls;
       needWrite=ms!==rs;
-      if(changed)adopt(M);
+      if(changed){changes=diffEnt(Lp,M,LOCAL);adopt(M);}
     }
     lineage=[...new Set([...(R.meta.lineage||[]),...lineage])].slice(0,LINEAGE_CAP);
     seqNow=Math.max(seqNow,R.meta.seq||0);
     pushH({wid:R.meta.wid,seq:R.meta.seq||0,proj:R.proj});
-    return{changed,needWrite};
+    return{changed,needWrite,changes};
   }
 
   /* One sync cycle: fetch → merge → (write if needed). */
@@ -1815,11 +1849,12 @@ function create(env){
         if(stable(loc)!==(R.str||(R.str=stable(R.proj)))){try{env.stash(JSON.stringify(loc));}catch(_){}}
       }
       const r=mergeStep(R);
-      if(r.changed){try{env.onApplied();}catch(e){console.error(e);}}
+      if(r.changed){try{env.onApplied({by:R.meta.by,byName:R.meta.byName,client:R.meta.client,seq:R.meta.seq,changes:r.changes||[]});}catch(e){console.error(e);}}
       if(!r.needWrite){persistNow();env.status('synced');return;}
     }
     // ── write ──
     if(env.prepare)env.prepare();
+    if(env.beforeWrite&&R){try{env.beforeWrite(diffEnt(R.proj,project(S()),LOCAL));}catch(e){console.error(e);}}
     const snap=clone(project(S()));
     const v=env.validate?env.validate(snap):{ok:true};
     if(!v.ok){env.status('error','⚠ Save blocked: '+v.reason);persistNow();return;}
@@ -1827,7 +1862,7 @@ function create(env){
     const seq=Math.max(seqNow,R?R.meta.seq||0:0)+1;
     const lin=[wid,...lineage.filter(x=>x!==wid)].slice(0,LINEAGE_CAP);
     LOG('put',{wid:wid.slice(0,4),seq});
-    const payload={...snap,_wid:wid,_seq:seq,_lineage:lin,_clientId:env.clientId};
+    const payload={...snap,_wid:wid,_seq:seq,_lineage:lin,_clientId:env.clientId,_by:env.author?env.author():null,_byName:env.authorName?env.authorName():null};
     // Record the write as an ancestor BEFORE sending: if the request errors or its response is lost it may
     // still have landed, and anything we do next must be judged against what we tried to write.
     seqNow=seq;
@@ -1836,6 +1871,7 @@ function create(env){
     persistNow();
     const res=await T.put(JSON.stringify(payload),head?head.id:null);
     rc={token:res.token,proj:snap,meta:{wid,seq,lineage:lin},seed:{},str:null};
+    wrote=true;
     persistNow();
     try{env.onSaved(snap);}catch(e){console.error(e);}
     if(stable(project(S()))!==stable(snap))again=true; // edited while writing
@@ -1850,12 +1886,13 @@ function create(env){
       do{again=false;await cycle();n++;}while(again&&n<6);
       backoff=0;lastErr=null;
       if(again)schedule(1500);
+      else if(wrote){wrote=false;schedule(1500);}   // verify the write wasn't clobbered by a concurrent writer
     }catch(e){
       lastErr=e;
       if(e&&e.retry){schedule(30);}                 // e.g. record was created by someone else meanwhile
       else{
         if(e&&e.fatal){env.status('error','⚠ '+(e.message||'Save failed'));backoff=Math.min(Math.max(backoff*2,15000),120000);}
-        else{env.status('offline');backoff=Math.min(backoff?backoff*2:3000,60000);}
+        else{env.status('offline',e&&e.message);backoff=Math.min(backoff?backoff*2:3000,60000);}
         schedule(backoff);
       }
       persistNow();
@@ -1897,6 +1934,14 @@ function create(env){
       }catch(_){}
     },
     isBusy(){return running||!!timer;},
+    /* changes on screen that the server has not confirmed yet (entity-level list) */
+    pending(){
+      try{
+        const base=rc?rc.proj:(H.length?H[0].proj:null);
+        if(!base)return[];
+        return diffEnt(base,project(S()),LOCAL);
+      }catch(_){return[];}
+    },
     lastError(){return lastErr;},
     stop(){stopped=true;if(timer)clearTimeout(timer);if(persistTimer)clearTimeout(persistTimer);timer=persistTimer=null;},
     reset(){api.stop();H=[];rc=null;lineage=[];stopped=false;running=false;again=false;backoff=0;},
@@ -1960,7 +2005,7 @@ function create(env){
   return api;
 }
 
-const PFSync={create,merge3,stable,mergeColl,mergeSet,mergeTomb,applyTombs,clone,eq,isIdArr,encodeDiff,decodeDiff};
+const PFSync={diffEnt,create,merge3,stable,mergeColl,mergeSet,mergeTomb,applyTombs,clone,eq,isIdArr,encodeDiff,decodeDiff};
 if(typeof module!=='undefined'&&module.exports)module.exports=PFSync;
 else root.PFSync=PFSync;
 })(typeof window!=='undefined'?window:globalThis);
@@ -2075,22 +2120,28 @@ const PF=PFSync.create({
   writeStored:_pfWriteStored,
   stash:_pfStash,
   validate:()=>_validateBeforeSave(),
-  status:(k,m)=>{
-    if(k==='synced'){_online=true;_consecutiveSaveFailures=0;_setSyncStatus('synced','Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · '+(S.tasks||[]).length+'t '+(S.projects||[]).length+'p');}
-    else if(k==='offline'){_online=false;_consecutiveSaveFailures++;_setSyncStatus('offline');}
-    else if(k==='error'){_consecutiveSaveFailures++;_setSyncStatus('error',m||'');}
-    else _setSyncStatus('saving');
-  },
-  onApplied:()=>{
+  status:(k,m)=>_pfConn(k,m),
+  author:()=>_pbUser?(_pbUser.id||_pbUser.email||null):null,
+  authorName:()=>_pbUser?(_pbUser.name||_pbUser.email||null):null,
+  beforeWrite:changes=>_pfLogActivity(changes),
+  onApplied:info=>{
     _lastKnownCounts={projects:(S.projects||[]).length,tasks:(S.tasks||[]).length,members:(S.members||[]).length,sponsors:(S.sponsors||[]).length};
+    const me=_pbUser&&(_pbUser.id||_pbUser.email);
+    const theirs=!!(info&&info.by&&info.by!==me);          // your own other tabs/devices stay silent
+    let show=false;
+    if(theirs){
+      const ch=(info.changes||[]).filter(c=>c.c!=='activity');
+      ch.forEach(c=>{if(c.c==='tasks'&&c.i)_pfHl.set(String(c.i),Date.now()+6000);});
+      // only speak up if the change touches something on screen right now (checked BEFORE re-rendering, so deletions count)
+      show=ch.some(c=>(c.c==='tasks'&&c.i&&_pfOnScreen(c.i))||(c.c==='projects'&&c.i&&S.detailId===c.i));
+      if(show)_pfNotifyTeam(info,ch);
+    }
     _pfSafeRender();
-    _showSyncToast();
   },
   onSaved:()=>{
     _lastSavedAt=new Date().toISOString();_saveCount++;
     _lastSavePayloadCounts={tasks:(S.tasks||[]).length,projects:(S.projects||[]).length,members:(S.members||[]).length,labels:(S.labels||[]).length};
-    _online=true;_consecutiveSaveFailures=0;
-    _setSyncStatus('synced','Saved '+new Date().toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'})+' · '+_lastSavePayloadCounts.tasks+'t '+_lastSavePayloadCounts.projects+'p');
+    _pfConn('synced');
     if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
   },
   clientId:_myClientId,
@@ -2104,6 +2155,245 @@ function _pfRestoreInto(restored){
   PF.allowRevive();
   Object.assign(S,restored);
 }
+
+
+/* ════ TEAM AWARENESS: who changed what, who is where ════ */
+const _pfHl=new Map();           // taskId -> highlight expiry (rows changed by a teammate)
+let _pfPeers=[];                 // [{id,name,editing}] other people online right now
+let _pfNotifyAt=0;
+
+const _pfEsc=s=>String(s==null?'':s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const _pfSel=id=>(window.CSS&&CSS.escape)?CSS.escape(String(id)):String(id).replace(/"/g,'');
+function _pfOnScreen(id){
+  try{return !!document.querySelector('.task-item[data-id="'+_pfSel(id)+'"],.kcard[data-task-id="'+_pfSel(id)+'"]');}catch(_){return false;}
+}
+function _pfHash(str){let h=5381;for(let i=0;i<str.length;i++)h=((h<<5)+h+str.charCodeAt(i))|0;return (h>>>0).toString(36);}
+
+/* One change -> "completed “Book venue”" */
+function _pfVerb(c){
+  const noun=c.c==='tasks'?'“'+(c.n||'a task')+'”'
+    :c.c==='projects'?'event “'+(c.n||'?')+'”'
+    :c.n?'“'+c.n+'”':({finance:'finance',settings:'settings',members:'a member',sponsors:'a sponsor',labels:'a label'}[c.c]||c.c);
+  let verb={add:'added',del:'deleted',mod:'updated'}[c.t]||'updated';
+  if(c.t==='mod'&&c.c==='tasks'&&c.f&&c.f.length){
+    const f=c.f.includes('done')?'done':c.f[0];
+    if(f==='done')verb=(c.d&&c.d.done)?'completed':'reopened';
+    else if(c.f.length>1)verb='updated';
+    else if(f==='name')verb='renamed';
+    else if(f==='assignees')verb='changed assignees on';
+    else if(f==='labels')verb='changed labels on';
+    else if(/date|due|start|end/i.test(f))verb='changed the dates on';
+    else if(f==='kStatus'||f==='status')verb='moved';
+    else if(f==='parentId')verb='moved';
+  }
+  return verb+' '+noun;
+}
+function _pfNotifyTeam(info,ch){
+  const now=Date.now();
+  if(now-_pfNotifyAt<8000||document.hidden)return;
+  _pfNotifyAt=now;
+  const first=ch.find(c=>c.c==='tasks')||ch[0];
+  const more=ch.length-1;
+  _showSyncToast((info.byName||'A teammate')+' '+_pfVerb(first)+(more>0?' (+'+more+' more)':''));
+}
+
+/* Append this client's net changes to the shared activity list (called by the engine just before it writes) */
+function _pfLogActivity(changes){
+  if(!changes||!changes.length||!_pbUser)return;
+  const me=_pbUser.id||_pbUser.email,name=_pbUser.name||_pbUser.email||'Someone',now=Date.now();
+  if(!Array.isArray(S.activity))S.activity=[];
+  const recent=new Set(S.activity.filter(e=>now-e.t<300000).map(e=>e.k));
+  const out=[];
+  for(const c of changes){
+    const k=me+'|'+c.c+'|'+c.i+'|'+c.t+'|'+_pfHash((c.f||[]).join()+c.v);
+    if(recent.has(k))continue;                       // same pending change re-reported after a retry
+    const e={k,t:now,by:me,n:name,c:c.c,i:c.i,a:c.t,f:c.f||[],x:c.n||null};
+    if(c.d&&Object.keys(c.d).length)e.d=c.d;
+    out.push(e);
+    if(out.length>=12)break;
+  }
+  if(out.length)S.activity=S.activity.concat(out).slice(-300);
+}
+
+/* ── Decorations: highlight rows a teammate changed, show who is editing which task ── */
+(function(){
+  const st=document.createElement('style');
+  st.textContent='@keyframes pfhl{0%,40%{box-shadow:inset 0 0 0 2px var(--acc);background:rgba(98,208,170,.16)}100%{box-shadow:inset 0 0 0 2px transparent;background:transparent}}'
+   +'.pf-hl{animation:pfhl 6s ease-out both;border-radius:8px}'
+   +'.pf-pres{position:absolute;right:8px;top:6px;z-index:3;display:inline-flex;align-items:center;gap:4px;font:600 .55rem "DM Mono",monospace;color:#08130f;border-radius:999px;padding:2px 7px;pointer-events:none;box-shadow:0 0 0 2px var(--surface)}'
+   +'.task-row{position:relative}'
+   +'#pf-coedit{position:fixed;top:64px;left:50%;transform:translateX(-50%);z-index:900;background:var(--surface);border:1.5px solid var(--yellow);color:var(--text2);border-radius:10px;padding:8px 14px;font-size:.74rem;box-shadow:0 8px 28px rgba(0,0,0,.4);max-width:calc(100vw - 32px)}'
+   +'.pf-act-row{display:flex;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);font-size:.78rem;line-height:1.4}'
+   +'.pf-act-row:last-child{border:0}.pf-act-t{flex:0 0 auto;width:62px;color:var(--muted);font:.65rem "DM Mono",monospace;padding-top:2px}';
+  document.head.appendChild(st);
+})();
+const _pfColor=n=>['#62D0AA','#3d82f0','#f59e0b','#ec4899','#8b5cf6','#06b6d4'][(String(n||'?').charCodeAt(0)||0)%6];
+let _pfDecoQ=false,_pfObs=null,_pfDecoTimer=null;
+function _pfDecorate(){
+  _pfDecoQ=false;
+  const c=document.getElementById('content'),mc=document.getElementById('mc');
+  if(_pfObs)_pfObs.disconnect();
+  try{
+    const now=Date.now();
+    _pfHl.forEach((exp,id)=>{if(exp<now)_pfHl.delete(id);});
+    if(c){
+      c.querySelectorAll('.pf-pres').forEach(x=>x.remove());
+      c.querySelectorAll('.task-item[data-id],.kcard[data-task-id]').forEach(elm=>{
+        const id=elm.dataset.id||elm.dataset.taskId;
+        const hl=_pfHl.has(String(id));
+        if(hl&&!elm.classList.contains('pf-hl'))elm.classList.add('pf-hl');
+        else if(!hl&&elm.classList.contains('pf-hl'))elm.classList.remove('pf-hl');
+        const ps=_pfPeers.filter(p=>p.editing&&String(p.editing)===String(id));
+        if(ps.length){
+          const host=elm.classList.contains('kcard')?elm:(elm.querySelector('.task-row')||elm);
+          const chip=document.createElement('span');
+          chip.className='pf-pres';chip.style.background=_pfColor(ps[0].name);
+          chip.title=ps.map(p=>p.name).join(', ')+' editing';
+          chip.textContent=(ps[0].name||'?').split(/\s+/).map(w=>w[0]).join('').slice(0,2).toUpperCase()+(ps.length>1?' +'+(ps.length-1):'');
+          host.appendChild(chip);
+        }
+      });
+    }
+    // banner inside an open task if someone else has the same task open
+    const old=document.getElementById('pf-coedit');if(old)old.remove();
+    if(mc&&mc.firstChild&&_presenceEditing){
+      const ps=_pfPeers.filter(p=>p.editing&&String(p.editing)===String(_presenceEditing));
+      if(ps.length){
+        const b=document.createElement('div');b.id='pf-coedit';
+        b.textContent='⚠ '+ps.map(p=>p.name).join(', ')+(ps.length>1?' are':' is')+' also editing this task. Edits to different fields merge; the same field takes whoever saves last.';
+        document.body.appendChild(b);
+      }
+    }
+  }finally{
+    if(_pfObs){
+      if(c)_pfObs.observe(c,{childList:true,subtree:true});
+      if(mc)_pfObs.observe(mc,{childList:true});
+    }
+    if(_pfHl.size){clearTimeout(_pfDecoTimer);_pfDecoTimer=setTimeout(_pfDecorate,1000);}
+  }
+}
+function _pfDecoSoon(){if(_pfDecoQ)return;_pfDecoQ=true;requestAnimationFrame(_pfDecorate);}
+function _pfStartDeco(){
+  if(_pfObs)return;
+  _pfObs=new MutationObserver(_pfDecoSoon);
+  _pfDecoSoon();
+}
+
+/* ── Activity viewer ── */
+function _pfAgo(t){
+  const s=Math.round((Date.now()-t)/1000);
+  if(s<60)return 'just now';if(s<3600)return Math.round(s/60)+'m ago';
+  if(s<86400)return Math.round(s/3600)+'h ago';return Math.round(s/86400)+'d ago';
+}
+function showActivity(){
+  const list=(S.activity||[]).slice().sort((a,b)=>b.t-a.t).slice(0,150);
+  const rows=list.map(e=>{
+    const live=e.c==='tasks'&&e.i&&e.a!=='del'&&getTask(e.i);
+    const txt=_pfEsc(e.n||'Someone')+' '+_pfEsc(_pfVerb({c:e.c,t:e.a,n:e.x,f:e.f,d:e.d}));
+    return '<div class="pf-act-row"><div class="pf-act-t" title="'+_pfEsc(new Date(e.t).toLocaleString())+'">'+_pfAgo(e.t)+'</div>'
+      +'<div style="flex:1">'+(live?'<a href="#" style="color:inherit;text-decoration:none" onclick="event.preventDefault();closeModal();openModal(\'task\',\''+_pfEsc(e.i)+'\')">'+txt+'</a>':txt)+'</div></div>';
+  }).join('');
+  const mc=el('mc');
+  mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:520px;">'
+    +'<div class="mo-hd"><span class="mo-title">Recent activity</span><button class="mo-close" onclick="closeModal()">×</button></div>'
+    +'<div class="mo-body" style="max-height:65vh;overflow:auto;">'+(rows||'<div style="color:var(--muted);font-size:.78rem;">Nothing yet. Changes appear here as people save them.</div>')+'</div></div></div>';
+  mc.style.display='flex';
+}
+
+/* ════ CONNECTION STATUS: honest about what is saved, what is waiting, and why ════ */
+let _pfBadSince=null,_pfBadTimer=null,_pfSlowT=null,_pfUnsynced=false,_pfLastMsg='',_pfLastKind='';
+let _pfPN={t:0,n:0,list:[]};
+function _pfPending(force){
+  const now=Date.now();
+  if(force||now-_pfPN.t>1000){const list=PF.pending();_pfPN={t:now,n:list.length,list};}   // cached: cheap even while typing
+  return _pfPN;
+}
+const _pfTime=t=>new Date(t).toLocaleTimeString([],{hour:'2-digit',minute:'2-digit'});
+
+function _pfConn(k,m){
+  if(k==='synced'){
+    _pfUnsynced=false;_pfBadSince=null;_pfLastMsg='';_pfLastKind='';
+    clearTimeout(_pfBadTimer);clearTimeout(_pfSlowT);
+    _online=true;_consecutiveSaveFailures=0;
+    _setSyncStatus('synced','Saved '+_pfTime(Date.now())+' · '+(S.tasks||[]).length+'t '+(S.projects||[]).length+'p');
+    _pfBanner(null);
+  }else if(k==='saving'){
+    _pfUnsynced=true;
+    if(_pfBadSince){const n=_pfPending().n;_setSyncStatus(_pfLastKind==='error'?'error':'offline',_pfLastKind==='error'?(_pfLastMsg||'Save failed'):'Offline · '+n+' waiting');}
+    else{
+      _setSyncStatus('saving');
+      clearTimeout(_pfSlowT);
+      _pfSlowT=setTimeout(()=>{if(_pfUnsynced&&!_pfBadSince)_setSyncStatus('saving','Saving… '+_pfPending(true).n+' waiting');},4000);
+    }
+  }else{                                   // 'offline' or 'error'
+    _pfUnsynced=true;_online=false;_consecutiveSaveFailures++;
+    _pfLastKind=k;_pfLastMsg=m||'';
+    const first=!_pfBadSince;
+    if(first)_pfBadSince=Date.now();
+    const n=_pfPending(true).n;
+    _setSyncStatus(k==='error'?'error':'offline',k==='error'?(m||'Save failed'):'Offline · '+n+' waiting');
+    // ignore brief blips (banner after 6s of trouble) but never hide a real problem; later failures refresh the text
+    if(k==='error'||Date.now()-_pfBadSince>=6000)_pfBanner(k,m);
+    else if(first)_pfBadTimer=setTimeout(()=>_pfBanner(_pfLastKind,_pfLastMsg),6000);
+  }
+  const ind=document.getElementById('sync-indicator');
+  if(ind&&_pfUnsynced&&_pfBadSince)ind.title='Not saved to the server since '+_pfTime(_pfBadSince)+(_pfLastMsg?' ('+_pfLastMsg+')':'')+' — click for details';
+  else if(ind)ind.title='Sync status — click for details';
+}
+
+function _pfBanner(k,m){
+  let b=document.getElementById('pf-conn');
+  if(!k||!_pfBadSince){if(b)b.remove();return;}
+  const n=_pfPending(true).n,since=_pfTime(_pfBadSince);
+  const expired=/session expired|not signed in/i.test(m||'');
+  const kept=n?(n+' change'+(n>1?'s are':' is')+' kept on this device'):'Nothing is waiting to be saved';
+  const txt=expired?'Your session expired at '+since+'. '+kept+'. Sign in again to sync.'
+    :k==='error'?'Can’t save: '+_pfEsc(m||'unknown problem')+'. '+kept+'.'
+    :'You’re offline (since '+since+'). '+kept+' and will sync automatically when the connection is back.';
+  if(!b){b=document.createElement('div');b.id='pf-conn';document.body.appendChild(b);}
+  b.innerHTML='<span style="flex:1;min-width:200px">'+txt+'</span>'
+    +(expired?'<button class="btn btn-acc btn-sm" onclick="handleLogout()">Sign in</button>':'<button class="btn btn-acc btn-sm" onclick="PF.saveNow()">Retry now</button>')
+    +'<button class="btn btn-ghost btn-sm" onclick="showSyncDetails()">Details</button>';
+}
+
+function showSyncDetails(){
+  const p=_pfPending(true);
+  const bad=!!_pfBadSince;
+  const state=bad?(_pfLastKind==='error'?'Not saving':'Offline'):(_pfUnsynced?'Saving…':'All changes saved');
+  const colour=bad?(_pfLastKind==='error'?'var(--red)':'var(--yellow)'):'var(--green)';
+  const items=p.list.slice(0,8).map(c=>'<li>'+_pfEsc(_pfVerb({c:c.c,t:c.t,n:c.n,f:c.f,d:c.d}))+'</li>').join('');
+  const mc=el('mc');
+  mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:440px;">'
+    +'<div class="mo-hd"><span class="mo-title">Sync status</span><button class="mo-close" onclick="closeModal()">×</button></div>'
+    +'<div class="mo-body" style="display:flex;flex-direction:column;gap:10px;font-size:.8rem;line-height:1.5;">'
+    +'<div style="font-weight:700;color:'+colour+'">● '+state+'</div>'
+    +'<div style="color:var(--text2)">Last saved to the server: '+(_lastSavedAt?_pfTime(_lastSavedAt):'not yet this session')+'</div>'
+    +(bad?'<div style="color:var(--text2)">Problem since '+_pfTime(_pfBadSince)+': '+_pfEsc(_pfLastMsg||'cannot reach the server')+'</div>':'')
+    +'<div style="color:var(--text2)">Waiting to sync: <b>'+p.n+'</b>'+(p.n?'<ul style="margin:6px 0 0 18px;padding:0">'+items+(p.n>8?'<li>…and '+(p.n-8)+' more</li>':'')+'</ul>':'')+'</div>'
+    +(p.n?'<div style="color:var(--muted);font-size:.72rem">These are stored on this device and will be merged with your team’s changes when the connection returns.</div>':'')
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'
+    +'<button class="btn btn-acc btn-sm" onclick="PF.saveNow();closeModal()">Retry now</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="_pfDownloadCopy()">Save a copy to this computer</button></div>'
+    +'</div></div></div>';
+  mc.style.display='flex';
+}
+function _pfDownloadCopy(){
+  try{
+    const blob=new Blob([JSON.stringify(S)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='projectflow-copy-'+new Date().toISOString().slice(0,19).replace(/[T:]/g,'-')+'.json';
+    a.click();setTimeout(()=>URL.revokeObjectURL(a.href),2000);
+  }catch(e){alert('Could not create the copy: '+e.message);}
+}
+function _pfStartConn(){
+  const ind=document.getElementById('sync-indicator');
+  if(ind){ind.style.cursor='pointer';ind.onclick=showSyncDetails;}
+}
+(function(){
+  const st=document.createElement('style');
+  st.textContent='#pf-conn{position:fixed;top:10px;left:50%;transform:translateX(-50%);z-index:950;display:flex;align-items:center;gap:10px;flex-wrap:wrap;background:var(--surface);border:1.5px solid var(--yellow);color:var(--text2);border-radius:11px;padding:9px 14px;font-size:.74rem;line-height:1.45;box-shadow:0 8px 32px rgba(0,0,0,.45);width:min(560px,calc(100vw - 24px))}';
+  document.head.appendChild(st);
+})();
 
 /* ── Sync state ── */
 let _lastSavedAt=null;       // ISO string of last save we wrote
@@ -2772,6 +3062,7 @@ function _applyDefaults(){
   if(!S.projFilter)S.projFilter='all';
   if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
   if(S.hideDone===undefined)S.hideDone=false;
+  if(!Array.isArray(S.activity))S.activity=[];
   if(!S._tomb||typeof S._tomb!=='object'||Array.isArray(S._tomb))S._tomb={}; // delete markers (sync)
   if(!S.expandedTasks)S.expandedTasks=[];
   if(!S.expandedGantt)S.expandedGantt=[];
@@ -2866,12 +3157,12 @@ function _showConflictBanner(){}
 function _conflictKeepMine(){const b=document.getElementById('conflict-banner');if(b)b.style.display='none';}
 function _conflictTakeRemote(){_conflictKeepMine();}
 
-function _showSyncToast(){
+function _showSyncToast(msg){
   let t=document.getElementById('sync-toast');
   if(!t){t=document.createElement('div');t.id='sync-toast';
     t.style.cssText='position:fixed;bottom:70px;left:50%;transform:translateX(-50%);background:var(--surface3);color:var(--text2);border:1px solid var(--border);padding:7px 14px;border-radius:8px;font-size:.73rem;z-index:9999;opacity:0;transition:opacity .2s;white-space:nowrap;';
     document.body.appendChild(t);}
-  t.textContent='↓ Updated by a team member';
+  t.textContent='↓ '+(msg||'Updated by a teammate');
   t.style.opacity='1';
   setTimeout(()=>{t.style.opacity='0';},3000);
 }
@@ -2882,7 +3173,10 @@ document.addEventListener('visibilitychange',()=>{
   else if(_pbToken){PF.requestSync(0);if(!_pbEventSource)_startPBRealtime();}
 });
 window.addEventListener('pagehide',()=>{try{PF.flush();}catch(_){}});
-window.addEventListener('beforeunload',()=>{try{PF.flush();}catch(_){}});
+window.addEventListener('beforeunload',e=>{
+  try{PF.flush();}catch(_){}
+  if(_pfUnsynced&&_pfBadSince){e.preventDefault();e.returnValue='';}   // only when changes genuinely haven't reached the server
+});
 window.addEventListener('focus',()=>{if(_pbToken)PF.requestSync(0);});
 window.addEventListener('online',()=>{_online=true;_setSyncStatus('saving');PF.requestSync(0);});
 window.addEventListener('offline',()=>{_online=false;_setSyncStatus('offline');});
@@ -3813,6 +4107,13 @@ document.addEventListener('mouseout',e=>{if(!e.relatedTarget?.closest('[data-tip
  * ════════════════ */
 let _presenceTimer=null;
 let _presenceRecordId=null;
+let _presenceEditing=null,_pingAgain=false,_presT=null;
+function _pfSetEditing(id){
+  if(_presenceEditing===id)return;
+  _presenceEditing=id;
+  if(typeof _pfDecoSoon==='function')_pfDecoSoon();
+  clearTimeout(_presT);_presT=setTimeout(_pingPresence,id?150:500); // tell teammates promptly
+}
 
 
 async function _cleanupPresence(){
@@ -3846,12 +4147,13 @@ async function _cleanupPresence(){
 
 let _pinging=false;
 async function _pingPresence(){
-  if(!_pbToken||!_pbUser||_pinging)return;
+  if(!_pbToken||!_pbUser)return;
+  if(_pinging){_pingAgain=true;return;}
   _pinging=true;
   const now=new Date().toISOString();
   const body=JSON.stringify({
     user_id:_pbUser.id,
-    user_name:_pbUser.name||_pbUser.email||'Unknown',
+    user_name:(_pbUser.name||_pbUser.email||'Unknown')+(_presenceEditing?'\u0001'+_presenceEditing:''), // task id rides along after \u0001 (no schema change needed)
     updated_at:now
   });
   const headers={Authorization:_pbToken,'Content-Type':'application/json'};
@@ -3888,11 +4190,14 @@ async function _pingPresence(){
     );
     if(active.ok){
       const d=await active.json();
-      const others=(d.items||[]).filter(u=>u.user_id!==_pbUser.id);
+      const others=(d.items||[]).filter(u=>u.user_id!==_pbUser.id).map(u=>{const p=String(u.user_name||'?').split('\u0001');return{...u,user_name:p[0],editing:p[1]||null};});
+      _pfPeers=others.map(u=>({id:u.user_id,name:u.user_name,editing:u.editing}));
       _renderPresence(others);
+      if(typeof _pfDecoSoon==='function')_pfDecoSoon();
     }
   }catch(e){}
   _pinging=false;
+  if(_pingAgain){_pingAgain=false;_pingPresence();}
 }
 
 function _renderPresence(users){
@@ -3903,7 +4208,7 @@ function _renderPresence(users){
     const initials=(u.user_name||'?').substring(0,2).toUpperCase();
     const colors=['#62D0AA','#3d82f0','#f59e0b','#ec4899','#8b5cf6','#06b6d4'];
     const color=colors[u.user_name.charCodeAt(0)%colors.length];
-    return`<div class="av" style="width:26px;height:26px;background:${color};font-size:.5rem;flex-shrink:0;border:2px solid var(--surface);border-radius:50%;cursor:default;" title="${u.user_name} is online">${initials}</div>`;
+    return`<div class="av" style="width:26px;height:26px;background:${color};font-size:.5rem;flex-shrink:0;border:2px solid var(--surface);border-radius:50%;cursor:default;" title="${u.user_name} is online${u.editing&&getTask(u.editing)?' — editing “'+getTask(u.editing).name.replace(/"/g,'')+'”':''}">${initials}</div>`;
   }).join('');
 }
 
@@ -8508,7 +8813,7 @@ function deleteDevTodo(id){
 
 /* ════ RESTORED MODAL + SAVE FUNCTIONS ════ */
 
-function closeModal(){_closeAllMs();const mc=el('mc');mc.innerHTML='';mc.style.display='';window._pendingProjTmpl=null;}
+function closeModal(){_pfSetEditing(null);_closeAllMs();const mc=el('mc');mc.innerHTML='';mc.style.display='';window._pendingProjTmpl=null;}
 
 function _closeAllMs(){
   if(_msPortal.el&&_msPortal.orig){
@@ -8520,6 +8825,7 @@ function _closeAllMs(){
 }
 
 function openModal(type,data){
+  _pfSetEditing(type==='task'&&typeof data==='string'&&data?data:null);
   const mc=el('mc');let html='';
   switch(type){
     case'project':html=projectModalHtml(data);break;
@@ -11880,6 +12186,8 @@ async function init(){
   startPolling();
   _startFallbackPoll();
   startPresence();
+  _pfStartDeco();
+  _pfStartConn();
   // Hourly stale presence cleanup
   setInterval(()=>{if(_pbToken)_cleanupPresence();},60*60*1000);
   startAutoBackup();
