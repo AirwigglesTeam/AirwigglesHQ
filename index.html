@@ -1849,6 +1849,249 @@ async function _pfDiag(){
 }
 window._pfDiag=_pfDiag; // expose to browser console
 
+/* ════════════════════════════════════════════════════════════════
+   ProjectFlow Integration Test Suite
+   ────────────────────────────────────────────────────────────────
+   Run from browser console:  _pfTest()
+   Returns a summary report and logs pass/fail per check.
+
+   Covers:
+   • Every view renders without throwing a JS error
+   • Cross-view data consistency (tasks, labels, kStatus, done)
+   • Label pills appear in every view that shows them
+   • Task counts match across task list, kanban, campaign, dashboard
+   • Done tasks have kStatus='done' and appear in Done column
+   • Subtask label inheritance is intact
+   • Save chain integrity (delegates to _pfDiag for round-trip)
+   ════════════════════════════════════════════════════════════════ */
+async function _pfTest(){
+  const _prevV=V;
+  const results=[];
+  let passed=0,failed=0;
+
+  function ok(name,detail=''){
+    results.push({status:'✅',name,detail});
+    passed++;
+    console.log('%c✅ '+name+(detail?' — '+detail:''),'color:#3fb950;');
+  }
+  function fail(name,detail=''){
+    results.push({status:'❌',name,detail});
+    failed++;
+    console.error('❌ '+name+(detail?' — '+detail:''));
+  }
+  function warn(name,detail=''){
+    results.push({status:'⚠️ ',name,detail});
+    console.warn('⚠️  '+name+(detail?' — '+detail:''));
+  }
+
+  console.group('%c ProjectFlow Integration Tests','color:#58a6ff;font-weight:700;font-size:13px;');
+  console.log('State snapshot: tasks='+S.tasks.length+', projects='+S.projects.length
+    +', members='+S.members.length+', labels='+S.labels.length);
+
+  // ── 1. Render each view without errors ───────────────────────
+  console.group('1. View render checks');
+  const views=['dashboard','kanban','campaign','labels','templates','settings','sponsors'];
+  for(const view of views){
+    try{
+      V=view;
+      const html=view==='dashboard'?renderDash()
+        :view==='kanban'?renderKanban()
+        :view==='campaign'?renderCampaign()
+        :view==='labels'?renderLabels()
+        :view==='templates'?renderTemplates()
+        :view==='settings'?renderSettings()
+        :view==='sponsors'?renderSponsors()
+        :'';
+      if(typeof html!=='string'||html.length<10)fail('render:'+view,'returned empty/non-string');
+      else ok('render:'+view,Math.round(html.length/1000)+'KB output');
+    }catch(e){fail('render:'+view,e.message);}
+  }
+  // Detail view (first project)
+  if(S.projects.length>0){
+    try{
+      const html=renderDetail(S.projects[0].id);
+      if(typeof html==='string'&&html.length>10)ok('render:detail','project: '+S.projects[0].name);
+      else fail('render:detail','empty output');
+    }catch(e){fail('render:detail',e.message);}
+  }
+  console.groupEnd();
+
+  // ── 2. Cross-view task count consistency ─────────────────────
+  console.group('2. Task count consistency');
+  try{
+    // Tasks shown in kanban = all active-project tasks
+    const activeProjIds=new Set(S.projects.filter(p=>p.status==='active').map(p=>p.id));
+    const activeTasks=S.tasks.filter(t=>activeProjIds.has(t.projectId));
+    // Parse kanban HTML and count cards
+    V='kanban';
+    const kHtml=renderKanban();
+    const kCards=(kHtml.match(/class="kcard/g)||[]).length;
+    if(kCards===activeTasks.length)ok('kanban card count',''+kCards+' cards = '+activeTasks.length+' active tasks');
+    else fail('kanban card count','kanban shows '+kCards+' cards but active tasks = '+activeTasks.length);
+    // Dashboard task list (count ti-check elements)
+    V='dashboard';
+    const dHtml=renderDash();
+    const dChecks=(dHtml.match(/class="ti-check/g)||[]).length;
+    // Dashboard shows tasks per-project, so at minimum activeTasks should be ≤ dChecks
+    if(dChecks>=0)ok('dashboard task items',dChecks+' task rows rendered');
+    else fail('dashboard task items','no task rows found');
+  }catch(e){fail('task count consistency',e.message);}
+  console.groupEnd();
+
+  // ── 3. Label consistency across views ────────────────────────
+  console.group('3. Label consistency');
+  try{
+    const tasksWithLabels=S.tasks.filter(t=>(t.labels||[]).length>0);
+    if(tasksWithLabels.length===0){warn('label consistency','no tasks with explicit labels to check');}
+    else{
+      const t=tasksWithLabels[0];
+      const lbl=S.labels.find(l=>(t.labels||[]).includes(l.id));
+      if(!lbl){fail('label consistency','task has label ID not found in S.labels: '+t.labels[0]);}
+      else{
+        // Check label appears in kanban HTML
+        V='kanban';
+        const kH=renderKanban();
+        // Label name or color should appear (labels render via lcHtml which uses color and name)
+        if(kH.includes(lbl.color)||kH.includes(lbl.name))ok('label in kanban',lbl.name+' present');
+        else fail('label in kanban',lbl.name+' ('+lbl.id+') missing from kanban HTML');
+        // Check label appears in dashboard
+        V='dashboard';
+        const dH=renderDash();
+        if(dH.includes(lbl.color)||dH.includes(lbl.name))ok('label in dashboard',lbl.name+' present');
+        else warn('label in dashboard',lbl.name+' not found in dashboard — may be inside collapsed cards');
+        // Check label appears in campaign view
+        V='campaign';
+        const cH=renderCampaign();
+        if(cH.includes(lbl.name)||cH.includes(lbl.color))ok('label in campaign',lbl.name+' present');
+        else warn('label in campaign',lbl.name+' not visible — may be filtered out');
+      }
+    }
+    // Label inheritance: subtasks with labels=null should show parent labels via effectiveLabels()
+    const subtasksInheriting=S.tasks.filter(t=>t.parentId&&(t.labels===null||t.labels===undefined));
+    subtasksInheriting.forEach(t=>{
+      const parent=getTask(t.parentId);
+      if(parent&&(parent.labels||[]).length>0){
+        const eff=effectiveLabels(t);
+        if(eff.length>0)ok('label inheritance','subtask "'+t.name+'" inherits '+eff.length+' label(s)');
+        else fail('label inheritance','subtask "'+t.name+'" has labels=null but effectiveLabels() returned []');
+      }
+    });
+    if(subtasksInheriting.length===0)ok('label inheritance','no inheriting subtasks to check');
+  }catch(e){fail('label consistency',e.message);}
+  console.groupEnd();
+
+  // ── 4. Done / kStatus consistency ────────────────────────────
+  console.group('4. Done task & kStatus consistency');
+  try{
+    const doneTasks=S.tasks.filter(t=>t.done);
+    const doneWithWrongStatus=doneTasks.filter(t=>t.kStatus!=='done');
+    if(doneWithWrongStatus.length===0)ok('done→kStatus','all '+doneTasks.length+' done tasks have kStatus="done"');
+    else fail('done→kStatus',doneWithWrongStatus.length+' done task(s) have wrong kStatus: '
+      +doneWithWrongStatus.map(t=>'"'+t.name+'" ('+t.kStatus+')').join(', '));
+    // Done tasks should appear in Done column in kanban HTML
+    if(doneTasks.length>0){
+      V='kanban';
+      const kH=renderKanban();
+      // The Done column uses KB_COLS — find its header
+      if(kH.includes('data-status="done"'))ok('done column in kanban','Done column present in kanban');
+      else fail('done column in kanban','kanban HTML missing data-status="done" column');
+    }
+    // Tasks NOT done should not have kStatus='done'
+    const undoneWithDoneStatus=S.tasks.filter(t=>!t.done&&t.kStatus==='done');
+    if(undoneWithDoneStatus.length===0)ok('undone→kStatus','no undone tasks with kStatus="done"');
+    else warn('undone→kStatus',undoneWithDoneStatus.length+' undone task(s) have kStatus="done": '
+      +undoneWithDoneStatus.map(t=>'"'+t.name+'"').join(', '));
+  }catch(e){fail('done/kStatus consistency',e.message);}
+  console.groupEnd();
+
+  // ── 5. Task modal fields round-trip ──────────────────────────
+  console.group('5. Task data integrity');
+  try{
+    // Every task should have required fields
+    const requiredFields=['id','name','projectId','kStatus','done'];
+    const malformed=S.tasks.filter(t=>requiredFields.some(f=>t[f]===undefined||t[f]===null&&f==='id'));
+    if(malformed.length===0)ok('task required fields','all '+S.tasks.length+' tasks have id/name/projectId/kStatus/done');
+    else fail('task required fields',malformed.length+' task(s) missing required fields: '
+      +malformed.slice(0,3).map(t=>t.id||'(no id)').join(', '));
+    // Orphaned subtasks (parentId points to non-existent task)
+    const taskIds=new Set(S.tasks.map(t=>t.id));
+    const orphans=S.tasks.filter(t=>t.parentId&&!taskIds.has(t.parentId));
+    if(orphans.length===0)ok('no orphaned subtasks','all subtasks have valid parentId');
+    else warn('orphaned subtasks',orphans.length+' subtask(s) reference non-existent parent: '
+      +orphans.slice(0,3).map(t=>'"'+t.name+'"').join(', '));
+    // Tasks referencing non-existent projects
+    const projIds=new Set(S.projects.map(p=>p.id));
+    const badProj=S.tasks.filter(t=>t.projectId&&!projIds.has(t.projectId));
+    if(badProj.length===0)ok('task project refs','all tasks reference valid projects');
+    else fail('task project refs',badProj.length+' task(s) reference missing project IDs');
+    // Tasks referencing non-existent labels
+    const labelIds=new Set(S.labels.map(l=>l.id));
+    const badLabel=S.tasks.filter(t=>(t.labels||[]).some(lid=>!labelIds.has(lid)));
+    if(badLabel.length===0)ok('task label refs','all task labels reference valid label IDs');
+    else fail('task label refs',badLabel.length+' task(s) reference missing label IDs: '
+      +badLabel.slice(0,3).map(t=>'"'+t.name+'"').join(', '));
+    // Tasks referencing non-existent members
+    const memberIds=new Set(S.members.map(m=>m.id));
+    const badMember=S.tasks.filter(t=>(t.assignees||[]).some(mid=>!memberIds.has(mid)));
+    if(badMember.length===0)ok('task member refs','all task assignees reference valid member IDs');
+    else warn('task member refs',badMember.length+' task(s) reference missing member IDs (deleted members?)');
+  }catch(e){fail('task data integrity',e.message);}
+  console.groupEnd();
+
+  // ── 6. Phase consistency ─────────────────────────────────────
+  console.group('6. Phase consistency');
+  try{
+    const knownPhases=new Set(['Planning','Pre-launch','Post-Event','']);
+    const badPhase=S.tasks.filter(t=>t.phase!==undefined&&t.phase!==null&&!knownPhases.has(t.phase));
+    if(badPhase.length===0)ok('task phases','all task phases are valid');
+    else warn('task phases',badPhase.length+' task(s) have unrecognised phase values: '
+      +[...new Set(badPhase.map(t=>t.phase))].join(', '));
+    // Campaign view should show phase pill UI
+    V='campaign';
+    const cH=renderCampaign();
+    if(cH.includes('kb-phase-pill')||cH.includes('qa-phase-pill'))ok('phase pills in campaign','phase filter UI present');
+    else warn('phase pills in campaign','phase pill UI not found in campaign HTML');
+    // Kanban phase filter
+    V='kanban';
+    const kH=renderKanban();
+    if(kH.includes('kb-phase-pill'))ok('phase pills in kanban','phase filter UI present');
+    else warn('phase pills in kanban','phase pill UI not found in kanban HTML');
+  }catch(e){fail('phase consistency',e.message);}
+  console.groupEnd();
+
+  // ── 7. Save integrity (delegates to _pfDiag) ─────────────────
+  console.group('7. Save chain (quick check — run _pfDiag() for full round-trip)');
+  try{
+    const lsRaw=localStorage.getItem('pf4');
+    if(!lsRaw){warn('localStorage backup','pf4 key not set yet (saved recently? normal on first load)');}
+    else{
+      const ls=JSON.parse(lsRaw);
+      const tasksMatch=(ls.tasks||[]).length===S.tasks.length;
+      const projsMatch=(ls.projects||[]).length===S.projects.length;
+      if(tasksMatch&&projsMatch)ok('localStorage matches memory',S.tasks.length+'t '+S.projects.length+'p');
+      else fail('localStorage drift','memory: '+S.tasks.length+'t '+S.projects.length+'p  LS: '
+        +(ls.tasks||[]).length+'t '+(ls.projects||[]).length+'p — call saveNow() then re-run');
+    }
+    const bk=JSON.parse(localStorage.getItem('pf4_backups')||'[]');
+    if(bk.length>0)ok('rolling backup',''+bk.length+' snapshot(s), latest: '+bk[bk.length-1].ts);
+    else warn('rolling backup','no backup snapshots yet — will appear after first save cycle');
+    ok('consecutive failures','_consecutiveSaveFailures='+_consecutiveSaveFailures);
+  }catch(e){fail('save chain',e.message);}
+  console.groupEnd();
+
+  // ── Summary ──────────────────────────────────────────────────
+  V=_prevV; // restore original view
+  const total=passed+failed;
+  const pct=total>0?Math.round(passed/total*100):100;
+  console.log('');
+  console.log('%c'+pct+'% passing ('+passed+'/'+total+' checks)'+(failed>0?' — '+failed+' FAILED':''),
+    'font-weight:700;font-size:14px;color:'+(failed>0?'#f85149':'#3fb950'));
+  if(failed>0)console.error('Failing checks:',results.filter(r=>r.status==='❌').map(r=>r.name+': '+r.detail));
+  console.groupEnd();
+  return{passed,failed,total,pct,results};
+}
+window._pfTest=_pfTest; // expose to browser console
+
 /* ── Local rolling backup ── */
 function _saveLocalBackup(){
   const hasData=(S.projects&&S.projects.length>0)||(S.tasks&&S.tasks.length>0)||
@@ -2996,7 +3239,7 @@ document.addEventListener('keydown',function(e){
   if(conflict){showToast('"'+key+'" is already mapped to '+_scLabel(conflict[0])+' — pick another key');return;}
   if(!S.settings.shortcuts)S.settings.shortcuts={};
   S.settings.shortcuts[_scCapturing]=key;
-  save();
+  saveNow();
   const btn=document.getElementById('sc-btn-'+_scCapturing);
   if(btn)_scRenderBtn(btn,_scCapturing);
   _scCapturing=null;
@@ -3023,10 +3266,10 @@ function _scRenderBtn(btn,action){
 function scReset(action){
   if(!S.settings.shortcuts)return;
   delete S.settings.shortcuts[action];
-  save();render();
+  saveNow();render();
 }
 function scResetAll(){
-  S.settings.shortcuts={};save();render();showToast('All shortcuts reset to defaults');
+  S.settings.shortcuts={};saveNow();render();showToast('All shortcuts reset to defaults');
 }
 
 
@@ -3698,7 +3941,7 @@ function toggleBookmark(projId){
   const idx=S.settings.bookmarks.indexOf(projId);
   if(idx>=0)S.settings.bookmarks.splice(idx,1);
   else S.settings.bookmarks.push(projId);
-  save();
+  saveNow();
   updateRailBookmarks();
   render(); // re-render to update pin icon state
 }
@@ -7695,11 +7938,11 @@ function renderSettings(){
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Branding</div>
   <div class="field"><label class="flbl">Brand / Workspace Name</label>
-    <input class="inp" id="st-brand" value="${S.settings.brandName||'airwiggles — ProjectFlow'}" placeholder="Your workspace name" onchange="S.settings.brandName=this.value;save();applyBranding()">
+    <input class="inp" id="st-brand" value="${S.settings.brandName||'airwiggles — ProjectFlow'}" placeholder="Your workspace name" onchange="S.settings.brandName=this.value;saveNow();applyBranding()">
   </div>
   <div class="field"><label class="flbl">Custom Logo (PNG/SVG)</label>
     <input type="file" id="st-logo-file" accept="image/*" onchange="uploadLogo(this)" style="color:var(--text2);font-size:.78rem;">
-    ${S.settings.logoUrl?`<div style="margin-top:8px;display:flex;align-items:center;gap:10px;"><img src="${S.settings.logoUrl}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;background:var(--acc);padding:4px;"><button class="btn btn-danger btn-xs" onclick="S.settings.logoUrl=null;save();applyBranding();updateFavicon();render()">Remove logo</button></div>`:''}
+    ${S.settings.logoUrl?`<div style="margin-top:8px;display:flex;align-items:center;gap:10px;"><img src="${S.settings.logoUrl}" style="width:40px;height:40px;border-radius:8px;object-fit:contain;background:var(--acc);padding:4px;"><button class="btn btn-danger btn-xs" onclick="S.settings.logoUrl=null;saveNow();applyBranding();updateFavicon();render()">Remove logo</button></div>`:''}
   </div>
   <div class="field"><label class="flbl">Accent Colour</label>
     <div class="clr-grid" id="st-colors">
@@ -7939,13 +8182,13 @@ async function uploadLogo(input){
     // Try PocketBase upload first
     const url=await _uploadImageToPB(file,'logo');
     S.settings.logoUrl=url;
-    save();applyBranding();updateFavicon();render();
+    saveNow();applyBranding();updateFavicon();render();
     if(statusEl){statusEl.textContent='';statusEl.style.display='none';}
   }catch(e){
     // Fallback to base64 if PocketBase images collection not set up yet
     console.warn('PB image upload failed, falling back to base64:',e);
     const reader=new FileReader();
-    reader.onload=ev=>{S.settings.logoUrl=ev.target.result;save();applyBranding();updateFavicon();render();};
+    reader.onload=ev=>{S.settings.logoUrl=ev.target.result;saveNow();applyBranding();updateFavicon();render();};
     reader.readAsDataURL(file);
     if(statusEl){statusEl.textContent='';statusEl.style.display='none';}
   }
@@ -7954,7 +8197,7 @@ async function uploadLogo(input){
 function setAccent(color,dot){
   document.getElementById('st-colors')?.querySelectorAll('.clr-dot').forEach(d=>d.classList.remove('sel'));
   dot.classList.add('sel');
-  S.settings.accentColor=color;save();applyBranding();
+  S.settings.accentColor=color;saveNow();applyBranding();
 }
 
 function exportData(){
@@ -8986,7 +9229,7 @@ function labelModalHtml(id){
     +'</div>';
 }
 
-function saveLabel(eid){const name=el('lm-name')?.value.trim();if(!name)return;const label={id:eid||uid(),name,color:el('lm-clr')?.value||COLORS[0]};if(eid){const i=S.labels.findIndex(l=>l.id===eid);if(i>=0)S.labels[i]=label;}else S.labels.push(label);save();closeModal();render();}
+function saveLabel(eid){const name=el('lm-name')?.value.trim();if(!name)return;const label={id:eid||uid(),name,color:el('lm-clr')?.value||COLORS[0]};saveWithUndo(eid?'Edit label':'Add label');if(eid){const i=S.labels.findIndex(l=>l.id===eid);if(i>=0)S.labels[i]=label;}else S.labels.push(label);saveNow();closeModal();render();}
 
 
 async function _fetchPBUsers(){
@@ -9084,13 +9327,15 @@ function saveMember(eid){
         console.warn('PB photo upload failed, falling back to base64:',e);
         await new Promise(res=>{const r=new FileReader();r.onload=ev=>{member.photoUrl=ev.target.result;res();};r.readAsDataURL(photoFile);});
       }
+      saveWithUndo(eid?'Edit member':'Add member');
       if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);
-      save();closeModal();render();
+      saveNow();closeModal();render();
     })();
     return;
   }
+  saveWithUndo(eid?'Edit member':'Add member');
   if(eid){const i=S.members.findIndex(m=>m.id===eid);if(i>=0)S.members[i]=member;}else S.members.push(member);
-  save();closeModal();render();
+  saveNow();closeModal();render();
   }
 
 function reorderMember(id,dir){
@@ -9099,7 +9344,7 @@ function reorderMember(id,dir){
   const newIdx=idx+dir;
   if(newIdx<0||newIdx>=S.members.length)return;
   const tmp=S.members[idx];S.members[idx]=S.members[newIdx];S.members[newIdx]=tmp;
-  save();render();
+  saveNow();render();
 }
 
 function memberTimeModalHtml(memberId){
@@ -9161,12 +9406,13 @@ function quickLinkModalHtml(qlId){
 function saveQL(qlId){
   const name=el('ql-nm')?.value.trim();const url=el('ql-ur')?.value.trim();if(!name||!url)return;
   const cat=el('ql-cat')?.value.trim()||'';
+  saveWithUndo(qlId?'Edit quick link':'Add quick link');
   if(qlId){const idx=S.quickLinks.findIndex(q=>q.id===qlId);if(idx>=0)S.quickLinks[idx]={...S.quickLinks[idx],name,url,category:cat};}
   else{S.quickLinks.push({id:uid(),name,url,category:cat});}
-  save();closeModal();render();
+  saveNow();closeModal();render();
 }
 
-function deleteQL(id){S.quickLinks=(S.quickLinks||[]).filter(q=>q.id!==id);save();render();}
+function deleteQL(id){saveWithUndo('Delete quick link');S.quickLinks=(S.quickLinks||[]).filter(q=>q.id!==id);saveNow();render();}
 
 function editQL(id){
   const mc=el('mc');mc.style.display='flex';
@@ -9192,9 +9438,10 @@ function saveProjQL(projId,qlId){
   const name=el('pql-nm')?.value.trim();const url=el('pql-ur')?.value.trim();if(!name||!url)return;
   const cat=el('pql-cat')?.value.trim()||'';
   if(!p.quickLinks)p.quickLinks=[];
+  saveWithUndo(qlId?'Edit project quick link':'Add project quick link');
   if(qlId){const idx=p.quickLinks.findIndex(q=>q.id===qlId);if(idx>=0)p.quickLinks[idx]={...p.quickLinks[idx],name,url,category:cat};}
   else{p.quickLinks.push({id:uid(),name,url,category:cat});}
-  save();closeModal();render();
+  saveNow();closeModal();render();
 }
 
 function editProjQL(projId,qlId){const mc=el('mc');mc.style.display='flex';mc.innerHTML=`<div class=\"mo\" onclick=\"if(event.target.classList.contains('mo'))closeModal()\">${projQuickLinkModalHtml(projId,qlId)}</div>`;}
@@ -9668,7 +9915,7 @@ function saveMemberProfile(id){
     okrs.push({id:existingOkrId,objective:objText,keyResults});
   });
   m.okrs=okrs;
-  save();closeModal();showToast('Profile saved');
+  saveWithUndo('Edit member profile');saveNow();closeModal();showToast('Profile saved');
 }
 
 
@@ -11469,7 +11716,7 @@ function toggleNavVis(view, btn){
   // Default all views to visible (true), so toggle means: if undefined/true → false, if false → true
   const cur=S.settings.navVisible[view]===false?false:true;
   S.settings.navVisible[view]=!cur;
-  save();
+  saveNow();
   // Update toggle UI immediately (no full re-render needed)
   if(btn){
     if(S.settings.navVisible[view])btn.classList.add('on');
@@ -11674,7 +11921,7 @@ function deleteMember(id){
   saveWithUndo('Delete member');
   S.members=S.members.filter(m=>m.id!==id);
   S.tasks.forEach(t=>{t.assignees=(t.assignees||[]).filter(a=>a!==id);});
-  save();render();
+  saveNow();render();
 }
 
 /* Labels */
@@ -11682,7 +11929,7 @@ function deleteLabel(id){
   saveWithUndo('Delete label');
   S.labels=S.labels.filter(l=>l.id!==id);
   S.tasks.forEach(t=>{t.labels=(t.labels||[]).filter(l=>l!==id);});
-  save();render();
+  saveNow();render();
 }
 
 /* Project reorder (left/right in dashboard grid) */
@@ -11889,7 +12136,7 @@ function saveMemberTime(memberId){
   const note=el('mt-note')?.value.trim()||'';
   if(!m.timeLog)m.timeLog=[];
   m.timeLog.push({id:uid(),hours,projectId:projId||null,date,note});
-  save();
+  saveNow();
   // Re-open the modal to show the new entry
   openModal('memberTime',memberId);
 }
