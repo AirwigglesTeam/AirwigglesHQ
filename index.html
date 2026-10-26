@@ -6488,7 +6488,7 @@ ${(()=>{
 </div>
 
 <!-- SPONSORS IN PROJECT -->
-${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
+${((p.sponsors||[]).length>0||(S.sponsors||[]).length>0)?`<div style="margin-bottom:18px;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;cursor:pointer;" onclick="toggleSponsorsExpanded('${p.id}')">
     <div style="display:flex;align-items:center;gap:10px;flex:1;">
       <svg id="sp-toggle-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._spExpanded||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
@@ -6509,10 +6509,12 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
       })()}
     </div>
     <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
+      <button class="btn btn-acc btn-xs" onclick="openAddSponsorToEvent('${p.id}')" style="font-size:.65rem;">+ Add sponsor</button>
       <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')" style="font-size:.65rem;">Edit sponsors</button>
     </div>
   </div>
   <div id="sp-body-${p.id}" style="display:${(window._spExpanded||{})[p.id]!==false?'block':'none'};">
+  ${(p.sponsors||[]).length===0?'<div style="font-size:.75rem;color:var(--muted);padding:4px 0 10px;">No sponsors on this event yet. Use <b>+ Add sponsor</b> to start your shortlist.</div>':''}
   ${(()=>{
     const allSpons=p.sponsors||[];
     const tiers=[
@@ -6540,14 +6542,15 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
       const totalProds=allocatedProducts.length;
       const deliveredProds=allocatedProducts.filter(prod=>prod.delivered).length;
       const allDelivered=totalProds>0&&deliveredProds===totalProds;
-      return`<div style="background:var(--surface2);border:1px solid ${allDelivered?'var(--green)':'var(--border)'};border-radius:10px;overflow:hidden;display:flex;flex-direction:column;transition:border-color .2s;">
+      const _stDef=SP_STAGES.find(x=>x.id===_spStage(sp));const _pre=SP_STAGES.indexOf(_stDef)<3;
+      return`<div style="background:var(--surface2);border:1px solid ${allDelivered?'var(--green)':'var(--border)'};border-radius:10px;overflow:hidden;display:flex;flex-direction:column;border-left:4px solid ${_stDef.color};${_pre?'background:var(--surface);':''}transition:border-color .2s;">
         <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px 13px;">
           <div class="sp-avatar" style="width:30px;height:30px;font-size:.6rem;flex-shrink:0;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View ${s.name} profile">${s.logoDataUrl?`<img src="${s.logoDataUrl}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
           <div style="flex:1;min-width:0;">
             <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
               <span style="font-size:.84rem;font-weight:700;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View profile">${s.name}</span>
               ${sponsorPrizeVal>0?`<span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--yellow);">£${sponsorPrizeVal.toFixed(2)}</span>`:''}
-              <span style="font-size:.62rem;padding:1px 7px;background:${t.color}22;color:${t.color};border-radius:3px;font-weight:600;">${t.label}</span>
+              <span style="font-size:.62rem;padding:1px 7px;background:${t.color}22;color:${t.color};border-radius:3px;font-weight:600;">${t.label}</span>${sp.category==='headline'?'<span style="font-size:.6rem;color:var(--yellow);font-weight:700;">★ Headline</span>':sp.category==='event'?'<span style="font-size:.6rem;color:var(--blue);font-weight:700;">Event</span>':sp.category==='product'?'<span style="font-size:.6rem;color:var(--purple);font-weight:700;">Product</span>':''}
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" style="cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
             </div>
             ${totalProds>0?`<div style="display:flex;align-items:center;gap:5px;margin-top:4px;"><div style="flex:1;height:3px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${Math.round(deliveredProds/totalProds*100)}%;background:${allDelivered?'var(--green)':'var(--acc)'};border-radius:99px;transition:width .3s;"></div></div><span style="font-size:.6rem;font-family:'DM Mono',monospace;color:${allDelivered?'var(--green)':'var(--muted)'};">${deliveredProds}/${totalProds} delivered</span></div>`:''}
@@ -6564,6 +6567,8 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
             <button class="btn btn-ghost btn-xs" style="font-size:.6rem;color:var(--muted);" onclick="removeProjSponsor('${p.id}','${s.id}')" title="Remove sponsor from this event">× Remove</button>
           </div>
         </div>
+        ${_spStageBar(p.id,sp)}
+        ${_pre?'':`
         ${isCashSponsor?`<div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
           <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
             <div class="ti-check${sp.invoiceSent?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','invoiceSent')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.invoiceSent?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp.invoiceSent?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
@@ -6586,28 +6591,15 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
             <span style="font-weight:600;color:${sp.fulfilled?'var(--green)':'var(--text2)'};">Sponsorship fulfilled</span>
           </label>
         </div>
-        ${p.isAirCon?`<div style="padding:8px 13px;border-top:1px solid var(--border2);">
-          <div style="font-size:.62rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.07em;margin-bottom:7px;">AirCon checklist</div>
+        ${p.isAirCon?(()=>{const _its=_airconItems(sp);if(!_its.length)return'';const _n=_its.filter(it=>sp[it.id]).length;return`<div style="padding:8px 13px;border-top:1px solid var(--border2);">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><span style="font-size:.62rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.07em;">AirCon checklist</span><span style="font-size:.62rem;color:var(--muted);font-family:'DM Mono',monospace;">${_n}/${_its.length}</span></div>
           <div style="display:flex;flex-direction:column;gap:6px;">
-            ${[
-              {flag:'airconLogoAssets',label:'Sponsor logo and assets received/confirmed'},
-              {flag:'airconPostContent',label:'Sponsored post content confirmed'},
-              {flag:'airconPostPosted',label:'Sponsored post posted'},
-            ].map(item=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-              <div class="ti-check${sp[item.flag]?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','${item.flag}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${sp[item.flag]?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp[item.flag]?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-              <span style="color:${sp[item.flag]?'var(--acc)':'var(--text2)'};">${item.label}</span>
+            ${_its.map(item=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
+              <div class="ti-check${sp[item.id]?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','${item.id}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${sp[item.id]?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp[item.id]?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
+              <span style="color:${sp[item.id]?'var(--acc)':'var(--text2)'};">${item.label}</span>
             </label>`).join('')}
-            ${(sp.category==='headline')?[
-              {flag:'airconWorkshop',label:'Workshop confirmed'},
-              {flag:'airconDigitalBooth',label:'Digital booth signed off'},
-              {flag:'airconBannerLogo',label:'Logo on banner above Airwiggles feed'},
-              {flag:'airconAdLogo',label:'Logo on targeted AirCon26 ads'},
-            ].map(item=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-              <div class="ti-check${sp[item.flag]?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','${item.flag}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${sp[item.flag]?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp[item.flag]?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-              <span style="color:${sp[item.flag]?'var(--acc)':'var(--text2)'};">${item.label}</span>
-            </label>`).join(''):''}
           </div>
-        </div>`:''}
+        </div>`;})():''}
         ${allocatedProducts.length>0?`<div style="border-top:1px solid var(--border2);">
           <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px;cursor:pointer;" onclick="var d=this.nextElementSibling;var open=d.style.display!=='none';d.style.display=open?'none':'';this.querySelector('.sp-prod-chevron').textContent=open?'\u25be':'\u25b4';">
             <div style="font-size:.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">${allocatedProducts.length} Product Allocation${allocatedProducts.length!==1?'s':''}</div>
@@ -6631,16 +6623,19 @@ ${(p.sponsors||[]).length>0?`<div style="margin-bottom:18px;">
           </div>
         </div>`:''}
         ${allocatedProducts.length===0&&s_prods.length>0?`<div style="padding:6px 13px 9px;border-top:1px solid var(--border2);font-size:.68rem;color:var(--muted);">No products allocated yet. <button class="btn btn-ghost btn-xs" style="margin-left:4px;" onclick="openModal('project','${p.id}')">Assign products →</button></div>`:''}
+      `}
       </div>`;
     };
-    return usedTiers.map(tier=>{
-      const tierSpons=allSpons.filter(sp=>(sp.category||'')=== tier.key);
-      if(tierSpons.length===0)return'';
-      // Show tier label only when there are multiple tiers in use
-      const showLabel=usedTiers.length>1;
-      return`${showLabel?`<div style="font-size:.65rem;font-weight:700;color:${tier.color};text-transform:uppercase;letter-spacing:.08em;margin:${tier===usedTiers[0]?'0':'14px'} 0 8px;display:flex;align-items:center;gap:6px;">${tier.label}</div>`:''}
-      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start;margin-bottom:4px;">
-        ${tierSpons.map(sp=>spCardHtml(sp)).join('')}
+    const _tierRank={headline:0,event:1,product:2,'':3};
+    return _spPipelineBar(allSpons)+['infosent','confirmed','discussion','contacted','shortlisted'].map(sid=>{
+      const grp=allSpons.filter(sp=>_spStage(sp)===sid).sort((a,b)=>(_tierRank[a.category||'']??3)-(_tierRank[b.category||'']??3));
+      if(!grp.length)return'';
+      const d=SP_STAGES.find(x=>x.id===sid);const key=p.id+'-'+sid;const off=!!(window._spGrpOff||{})[key];
+      return`<div style="margin-bottom:12px;">
+        <div style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-bottom:8px;" onclick="toggleSpGroup('${key}',this)"><span class="sg-chev" style="font-size:.6rem;color:var(--muted);transition:transform .15s;${off?'transform:rotate(-90deg);':''}">&#9662;</span><span style="width:8px;height:8px;border-radius:50%;background:${d.color};"></span><span style="font-size:.68rem;font-weight:700;color:${d.color};text-transform:uppercase;letter-spacing:.08em;">${d.name}</span><span style="font-size:.66rem;color:var(--muted);">${grp.length}</span></div>
+        <div style="display:${off?'none':'grid'};grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start;">
+          ${grp.map(sp=>spCardHtml(sp)).join('')}
+        </div>
       </div>`;
     }).join('');
   })()}
@@ -8879,6 +8874,8 @@ function renderSettings(){
   </div>
 </div>
 
+${_airconSettingsHtml()}
+
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg> Navigation Icons</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Choose an icon for each navigation section.</p>
@@ -9278,7 +9275,7 @@ function saveNavIcon(view,iconId){
 
 function saveProject(eid){
   const name=el('pm-name')?.value.trim();if(!name){if(el('pm-name'))el('pm-name').style.borderColor='var(--red)';return;}
-  const newSponsors=readProjSponsorRows();
+  const newSponsors=readProjSponsorRows().map(sp=>{const o=((eid&&getProject(eid))?.sponsors||[]).find(x=>x.id===sp.id);return o?sp:{...sp,stage:'shortlisted',stageDates:{shortlisted:_spIso()}};});
   const newOkrs=readPmOkrs();
   const isAirCon=!!el('pm-aircon')?.value;
   const _pwP=el('pm-pw-planning')?.value.trim();
@@ -9298,17 +9295,15 @@ function saveProject(eid){
         const oldSp=(old.sponsors||[]).find(o=>o.id===sp.id);
         // Spread old to preserve invoiceSent, invoicePaid, prizeHistory, etc.
         // products already contain preserved delivery fields from readProjSponsorRows
-        return{...(oldSp||{}),id:sp.id,type:sp.type,category:sp.category,products:sp.products};
+        return{...(oldSp||{stage:sp.stage,stageDates:sp.stageDates}),id:sp.id,type:sp.type,category:sp.category,products:sp.products};
       });
       // Find newly added sponsors
       const oldSpIds=(old.sponsors||[]).map(s=>s.id);
       const addedSponsors=proj.sponsors.filter(s=>!oldSpIds.includes(s.id));
       _pfApplyEdit('projects',eid,{...old,...proj});
-      addedSponsors.forEach(sp=>autoGenerateSponsorTasks(eid,sp));
     }
   } else {
     S.projects.push(proj);
-    newSponsors.forEach(sp=>autoGenerateSponsorTasks(proj.id,sp));
   }
   saveWithUndo(eid?'Edit project':'New project');
   closeModal();
@@ -11042,6 +11037,134 @@ function toggleOverviewExpanded(projId){
   const open=window._ovExpanded[projId]!==false;
   if(body)body.style.display=open?'block':'none';
   if(ico)ico.style.transform=open?'rotate(0deg)':'rotate(-90deg)';
+}
+
+
+/* ════ SPONSOR OUTREACH PIPELINE ════ */
+const SP_STAGES=[
+  {id:'shortlisted',name:'Shortlisted',color:'#8b8fa3'},
+  {id:'contacted',name:'Contacted',color:'#3d82f0'},
+  {id:'discussion',name:'In discussion',color:'#f5a623'},
+  {id:'confirmed',name:'Confirmed',color:'#1fba7a'},
+  {id:'infosent',name:'Info pack sent',color:'#12a39a'}
+];
+const SP_FOLLOWUPS={contacted:{days:7,name:n=>'Follow up with '+n+' (outreach)'},infosent:{days:5,name:n=>'Check '+n+' received the info pack'}};
+function _spStage(sp){return SP_STAGES.some(x=>x.id===sp.stage)?sp.stage:'confirmed';}   // sponsors added before the pipeline existed count as confirmed
+function _spIso(d){return (d||new Date()).toISOString().slice(0,10);}
+function _spDaysSince(iso){return iso?Math.max(0,Math.round((new Date(_spIso())-new Date(iso))/86400000)):0;}
+function setSponsorStage(pid,sid,stage){
+  const p=getProject(pid);const sp=p?.sponsors?.find(x=>x.id===sid);if(!sp)return;
+  if(stage==='declined'){
+    const s=getSponsor(sid);
+    if(!confirm('Mark '+(s?s.name:'this sponsor')+' as declined? They will be removed from this event (you can undo).'))return;
+    removeProjSponsor(pid,sid);return;
+  }
+  const idx=id=>SP_STAGES.findIndex(x=>x.id===id);
+  if(idx(stage)<0)return;
+  const prev=_spStage(sp);if(prev===stage&&sp.stage)return;
+  saveWithUndo('Sponsor stage');
+  sp.stage=stage;sp.stageDates={...(sp.stageDates||{}),[stage]:_spIso()};
+  if(idx(stage)>idx(prev)){
+    // moving forward closes the earlier follow-up reminders for this sponsor
+    S.tasks.forEach(t=>{if(t.projectId===pid&&t._stageSponsor===sid&&!t.done&&idx(t._stageTask)<idx(stage)){t.done=true;t.kStatus='done';}});
+    if(idx(stage)>=idx('confirmed'))autoGenerateSponsorTasks(pid,sp);   // sponsor template tasks appear once they are confirmed
+    const fu=SP_FOLLOWUPS[stage];
+    if(fu&&!S.tasks.some(t=>t.projectId===pid&&t._stageSponsor===sid&&t._stageTask===stage)){
+      const d=new Date();d.setDate(d.getDate()+fu.days);
+      S.tasks.push({id:uid(),name:fu.name(getSponsor(sid)?.name||'sponsor'),description:'Created when the sponsor moved to "'+SP_STAGES[idx(stage)].name+'".',projectId:pid,parentId:null,priority:'Medium',assignees:[],labels:[],blockedBy:[],startDate:'',endDate:_spIso(d),kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{},_stageSponsor:sid,_stageTask:stage});
+    }
+  }
+  save();render();
+}
+function setSponsorNote(pid,sid,v){const sp=getProject(pid)?.sponsors?.find(x=>x.id===sid);if(!sp)return;sp.outreachNote=v.trim();save();}
+function _spStageBar(pid,sp){
+  const cur=_spStage(sp),ci=SP_STAGES.findIndex(x=>x.id===cur),def=SP_STAGES[ci];
+  const dt=(sp.stageDates||{})[cur];const days=_spDaysSince(dt);
+  const stale=cur==='contacted'&&days>=7;
+  const pre=ci<3;
+  return '<div style="padding:7px 13px 8px;border-top:1px solid var(--border2);">'
+   +'<div style="display:flex;gap:3px;align-items:center;flex-wrap:wrap;">'
+   +SP_STAGES.map((x,i)=>{const on=i===ci,past=i<ci;
+      return '<button type="button" onclick="setSponsorStage(\''+pid+'\',\''+sp.id+'\',\''+x.id+'\')" title="Move to '+x.name+'" style="border:1px solid '+(on||past?x.color:'var(--border)')+';background:'+(on?x.color:past?x.color+'22':'transparent')+';color:'+(on?'#fff':past?x.color:'var(--muted)')+';font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:20px;cursor:pointer;white-space:nowrap;">'+x.name+'</button>';}).join('')
+   +'<button type="button" onclick="setSponsorStage(\''+pid+'\',\''+sp.id+'\',\'declined\')" title="Declined: removes the sponsor from this event" style="margin-left:auto;border:1px solid var(--border);background:transparent;color:var(--muted);font-size:.58rem;font-weight:600;padding:2px 7px;border-radius:20px;cursor:pointer;">Declined</button>'
+   +'</div>'
+   +(dt?'<div style="font-size:.6rem;margin-top:4px;color:'+(stale?'var(--yellow)':'var(--muted)')+';">'+def.name+' since '+fmtD(dt)+' · '+(days===0?'today':days+' day'+(days!==1?'s':'')+' ago')+(stale?' · no reply yet?':'')+'</div>':'')
+   +(pre?'<input class="inp" style="margin-top:6px;font-size:.7rem;padding:4px 8px;" placeholder="Notes: who you spoke to, next step…" value="'+String(sp.outreachNote||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" onchange="setSponsorNote(\''+pid+'\',\''+sp.id+'\',this.value)">':(sp.outreachNote?'<div style="font-size:.64rem;color:var(--text2);margin-top:4px;">'+String(sp.outreachNote).replace(/</g,'&lt;')+'</div>':''))
+   +'</div>';
+}
+function _spPipelineBar(list){
+  const n=list.length;if(!n)return'';
+  const cnt=id=>list.filter(sp=>_spStage(sp)===id).length;
+  const conf=cnt('confirmed')+cnt('infosent');
+  return '<div style="margin-bottom:12px;">'
+   +'<div style="display:flex;height:8px;border-radius:99px;overflow:hidden;background:var(--surface3);">'
+   +[...SP_STAGES].reverse().map(x=>cnt(x.id)?'<div title="'+cnt(x.id)+' '+x.name+'" style="flex:'+cnt(x.id)+';background:'+x.color+';"></div>':'').join('')+'</div>'
+   +'<div style="display:flex;gap:12px;flex-wrap:wrap;margin-top:6px;font-size:.66rem;color:var(--muted);">'
+   +'<span style="color:var(--green);font-weight:700;">'+conf+' of '+n+' confirmed</span>'
+   +[...SP_STAGES].reverse().filter(x=>cnt(x.id)).map(x=>'<span style="display:inline-flex;align-items:center;gap:4px;"><span style="width:7px;height:7px;border-radius:50%;background:'+x.color+';"></span>'+cnt(x.id)+' '+x.name+'</span>').join('')
+   +'</div></div>';
+}
+function toggleSpGroup(key,hd){
+  window._spGrpOff=window._spGrpOff||{};window._spGrpOff[key]=!window._spGrpOff[key];
+  const body=hd.nextElementSibling;if(body)body.style.display=window._spGrpOff[key]?'none':'grid';
+  const c=hd.querySelector('.sg-chev');if(c)c.style.transform=window._spGrpOff[key]?'rotate(-90deg)':'';
+}
+function openAddSponsorToEvent(pid){
+  const p=getProject(pid);if(!p)return;
+  const have=(p.sponsors||[]).map(x=>x.id);
+  const avail=S.sponsors.filter(s=>!have.includes(s.id));
+  const mc=el('mc');mc.style.display='flex';
+  if(!avail.length){mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:340px;"><div class="mo-hd"><span class="mo-title">Add sponsor</span><button class="mo-close" onclick="closeModal()">×</button></div><div class="mo-body" style="font-size:.8rem;color:var(--text2);">Every sponsor in your list is already on this event. Add new companies from the Sponsors page.</div></div></div>';return;}
+  mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:380px;">'
+   +'<div class="mo-hd"><span class="mo-title">Add sponsor to event</span><button class="mo-close" onclick="closeModal()">×</button></div>'
+   +'<div class="mo-body" style="display:flex;flex-direction:column;gap:12px;">'
+   +'<div class="field"><label class="flbl">Sponsor</label><select class="fsel" id="as-sp" style="width:100%;">'+avail.map(s=>'<option value="'+s.id+'">'+s.name+'</option>').join('')+'</select></div>'
+   +'<div class="field"><label class="flbl">Sponsorship type</label><select class="fsel" id="as-type" style="width:100%;">'+Object.entries(SP_TYPES).map(([k,v])=>'<option value="'+k+'"'+(k==='product'?' selected':'')+'>'+v.label+'</option>').join('')+'</select></div>'
+   +'<div class="field"><label class="flbl">Tier</label><select class="fsel" id="as-cat" style="width:100%;"><option value="">None</option><option value="headline">Headline</option><option value="event">Event</option><option value="product">Product</option></select></div>'
+   +'<div style="font-size:.7rem;color:var(--muted);">They start as <b>Shortlisted</b>. Move them along as outreach progresses.</div>'
+   +'</div><div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="addSponsorToEvent(\''+pid+'\')">Add as shortlisted</button></div></div></div>';
+}
+function addSponsorToEvent(pid){
+  const p=getProject(pid);if(!p)return;
+  const id=el('as-sp')?.value;if(!id||(p.sponsors||[]).some(x=>x.id===id))return;
+  saveWithUndo('Add sponsor to event');
+  if(!p.sponsors)p.sponsors=[];
+  p.sponsors.push({id,type:el('as-type')?.value||'product',category:el('as-cat')?.value||'',products:[],stage:'shortlisted',stageDates:{shortlisted:_spIso()}});
+  save();closeModal();render();
+}
+
+/* ════ AIRCON CHECKLIST (editable master list, Settings) ════ */
+const AIRCON_DEFAULT_CHECKLIST=[
+  {id:'airconLogoAssets',label:'Sponsor logo and assets received/confirmed',tier:'all'},
+  {id:'airconPostContent',label:'Sponsored post content confirmed',tier:'all'},
+  {id:'airconPostPosted',label:'Sponsored post posted',tier:'all'},
+  {id:'airconWorkshop',label:'Workshop confirmed',tier:'headline'},
+  {id:'airconDigitalBooth',label:'Digital booth signed off',tier:'headline'},
+  {id:'airconBannerLogo',label:'Logo on banner above Airwiggles feed',tier:'headline'},
+  {id:'airconAdLogo',label:'Logo on targeted AirCon26 ads',tier:'headline'}
+];
+function airconChecklist(){const c=S.settings&&S.settings.airconChecklist;return Array.isArray(c)?c:AIRCON_DEFAULT_CHECKLIST;}
+function _airconItems(sp){return airconChecklist().filter(it=>!it.tier||it.tier==='all'||it.tier===(sp.category||'none'));}
+function _acEdit(fn){if(!Array.isArray(S.settings.airconChecklist))S.settings.airconChecklist=AIRCON_DEFAULT_CHECKLIST.map(x=>({...x}));fn(S.settings.airconChecklist);save();}
+function acRename(i,v){_acEdit(l=>{if(l[i]&&v.trim())l[i].label=v.trim();});}
+function acTier(i,v){_acEdit(l=>{if(l[i])l[i].tier=v;});}
+function acMove(i,d){_acEdit(l=>{const j=i+d;if(j<0||j>=l.length)return;const t=l[i];l[i]=l[j];l[j]=t;});render();}
+function acDelete(i){saveWithUndo('Delete checklist item');_acEdit(l=>{l.splice(i,1);});render();}
+function acAdd(){_acEdit(l=>{l.push({id:'ck'+uid(),label:'New checklist item',tier:'all'});});render();setTimeout(()=>{const r=document.querySelectorAll('.ac-label');const e=r[r.length-1];if(e){e.focus();e.select();}},50);}
+function acReset(){if(!confirm('Reset the AirCon checklist to the original list? Your edits to the list will be lost (ticks on sponsors are kept).'))return;delete S.settings.airconChecklist;save();render();}
+function _airconSettingsHtml(){
+  const l=airconChecklist();
+  const tiers=[['all','All sponsors'],['headline','Headline only'],['event','Event sponsors only'],['product','Product sponsors only']];
+  return '<div class="settings-sec"><div class="settings-ttl">AirCon sponsorship checklist</div>'
+   +'<p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Items every AirCon sponsor works through once confirmed. Changes apply to all AirCon events straight away; ticks already made are kept.</p>'
+   +l.map((it,i)=>'<div style="display:flex;align-items:center;gap:6px;padding:6px 0;border-bottom:1px solid var(--border2);flex-wrap:wrap;">'
+     +'<input class="inp ac-label" style="flex:1;min-width:180px;font-size:.78rem;" value="'+String(it.label).replace(/&/g,'&amp;').replace(/"/g,'&quot;')+'" onchange="acRename('+i+',this.value)">'
+     +'<select class="fsel" style="font-size:.72rem;" onchange="acTier('+i+',this.value)">'+tiers.map(t=>'<option value="'+t[0]+'"'+((it.tier||'all')===t[0]?' selected':'')+'>'+t[1]+'</option>').join('')+'</select>'
+     +'<button class="btn btn-ghost btn-xs" onclick="acMove('+i+',-1)" title="Move up"'+(i===0?' disabled':'')+'>↑</button>'
+     +'<button class="btn btn-ghost btn-xs" onclick="acMove('+i+',1)" title="Move down"'+(i===l.length-1?' disabled':'')+'>↓</button>'
+     +'<button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="acDelete('+i+')" title="Delete item">×</button></div>').join('')
+   +'<div style="display:flex;gap:8px;margin-top:10px;"><button class="btn btn-acc btn-sm" onclick="acAdd()">+ Add item</button>'
+   +(Array.isArray(S.settings.airconChecklist)?'<button class="btn btn-ghost btn-sm" onclick="acReset()">Reset to original list</button>':'')+'</div></div>';
 }
 
 function toggleSponsorFlag(projectId,sponsorId,flag){
