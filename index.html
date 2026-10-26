@@ -5673,10 +5673,6 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
       <div class="card-bd">
         ${focusTasks.length===0?`<div style="color:var(--muted);font-size:.78rem;">Nothing due — all clear!</div>`:''}
 
-    ${_dsOn('mywork')?_myWorkCardHtml():''}
-
-    ${_dsOn('cowork')?_coworkCardHtml(mf):''}
-
         ${focusTasks.map(t=>{
           const proj=getProject(t.projectId);
           const od=t.endDate<todayStr;
@@ -5691,6 +5687,10 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
         }).join('')}
       </div>
     </div>`:''}
+
+    ${_dsOn('mywork')?_myWorkCardHtml():''}
+
+    ${_dsOn('cowork')?_coworkCardHtml(mf):''}
 
 
     ${mf?(()=>{
