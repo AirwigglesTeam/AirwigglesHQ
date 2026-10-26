@@ -5323,7 +5323,10 @@ function digestText(){
 }
 let _digBusy=false;
 async function postDigest(auto){
-  if(_digBusy)return false;_digBusy=true;setTimeout(()=>{_digBusy=false;},4000);
+  if(_digBusy)return false;_digBusy=true;
+  try{return await _postDigest(auto);}finally{_digBusy=false;}
+}
+async function _postDigest(auto){
   const url=S.slackWebhook;const st=el('digest-st');
   if(!url){if(st){st.textContent='Add a Slack webhook first.';st.style.color='var(--red)';}return false;}
   if(st){st.textContent='Sending…';st.style.color='var(--muted)';}
@@ -5532,8 +5535,9 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
 <div class="ec-two-col">
 
   <!-- LEFT: Event cards with filter -->
-  <div style="${_dsOn('events')?'':'display:none;'}container-type:inline-size;container-name:ec-two-left;min-width:0;">
-    <div style="display:flex;align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;">
+  <div style="${(_dsOn('events')||_dsOn('notes'))?'':'display:none;'}container-type:inline-size;container-name:ec-two-left;min-width:0;">
+    ${_dsOn('notes')?`<div style="margin-bottom:14px;">${_quickNotesCardHtml()}</div>`:''}
+    <div style="${_dsOn('events')?'display:flex;':'display:none;'}align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;">
       <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.length})</button>
       <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>p.status==='active').length})</button>
       <button class="chip${(S.projFilter||'active')==='backlog'?' on':''}" onclick="S.projFilter='backlog';save();render()">Backlog (${S.projects.filter(p=>p.status==='backlog').length})</button>
@@ -5541,6 +5545,7 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
       <button class="btn btn-acc btn-sm" style="margin-left:auto;" onclick="openModal('project',null)">+ New Event</button>
     </div>
     ${(()=>{
+      if(!_dsOn('events'))return'';
       const filter=S.projFilter||'active';
       let filtered=filter==='all'?[...S.projects]:S.projects.filter(p=>p.status===filter);
       // Sort: active first, then everything else (greyed) when showing all
@@ -5686,7 +5691,6 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
       </div>
     </div>`:''}
 
-    ${_dsOn('notes')?_quickNotesCardHtml():''}
 
     ${mf?(()=>{
       const mfm=getMember(mf);
