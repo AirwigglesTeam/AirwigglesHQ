@@ -2014,7 +2014,7 @@ else root.PFSync=PFSync;
 /*PFSYNC:END*/
 
 /* ── Sync glue: PocketBase transport, local persistence, UI hooks ── */
-const PF_LOCAL_KEYS=['detailId','activeMember','projFilter','kbFilter','dashFilters','campaignFilter','taskSort','expandedTasks','expandedGantt','hideDone'];
+const PF_LOCAL_KEYS=['kbSort','detailId','activeMember','projFilter','kbFilter','dashFilters','campaignFilter','taskSort','expandedTasks','expandedGantt','hideDone'];
 const PF_STORE_KEY='pf6';
 const _PB_Q='/api/collections/workspace_state/records?filter='+encodeURIComponent('(workspace="'+PB_WORKSPACE+'")')+'&perPage=1';
 const _pbTok=r=>(r.updated||'')+'|'+(r.updated_at||'');
@@ -6799,6 +6799,11 @@ function renderKanban(){
     if(tasksByCol[st])tasksByCol[st].push(t);
     else tasksByCol['todo'].push(t); // fallback for unknown status
   });
+  if((S.kbSort||'auto')==='auto'){      // default: earliest due date first (undated last); same date -> higher priority first
+    const _pr={Critical:0,High:1,Medium:2,Low:3};
+    const _end=(a,b)=>a.endDate===b.endDate?0:(!a.endDate?1:(!b.endDate?-1:(a.endDate<b.endDate?-1:1)));
+    KB_COLS.forEach(c=>tasksByCol[c.id].sort((a,b)=>_end(a,b)||((_pr[a.priority]??4)-(_pr[b.priority]??4))||_cmpDue(a,b)));
+  }
 
   return`<div class="fu">
 <div class="page-hd"><div class="page-title">Kanban <em>Board</em></div><button class="btn btn-acc btn-sm" onclick="openModal('task',null)">+ Task</button></div>
@@ -6814,6 +6819,10 @@ function renderKanban(){
   <select class="fsel" onchange="S.kbFilter.label=this.value;save();render()">
     <option value="">All labels</option>
     ${S.labels.map(l=>`<option value="${l.id}" ${kLbl===l.id?'selected':''}>${l.name}</option>`).join('')}
+  </select>
+  <select class="fsel" onchange="S.kbSort=this.value;render()" title="Order of cards within each column">
+    <option value="auto" ${(S.kbSort||'auto')==='auto'?'selected':''}>Sort: due date, then priority</option>
+    <option value="manual" ${S.kbSort==='manual'?'selected':''}>Sort: manual (drag to order)</option>
   </select>
   <div class="kb-phase-pills">
     ${PHASES.map(ph=>`<button class="kb-phase-pill${kPh===ph?' active':''}" onclick="S.kbFilter.phase=S.kbFilter.phase==='${ph}'?'':'${ph}';save();render()" style="border-color:${phaseColor(ph)};${kPh===ph?'background:'+phaseColor(ph)+';color:#fff;':'color:'+phaseColor(ph)+';'}">${ph}</button>`).join('')}
