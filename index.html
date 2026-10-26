@@ -1734,7 +1734,7 @@ const withTimeout=(p,ms)=>new Promise((res,rej)=>{
    localKeys:[...]  keys that are per-device and never synced,
    transport:{ head()->{id,token}|null, get()->{id,token,data}|null,
                put(str,id)->{token} },
-   readStored()->rec|null, writeStored(rec)->bool, stash(str),
+   readStored()->rec|null, writeStored(rec)->bool, peekMeta()->{tab,ts}|null (tiny record of who saved last), stash(str),
    validate(snap)->{ok,reason}, status(kind,msg), onApplied(), onSaved(snap),
    clientId, debounceMs, loadTimeoutMs, log
  }
@@ -2023,15 +2023,47 @@ function create(env){
   }
 
   /* ── persistence: local state + ancestor history as ONE consistent record (history stored as diffs) ── */
+  /* Several tabs/windows of one browser share one local save slot. Before this tab writes its copy, it folds in
+     whatever the other tab saved there (that tab's edits since ITS last sync), so the last writer never erases
+     another tab's unsynced work. */
+  const tabId=Math.random().toString(36).slice(2)+Date.now().toString(36);
+  const foldSeen={};
+  function foldSiblings(){
+    if(!env.peekMeta||!env.readStored)return false;
+    let meta;try{meta=env.peekMeta();}catch(_){return false;}
+    if(!meta||!meta.tab||meta.tab===tabId||(foldSeen[meta.tab]||0)>=meta.ts)return false;
+    foldSeen[meta.tab]=meta.ts;
+    let o;try{o=env.readStored();}catch(_){return false;}
+    if(!o||o.tab!==meta.tab||o.v!==5||!isObj(o.s)||!Array.isArray(o.h)||!o.h.length)return false;
+    try{
+      const os=clone(o.s);env.normalize(os);
+      const op=project(os);
+      const base=decodeDiff(o.h[0].d,op);           // that tab's last synced view: it differs from its copy only by its own pending edits
+      noteDeletes();
+      const Lp=project(S());
+      const M=merge3(base,Lp,op);
+      if(!isObj(M))return false;
+      M._tomb=mergeTomb(Lp._tomb,op._tomb);
+      applyTombs(M);
+      if(stable(M)===stable(Lp))return false;
+      const changes=diffEnt(Lp,M,LOCAL);
+      adopt(M);
+      try{env.onApplied({by:null,byName:null,client:null,seq:seqNow,changes:changes||[]});}catch(e){console.error(e);}
+      schedule(DEBOUNCE);                            // these edits still have to reach the server from this tab too
+      return true;
+    }catch(e){console.warn('sibling fold failed',e);return false;}
+  }
+
   function persistNow(){
     if(persistTimer){clearTimeout(persistTimer);persistTimer=null;}
     if(!env.writeStored)return;
     noteDeletes();
+    foldSiblings();
     try{
       const st=S();
       const s={...st};delete s._spSearch;delete s._clientId;
       const ps=project(s);
-      const rec={v:5,s,h:H.map(e=>({w:e.wid,q:e.seq,d:encodeDiff(e.proj,ps)})),sq:seqNow,ts:Date.now()};
+      const rec={v:5,s,h:H.map(e=>({w:e.wid,q:e.seq,d:encodeDiff(e.proj,ps)})),sq:seqNow,ts:Date.now(),tab:tabId};
       if(!env.writeStored(rec))env.writeStored({v:5,s,h:[],sq:seqNow,ts:Date.now()});
     }catch(e){console.warn('persist failed',e);}
   }
@@ -2042,6 +2074,7 @@ function create(env){
     markDirty(){noteDeletes();persistSoon();env.status('saving');if(running)again=true;schedule(DEBOUNCE);},
     saveNow(){persistNow();env.status('saving');if(running){again=true;return;}if(timer){clearTimeout(timer);timer=null;}run();},
     flush:persistNow,
+    foldSiblings,
     allowRevive(){revive=true;},
     requestSync(ms){if(running){again=true;return;}schedule(ms||0);},
     async poll(){
@@ -2068,6 +2101,7 @@ function create(env){
     /* initial load: reconcile stored local state with the server */
     async load(){
       const stored=env.readStored?env.readStored():null;
+      if(stored&&stored.tab)foldSeen[stored.tab]=Math.max(foldSeen[stored.tab]||0,stored.ts||0);   // the record we start from is already ours
       let R=null,failed=false;
       try{
         const full=await withTimeout(T.get(),env.loadTimeoutMs||25000);
@@ -2194,7 +2228,7 @@ function _pfReadStored(){
 }
 function _pfWriteStored(rec){
   let str;try{str=JSON.stringify(rec);}catch(_){return false;}
-  const put=()=>{try{localStorage.setItem(PF_STORE_KEY,str);return true;}catch(_){return false;}};
+  const put=()=>{try{localStorage.setItem(PF_STORE_KEY,str);try{localStorage.setItem('pf6m',JSON.stringify({tab:rec.tab||null,ts:rec.ts||0}));}catch(_){}return true;}catch(_){return false;}};
   if(put()){try{localStorage.removeItem('pf4');}catch(_){}return true;}
   // Quota full: shed rolling backups (the server holds the real history) until the live record fits.
   try{
@@ -2236,6 +2270,7 @@ const PF=PFSync.create({
   localKeys:PF_LOCAL_KEYS,
   transport:{head:_pbHead,get:_pbGetFull,put:_pbPut},
   readStored:_pfReadStored,
+  peekMeta:()=>{try{return JSON.parse(localStorage.getItem('pf6m')||'null');}catch(_){return null;}},
   writeStored:_pfWriteStored,
   stash:_pfStash,
   validate:()=>_pfSchemaTooNew?{ok:false,reason:'This workspace was saved by a newer version of ProjectFlow — refresh the page'}:_validateBeforeSave(),
@@ -3505,6 +3540,7 @@ document.addEventListener('visibilitychange',()=>{
   else if(_pbToken){PF.requestSync(0);if(!_pbEventSource)_startPBRealtime();}
 });
 window.addEventListener('pagehide',()=>{try{PF.flush();}catch(_){}});
+window.addEventListener('storage',e=>{if(e.key==='pf6m'){try{PF.foldSiblings();}catch(_){}}});   // another tab of this browser saved: fold its pending edits in
 window.addEventListener('beforeunload',e=>{
   try{PF.flush();}catch(_){}
   if(_pfUnsynced&&_pfBadSince){e.preventDefault();e.returnValue='';}   // only when changes genuinely haven't reached the server
