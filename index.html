@@ -501,6 +501,21 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 
 /* ── KANBAN ── */
 .kb-blk-tg.on{border-color:#f43f5e;color:#f43f5e;}
+.dash-grp-hd{display:flex;align-items:center;gap:8px;margin:14px 0 8px;font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);cursor:pointer;user-select:none;}
+.dash-grp-hd:first-child{margin-top:2px;}
+.dash-grp-n{font-weight:600;color:var(--muted);font-size:.66rem;}
+.dash-crow{display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface);border:1px solid var(--border);border-radius:9px;margin-bottom:6px;cursor:pointer;font-size:.8rem;transition:border-color .14s;}
+.dash-crow:hover{border-color:var(--acc);}
+.dash-crow-nm{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.dash-crow-meta{font-size:.66rem;color:var(--muted);font-family:'DM Mono',monospace;white-space:nowrap;}
+@media(max-width:560px){.dash-crow-dt{display:none;}}
+.qn-ed{min-height:58px;max-height:170px;overflow:auto;padding:8px 10px;border:1.5px solid var(--border);border-radius:8px;background:var(--bg);font-size:.8rem;line-height:1.45;outline:none;word-break:break-word;}
+.qn-ed:focus{border-color:var(--acc);}
+.qn-ed:empty:before{content:attr(data-ph);color:var(--muted);}
+.qn-ed ul,.qn-ed ol{margin:4px 0 4px 18px;}
+.qn-nb{min-height:0;background:var(--surface2);border-color:transparent;max-height:none;}
+.qn-note{margin-bottom:8px;}
+.qn-meta{display:flex;align-items:center;font-size:.62rem;color:var(--muted);padding:3px 2px 0;}
 .kb-wrap{display:flex;gap:11px;overflow-x:auto;padding-bottom:12px;min-height:60vh;}
 .kb-col{min-width:260px;max-width:280px;flex:0 0 260px;display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
 .kb-col.drag-over{border-color:var(--acc);background:rgba(98,208,170,.03);}
@@ -4891,6 +4906,167 @@ function ecShowTab(projId,tab,save=true){
   card.querySelectorAll('.ec-pane').forEach(p=>p.classList.toggle('active',p.dataset.pane===tab));
 }
 
+
+/* ════ DASHBOARD: per-account view settings ════ */
+function _dKey(){return (typeof _pbUser!=='undefined'&&_pbUser&&(_pbUser.id||_pbUser.email))||'device';}
+function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
+function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
+const DASH_SECTIONS=[['cowork','Next co-working day'],['events','Events'],['focus','Due this week'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team']];
+function _dsOn(id){return !(_dprefRead().hide||[]).includes(id);}
+function dsToggle(id){_dprefSet(p=>{const h=new Set(p.hide||[]);h.has(id)?h.delete(id):h.add(id);p.hide=[...h];});render();}
+function dsShowAll(){_dprefSet(p=>{p.hide=[];});render();}
+function dsPopToggle(){window._dsOpen=!window._dsOpen;render();}
+function _dsPopHtml(){
+  if(!window._dsOpen)return'';
+  return '<div style="position:absolute;right:0;top:34px;z-index:60;background:var(--surface);border:1px solid var(--border2);border-radius:10px;padding:10px 12px;min-width:220px;box-shadow:0 10px 30px rgba(0,0,0,.35);">'
+   +'<div style="font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-bottom:6px;">Show on dashboard</div>'
+   +DASH_SECTIONS.map(([id,l])=>'<label style="display:flex;align-items:center;gap:8px;padding:5px 0;font-size:.8rem;cursor:pointer;"><input type="checkbox" '+(_dsOn(id)?'checked ':'')+'onchange="dsToggle(\''+id+'\')"> '+l+'</label>').join('')
+   +'<div style="display:flex;justify-content:space-between;margin-top:8px;"><button class="btn btn-ghost btn-xs" onclick="dsShowAll()">Show all</button><button class="btn btn-acc btn-xs" onclick="dsPopToggle()">Done</button></div>'
+   +'<div style="font-size:.62rem;color:var(--muted);margin-top:8px;">Saved to your account, so it follows you across devices.</div></div>';
+}
+
+/* ════ DASHBOARD: events grouped by what is happening ════ */
+function _projWin(p){
+  if(!p.startDate&&!p.endDate)return null;
+  let s=p.startDate||p.endDate,e=p.endDate||p.startDate;
+  const seg=getPhaseBars(p);
+  if(seg.length){s=seg.reduce((a,x)=>x.startDate<a?x.startDate:a,seg[0].startDate);e=seg.reduce((a,x)=>x.endDate>a?x.endDate:a,seg[0].endDate);}
+  return{s,e};
+}
+function _dashGroups(list){
+  const today=_spIso(),soonEnd=_spIso(new Date(Date.now()+42*86400000));
+  const g={now:[],soon:[],undated:[],later:[],finished:[]};
+  list.forEach(p=>{const w=_projWin(p);let k;
+    if(!w)k='undated';else if(today>w.e)k='finished';else if(today>=w.s)k='now';else if(w.s<=soonEnd)k='soon';else k='later';
+    g[k].push({p,w});});
+  const cmp=(a,b)=>a<b?-1:a>b?1:0;
+  g.now.sort((a,b)=>cmp(a.p.endDate||a.w.e,b.p.endDate||b.w.e));
+  g.soon.sort((a,b)=>cmp(a.w.s,b.w.s));
+  g.later.sort((a,b)=>cmp(a.w.s,b.w.s));
+  g.finished.sort((a,b)=>cmp(b.w.e,a.w.e));
+  const of={},idx={};
+  Object.keys(g).forEach(k=>g[k].forEach((x,i)=>{of[x.p.id]=k;idx[x.p.id]=i;}));
+  return{ordered:[...g.now,...g.soon,...g.undated,...g.later,...g.finished].map(x=>x.p),counts:{now:g.now.length,soon:g.soon.length,undated:g.undated.length,later:g.later.length,finished:g.finished.length},of:p=>of[p.id],idx:p=>idx[p.id]};
+}
+const DASH_GROUP_LABELS={now:'Happening now',soon:'Coming up',undated:'No dates yet',later:'Later',finished:'Finished'};
+function _dashGrpOpen(g){const v=(_dprefRead().grpOpen||{})[g];return v===undefined?(g==='now'||g==='soon'||g==='undated'):!!v;}
+function dashGrpToggle(g){const open=_dashGrpOpen(g);_dprefSet(p=>{p.grpOpen={...(p.grpOpen||{}),[g]:!open};});render();}
+function _dashGroupHd(g,gi){
+  const open=_dashGrpOpen(g);
+  return '<div class="dash-grp-hd" onclick="dashGrpToggle(\''+g+'\')"><span style="font-size:.6rem;color:var(--muted);display:inline-block;transition:transform .15s;'+(open?'':'transform:rotate(-90deg);')+'">&#9662;</span><span>'+DASH_GROUP_LABELS[g]+'</span><span class="dash-grp-n">'+gi.counts[g]+'</span></div>';
+}
+function _dashCompactRow(p){
+  const comp=projComp(p);
+  const ds=p.startDate&&p.endDate?fmtD(p.startDate)+' → '+fmtD(p.endDate):p.endDate?'Due '+fmtD(p.endDate):'No dates';
+  const open=S.tasks.filter(t=>t.projectId===p.id&&!t.done).length;
+  return '<div class="dash-crow" onclick="openDetail(\''+p.id+'\')"><span style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;"></span>'
+   +'<span class="dash-crow-nm">'+p.name+'</span><span class="dash-crow-meta dash-crow-dt">'+ds+'</span><span class="dash-crow-meta dash-crow-dt">'+open+' open</span>'
+   +'<span class="dash-crow-meta" style="min-width:30px;text-align:right;">'+comp+'%</span></div>';
+}
+
+/* ════ QUICK NOTES (shared, rich text) ════ */
+function _qn(){if(!S.quickNotes)S.quickNotes=[];return S.quickNotes;}
+function _qnClean(html){
+  const root=new DOMParser().parseFromString('<div>'+String(html||'')+'</div>','text/html').body.firstChild;
+  const ok={B:1,STRONG:1,I:1,EM:1,U:1,S:1,UL:1,OL:1,LI:1,BR:1,DIV:1,P:1,A:1};
+  (function walk(n){[...n.childNodes].forEach(c=>{
+    if(c.nodeType===3)return;
+    if(c.nodeType!==1){c.remove();return;}
+    if(/^(SCRIPT|STYLE|IFRAME|OBJECT|EMBED|NOSCRIPT|TEMPLATE)$/.test(c.tagName)){c.remove();return;}
+    if(!ok[c.tagName]){walk(c);while(c.firstChild)n.insertBefore(c.firstChild,c);c.remove();return;}
+    [...c.attributes].forEach(a=>{if(!(c.tagName==='A'&&a.name==='href'&&/^(https?:|mailto:)/i.test(a.value)))c.removeAttribute(a.name);});
+    if(c.tagName==='A'){c.setAttribute('target','_blank');c.setAttribute('rel','noopener');}
+    walk(c);});})(root);
+  return root.innerHTML.trim();
+}
+function _qnText(html){const d=document.createElement('div');d.innerHTML=html||'';return (d.textContent||'').trim();}
+function _qnAgo(ts){const m=Math.round((Date.now()-ts)/60000);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.round(m/60);if(h<24)return h+'h ago';const d=Math.round(h/24);return d+'d ago';}
+function _qnNoteHtml(n){
+  return '<div class="qn-note" data-id="'+n.id+'"><div class="qn-ed qn-nb" contenteditable="true" onblur="qnSave(\''+n.id+'\',this)">'+_qnClean(n.html)+'</div>'
+   +'<div class="qn-meta"><span>'+escHtml(n.byName||'Someone')+' · '+_qnAgo(n.ts||0)+'</span><span style="margin-left:auto;display:flex;gap:4px;">'
+   +(n.org?'<button class="btn btn-ghost btn-xs" onclick="qnOrganise(\''+n.id+'\',false)">Restore</button>':'<button class="btn btn-ghost btn-xs" onclick="qnOrganise(\''+n.id+'\',true)" title="Sorted into the right place: tuck it away">Organised ✓</button>')
+   +'<button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="qnDelete(\''+n.id+'\')" title="Delete note">×</button></span></div></div>';
+}
+function _qnListHtml(){
+  const all=[..._qn()].sort((a,b)=>(b.ts||0)-(a.ts||0));
+  const live=all.filter(n=>!n.org),org=all.filter(n=>n.org);
+  return (live.length?live.map(_qnNoteHtml).join(''):'<div style="font-size:.75rem;color:var(--muted);padding:6px 2px;">Nothing waiting. Jot something above.</div>')
+   +(org.length?'<div class="dash-grp-hd" style="margin-top:8px;" onclick="window._qnOrg=!window._qnOrg;_qnRefresh()"><span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(window._qnOrg?'':'transform:rotate(-90deg);')+'">&#9662;</span><span>Organised</span><span class="dash-grp-n">'+org.length+'</span></div>'+(window._qnOrg?org.map(_qnNoteHtml).join(''):''):'');
+}
+function _qnRefresh(){const l=el('qn-list');if(l)l.innerHTML=_qnListHtml();}
+function _quickNotesCardHtml(){
+  const btn=(cmd,label,tip)=>'<button type="button" class="btn btn-ghost btn-xs" title="'+tip+'" onmousedown="event.preventDefault()" onclick="document.execCommand(\''+cmd+'\')" style="min-width:26px;">'+label+'</button>';
+  return '<div class="card" id="dash-quick-notes"><div class="card-hd"><span class="card-title">Quick Notes</span><span style="font-size:.62rem;color:var(--muted);">Shared with the team</span></div><div class="card-bd">'
+   +'<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">'+btn('bold','<b>B</b>','Bold')+btn('italic','<i>I</i>','Italic')+btn('underline','<u>U</u>','Underline')+btn('insertUnorderedList','• List','Bullet list')+btn('insertOrderedList','1. List','Numbered list')+'</div>'
+   +'<div id="qn-new" class="qn-ed" contenteditable="true" data-ph="Jot down a task, idea or reminder…" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();qnAdd();}"></div>'
+   +'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;"><button class="btn btn-acc btn-xs" onclick="qnAdd()">Add note</button><span style="font-size:.62rem;color:var(--muted);">Ctrl/Cmd + Enter</span></div>'
+   +'<div id="qn-list" style="max-height:380px;overflow:auto;">'+_qnListHtml()+'</div></div></div>';
+}
+function qnAdd(){
+  const ed=el('qn-new');if(!ed)return;
+  const html=_qnClean(ed.innerHTML);if(!_qnText(html))return;
+  _qn().push({id:uid(),html,by:(typeof PF!=='undefined'&&_pbUser?(_pbUser.id||_pbUser.email):null)||'',byName:(_pbUser&&(_pbUser.name||_pbUser.email))||'',ts:Date.now(),org:false});
+  ed.innerHTML='';save();_qnRefresh();ed.focus();
+}
+function qnSave(id,node){
+  const n=_qn().find(x=>x.id===id);if(!n)return;
+  const html=_qnClean(node.innerHTML);
+  if(!_qnText(html)){qnDelete(id);return;}
+  if(html!==_qnClean(n.html)){n.html=html;save();}
+}
+function qnOrganise(id,v){const n=_qn().find(x=>x.id===id);if(!n)return;n.org=!!v;save();_qnRefresh();}
+function qnDelete(id){saveWithUndo('Delete note');S.quickNotes=_qn().filter(x=>x.id!==id);save();_qnRefresh();}
+
+/* ════ NEXT CO-WORKING DAY ════ */
+function _nextCowork(){
+  const t=_spIso();
+  return (S.coworkDays||[]).filter(d=>d.date&&d.date>=t).sort((a,b)=>a.date<b.date?-1:a.date>b.date?1:((a.startTime||'')<(b.startTime||'')?-1:1))[0]||null;
+}
+function cwTag(tid,did){const t=getTask(tid);if(!t||!did)return;t.coworkDayId=did;save();render();}
+function cwUntag(tid){const t=getTask(tid);if(!t)return;t.coworkDayId='';save();render();}
+function _coworkCardHtml(mf){
+  const d=_nextCowork();
+  const hd='<div class="card-hd"><span class="card-title">Next Co-working Day</span><button class="btn btn-ghost btn-xs" onclick="openModal(\'coworkDay\',null)">+ New</button></div>';
+  if(!d)return '<div class="card" id="dash-cowork">'+hd+'<div class="card-bd"><div style="font-size:.78rem;color:var(--muted);">No co-working day scheduled. <span style="color:var(--acc);cursor:pointer;" onclick="openModal(\'coworkDay\',null)">Schedule one</span></div></div></div>';
+  const today=_spIso();
+  const days=Math.round((new Date(d.date)-new Date(today))/86400000);
+  const when=days===0?'Today':days===1?'Tomorrow':'In '+days+' days';
+  const dateStr=new Date(d.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'});
+  const act=t=>{const p=getProject(t.projectId);return p&&p.status==='active'&&!t.parentId?true:(p&&p.status==='active');};
+  const mine=t=>!mf||(t.assignees||[]).includes(mf);
+  const tagged=S.tasks.filter(t=>t.coworkDayId===d.id&&mine(t)).sort((a,b)=>(a.done-b.done)||((a.endDate||'9')<(b.endDate||'9')?-1:1));
+  const doneN=tagged.filter(t=>t.done).length;
+  const pastIds=(S.coworkDays||[]).filter(x=>x.date<today).map(x=>x.id);
+  const sugg=S.tasks.filter(t=>!t.done&&act(t)&&mine(t)&&t.coworkDayId!==d.id&&((t.coworkDayId&&pastIds.includes(t.coworkDayId))||(t.endDate&&t.endDate<=d.date)))
+    .sort((a,b)=>(a.endDate||'9')<(b.endDate||'9')?-1:1).slice(0,5);
+  const row=(t,tag)=>{const p=getProject(t.projectId);const od=t.endDate&&t.endDate<today&&!t.done;
+    return '<div style="display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);">'
+     +(tag?'<div class="ti-check'+(t.done?' done':'')+'" onclick="toggleDone(\''+t.id+'\')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid rgba(255,255,255,.18);flex-shrink:0;cursor:pointer;"></div>':'<button class="btn btn-ghost btn-xs" onclick="cwTag(\''+t.id+'\',\''+d.id+'\')" title="Add to this co-working day" style="padding:0 6px;">+</button>')
+     +'<div style="flex:1;min-width:0;cursor:pointer;" onclick="openModal(\'task\',\''+t.id+'\')"><div style="font-size:.76rem;'+(t.done?'text-decoration:line-through;color:var(--muted);':'')+'white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+t.name+'</div>'
+     +(p?'<div style="font-size:.6rem;color:var(--muted);display:flex;align-items:center;gap:4px;"><span style="width:5px;height:5px;border-radius:50%;background:'+p.color+';"></span>'+p.name+'</div>':'')+'</div>'
+     +(t.endDate?'<span style="font-size:.6rem;font-family:\'DM Mono\',monospace;color:'+(od?'var(--red)':'var(--muted)')+';">'+fmtD(t.endDate)+'</span>':'')
+     +(tag?'<button class="btn btn-ghost btn-xs" onclick="cwUntag(\''+t.id+'\')" title="Remove from this day" style="padding:0 5px;color:var(--muted);">×</button>':'')+'</div>';};
+  const mems=(d.members||[]).map(id=>avHtml(id,18)).join('');
+  return '<div class="card" id="dash-cowork">'+hd+'<div class="card-bd">'
+   +'<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><span style="font-size:.95rem;font-weight:700;">'+escHtml(d.title||'Co-working day')+'</span><span style="font-size:.7rem;font-weight:700;color:var(--acc);">'+when+'</span></div>'
+   +'<div style="font-size:.72rem;color:var(--text2);margin-top:2px;">'+dateStr+(d.startTime?' · '+d.startTime+(d.endTime?'–'+d.endTime:''):'')+(d.notes?' · '+escHtml(d.notes):'')+'</div>'
+   +(mems?'<div style="display:flex;gap:3px;margin-top:6px;">'+mems+'</div>':'')
+   +(d.objectives?'<div style="font-size:.74rem;color:var(--text);margin-top:8px;padding:7px 9px;background:var(--surface2);border-left:3px solid var(--acc);border-radius:6px;white-space:pre-wrap;">'+escHtml(d.objectives)+'</div>':'')
+   +'<div style="display:flex;align-items:center;gap:8px;margin:12px 0 4px;"><span style="font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);">Tasks for this day</span>'+(tagged.length?'<span style="font-size:.62rem;color:var(--muted);font-family:\'DM Mono\',monospace;">'+doneN+'/'+tagged.length+'</span>':'')+'</div>'
+   +(tagged.length?tagged.map(t=>row(t,true)).join(''):'<div style="font-size:.74rem;color:var(--muted);padding:2px 0 4px;">Nothing planned yet. Add tasks below.</div>')
+   +(sugg.length?'<div style="font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px;">Suggested</div>'+sugg.map(t=>row(t,false)).join(''):'')
+   +'<div style="display:flex;gap:6px;margin-top:10px;"><button class="btn btn-ghost btn-xs" onclick="openModal(\'coworkDay\',\''+d.id+'\')">Edit day</button></div>'
+   +'</div></div>';
+}
+function _cwTaskField(task){
+  const t=_spIso();
+  const days=(S.coworkDays||[]).filter(d=>d.date>=t||(task&&task.coworkDayId===d.id)).sort((a,b)=>a.date<b.date?-1:1);
+  if(!days.length)return'';
+  const cur=task?.coworkDayId||'';
+  return '<div class="field"><label class="flbl">Co-working day</label><select class="fsel" id="tm-cw" style="width:100%;"><option value="">Not planned for one</option>'
+   +days.map(d=>'<option value="'+d.id+'"'+(cur===d.id?' selected':'')+'>'+new Date(d.date+'T12:00:00').toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short'})+' · '+escHtml(d.title||'Co-working day')+'</option>').join('')+'</select></div>';
+}
+
 function renderDash(){
   const active=S.projects.filter(p=>p.status==='active');
   const mf=S.activeMember;
@@ -4916,10 +5092,11 @@ function renderDash(){
   return`<div class="fu">
 <div class="page-hd">
   <div class="page-title"><em>Dashboard</em>${mf?`<span style="font-size:.75rem;font-weight:400;color:var(--acc);margin-left:8px;">· ${getMember(mf)?.name||''} <button class="btn btn-ghost btn-xs" style="margin-left:4px;" onclick="S.activeMember=null;save();render()">✕</button></span>`:''}</div>
+  <div style="position:relative;"><button class="btn btn-ghost btn-sm" onclick="dsPopToggle()" title="Choose what shows on your dashboard">Customise</button>${_dsPopHtml()}</div>
 </div>
 
 <!-- TIMELINE (collapsible) -->
-${active.length>0?`<div style="margin-bottom:18px;">
+${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;">
   <div class="sec-hd" style="margin-bottom:10px;cursor:pointer;" onclick="const g=el('dash-gantt');if(g){const open=g.style.display!=='none';g.style.display=open?'none':'block';this.querySelector('.sec-chev').style.transform=open?'rotate(-90deg)':'';}">
     <span class="sec-lbl">Timeline</span>
     <svg class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
@@ -4928,7 +5105,7 @@ ${active.length>0?`<div style="margin-bottom:18px;">
 </div>`:''}
 
 <!-- TEAM OKRs -->
-<div style="margin-bottom:18px;" id="dash-team-okrs">
+${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
     <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="toggleEl('dash-team-okr-body')"><span class="sec-lbl">Team Objectives</span></div>
     <div style="display:flex;gap:5px;">
@@ -4937,10 +5114,10 @@ ${active.length>0?`<div style="margin-bottom:18px;">
     </div>
   </div>
   <div id="dash-team-okr-body">${renderTeamOkrs()}</div>
-</div>
+</div>`:''}
 
 <!-- QUICK LINKS -->
-${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
+${_dsOn('links')?`<div style="margin-bottom:18px;">
   <div class="sec-hd" style="margin-bottom:9px;"><span class="sec-lbl">Quick Links</span></div>
   ${(()=>{
     const cats=[...new Set(S.quickLinks.map(q=>q.category||''))];
@@ -4977,7 +5154,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
 <div class="ec-two-col">
 
   <!-- LEFT: Event cards with filter -->
-  <div style="container-type:inline-size;container-name:ec-two-left;min-width:0;">
+  <div style="${_dsOn('events')?'':'display:none;'}container-type:inline-size;container-name:ec-two-left;min-width:0;">
     <div style="display:flex;align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;">
       <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.length})</button>
       <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>p.status==='active').length})</button>
@@ -4997,7 +5174,17 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
         });
       }
       if(filtered.length===0)return`<div class="empty"><div class="empty-ico">${ICO.folder}</div><div class="empty-txt">No projects here. <span style="color:var(--acc);cursor:pointer;" onclick="openModal('project',null)">Create one →</span></div></div>`;
+      const _gi=(filter==='active'||filter==='all')?_dashGroups(filtered.filter(p=>p.status==='active')):null;
+      if(_gi)filtered=[..._gi.ordered,...filtered.filter(p=>p.status!=='active')];
+      let _lastG='';
       return filtered.map(p=>{
+      const _g=_gi?(p.status==='active'?_gi.of(p):'other'):'other';
+      let _pre='';
+      if(_g!==_lastG){_lastG=_g;if(_gi&&_g!=='other')_pre=_dashGroupHd(_g,_gi);}
+      if(_gi&&_g!=='other'){
+        if(!_dashGrpOpen(_g))return _pre;
+        if(_g==='later'||_g==='finished'||(_g==='soon'&&_gi.idx(p)>=4))return _pre+_dashCompactRow(p);
+      }
       const isInactive=filter==='all'&&p.status!=='active';const comp=projComp(p);
       const mf=S.activeMember;
       const top=sortTasksDoneToBottom(S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(!mf||(t.assignees||[]).includes(mf))));
@@ -5014,7 +5201,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
       const mems=p.ownerId?[p.ownerId].filter(id=>getMember(id)):[];
       const datesStr=p.startDate&&p.endDate?`${fmtD(p.startDate)} → ${fmtD(p.endDate)}`:p.endDate?`Due ${fmtD(p.endDate)}`:'';
 
-      return`<div class="ec-card${actuallyExp?' expanded':''}" ${isInactive?'data-inactive="1"':''} data-proj="${p.id}">
+      return _pre+`<div class="ec-card${actuallyExp?' expanded':''}" ${isInactive?'data-inactive="1"':''} data-proj="${p.id}">
         <!-- Header — always visible -->
         <div class="ec-header" onclick="ecToggle('${p.id}')">
           <div class="ec-color" style="background:${p.color};"></div>
@@ -5097,8 +5284,10 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
   <!-- RIGHT: Focus + Team -->
   <div style="display:flex;flex-direction:column;gap:14px;min-width:0;">
 
+    ${_dsOn('cowork')?_coworkCardHtml(mf):''}
+
     <!-- Focus: due this week -->
-    <div class="card">
+    ${_dsOn('focus')?`<div class="card">
       <div class="card-hd"><span class="card-title">Due This Week</span>${mf?`<button class="btn btn-ghost btn-xs" onclick="S.activeMember=null;save();render()">✕ ${getMember(mf)?.name||''}</button>`:''}</div>
       <div class="card-bd">
         ${focusTasks.length===0?`<div style="color:var(--muted);font-size:.78rem;">Nothing due — all clear!</div>`:''}
@@ -5115,7 +5304,9 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
           </div>`;
         }).join('')}
       </div>
-    </div>
+    </div>`:''}
+
+    ${_dsOn('notes')?_quickNotesCardHtml():''}
 
     ${mf?(()=>{
       const mfm=getMember(mf);
@@ -5138,7 +5329,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
     })():''}
 
     <!-- Team workload -->
-    <div class="card">
+    ${_dsOn('team')?`<div class="card">
       <div class="card-hd">
         <span class="card-title">Team</span>
         <button class="btn btn-acc btn-xs" onclick="openModal('member',null)" style="font-size:.68rem;">+ Add member</button>
@@ -5159,7 +5350,7 @@ ${S.quickLinks.length>0||true?`<div style="margin-bottom:18px;">
           </div>`;
         }).join('')}
       </div>
-    </div>
+    </div>`:''}
 
   </div>
 </div>
@@ -9723,6 +9914,7 @@ function taskModalHtml(data){
 
   ${S.members.length>0?`<div class="field"><label class="flbl">Assignees</label><div class="av-toggle-grid" id="tm-av-grid">${S.members.map(m=>`<div class="av-toggle${defAssignees.includes(m.id)?' active':''}" onclick="this.classList.toggle('active')" data-id="${m.id}">${avHtml(m.id,18)}<span>${m.name.split(' ')[0]}</span></div>`).join('')}</div></div>`:''}
 
+  ${_cwTaskField(task)}
   ${S.labels.length>0?`<div class="field"><label class="flbl">Labels${((task&&labelsInherited(task))||(!task&&defParent&&defLabels.length))?'<span id="tm-lb-inherit-note" style="font-size:.62rem;font-weight:400;color:var(--muted);margin-left:6px;">(inherited from parent)</span>':''}</label><div class="pill-sel" id="tm-lb-pills" data-inherited="${((task&&labelsInherited(task))||(!task&&defParent&&defLabels.length))?'1':'0'}">${S.labels.map(l=>`<span class="pill-opt${defLabels.includes(l.id)?' active':''}" style="border-color:${l.color}44;color:${l.color}88;${defLabels.includes(l.id)?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':''}" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';document.getElementById('tm-lb-pills').dataset.inherited='0';const n=document.getElementById('tm-lb-inherit-note');if(n)n.style.display='none';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
 
   ${parentOpts?`<div>
@@ -9783,7 +9975,7 @@ function saveTask(eid,defParent,tmplId){
   // null = inherit from parent. Only set explicit labels when user actually picked some.
   // tmLbStillInherited: user opened an inheriting subtask and didn't touch labels → keep null.
   const labels=tmLbStillInherited?null:(rawTmLabels.length>0?rawTmLabels:(parentVal?null:[]));
-  const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{}};
+  const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{},...(el('tm-cw')?{coworkDayId:el('tm-cw').value}:{})};
   if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   saveWithUndo(eid?'Edit task':'Add task');
   if(eid){_pfApplyEdit('tasks',eid,task);}else S.tasks.push(task);
