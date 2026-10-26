@@ -6584,7 +6584,7 @@ ${(()=>{
   },0);
 
   // Event date tile — three states using startDate and endDate
-  const today=new Date();todayStr=toISO(today);
+  const today=new Date();
   const msPerDay=86400000;
   const eventDateTile=(()=>{
     if(!p.startDate&&!p.endDate)return null;
@@ -7715,7 +7715,6 @@ let _ptBuf=[];
 let _ptEditing=-1;
 let _ptTmplId='';
 
-function escHtml(s){return(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');}
 
 function ptPickPrio(btn,val){
   const prioColors={Low:'var(--green)',Medium:'var(--yellow)',High:'var(--orange,#f97316)',Critical:'var(--red)'};
@@ -8975,6 +8974,7 @@ function var_css(name){return getComputedStyle(document.documentElement).getProp
 function mkDonut(canvasId,labels,data,colors,legId=null){
   if(charts[canvasId])charts[canvasId].destroy();
   const cv=el(canvasId);if(!cv)return;
+  if(typeof Chart==='undefined'){cv.parentNode&&(cv.style.display='none');return;}
   charts[canvasId]=new Chart(cv,{type:'doughnut',data:{labels,datasets:[{data,backgroundColor:colors,borderWidth:2,borderColor:'#1c1c1c',hoverOffset:4}]},options:{responsive:true,maintainAspectRatio:false,cutout:'65%',plugins:{legend:{display:false},tooltip:{callbacks:{label:ctx=>{const t=data.reduce((a,b)=>a+b,0);return` ${fmtGBP(ctx.raw)} (${(ctx.raw/t*100).toFixed(1)}%)`}}}}}});
   if(legId){const le=el(legId);if(le){const tot=data.reduce((a,b)=>a+b,0);le.innerHTML=labels.map((l,i)=>`<span class="leg-item"><span class="leg-dot" style="background:${colors[i]}"></span>${l}<span class="leg-pct">${(data[i]/tot*100).toFixed(1)}%</span></span>`).join('');}}
 }
