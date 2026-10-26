@@ -495,6 +495,7 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 .cwtt-row svg{flex-shrink:0;margin-top:1px;}
 
 /* ── KANBAN ── */
+.kb-blk-tg.on{border-color:#f43f5e;color:#f43f5e;}
 .kb-wrap{display:flex;gap:11px;overflow-x:auto;padding-bottom:12px;min-height:60vh;}
 .kb-col{min-width:260px;max-width:280px;flex:0 0 260px;display:flex;flex-direction:column;background:var(--surface2);border:1px solid var(--border);border-radius:12px;overflow:hidden;transition:border-color .2s;}
 .kb-col.drag-over{border-color:var(--acc);background:rgba(98,208,170,.03);}
@@ -2014,7 +2015,7 @@ else root.PFSync=PFSync;
 /*PFSYNC:END*/
 
 /* ── Sync glue: PocketBase transport, local persistence, UI hooks ── */
-const PF_LOCAL_KEYS=['kbSort','detailId','activeMember','projFilter','kbFilter','dashFilters','campaignFilter','taskSort','expandedTasks','expandedGantt','hideDone'];
+const PF_LOCAL_KEYS=['kbSort','detailId','activeMember','projFilter','kbFilter','dashFilters','campaignFilter','taskSort','expandedTasks','expandedGantt','hideDone','kbShowBlocked'];
 const PF_STORE_KEY='pf6';
 const _PB_Q='/api/collections/workspace_state/records?filter='+encodeURIComponent('(workspace="'+PB_WORKSPACE+'")')+'&perPage=1';
 const _pbTok=r=>(r.updated||'')+'|'+(r.updated_at||'');
@@ -3346,7 +3347,8 @@ window.addEventListener('offline',()=>{_online=false;_setSyncStatus('offline');}
 
 const COLORS=['#62D0AA','#14b8a6','#06b6d4','#22d3ee','#3b82f6','#6366f1','#8b5cf6','#a855f7','#ec4899','#f43f5e','#ef4444','#f97316','#fb923c','#f59e0b','#84cc16'];
 const PRIOS=['High','Medium','Low'];
-const KB_COLS=[{id:'todo',name:'To Do',color:'#888'},{id:'blocked',name:'Blocked',color:'#f43f5e'},{id:'in-progress',name:'In Progress',color:'#62D0AA'},{id:'review',name:'In Review',color:'#f59e0b'},{id:'done',name:'Done',color:'#1fba7a'}];
+const KB_COLS=[{id:'todo',name:'To Do',color:'#888'},{id:'blocked',name:'Blocked',color:'#f43f5e'},{id:'in-progress',name:'In Progress',color:'#62D0AA'},{id:'done',name:'Done',color:'#1fba7a'}];
+function _kbCols(){return S.kbShowBlocked?KB_COLS:KB_COLS.filter(c=>c.id!=='blocked');}
 const YEAR=new Date().getFullYear();
 const MOS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MDAYS=[31,28,31,30,31,30,31,31,30,31,30,31];
@@ -6795,14 +6797,16 @@ function renderKanban(){
     if(kPh&&t.phase!==kPh)return false;
     return true;
   }).forEach(t=>{
-    const st=t.kStatus||'todo';
+    let st=t.kStatus||'todo';
+    if(st==='review')st='in-progress';                 // legacy "In Review" cards now live in In Progress
+    if(st==='blocked'&&!S.kbShowBlocked)st='todo';     // blocked column hidden: card stays visible in To Do (still badged)
     if(tasksByCol[st])tasksByCol[st].push(t);
     else tasksByCol['todo'].push(t); // fallback for unknown status
   });
   if((S.kbSort||'auto')==='auto'){      // default: earliest due date first (undated last); same date -> higher priority first
     const _pr={Critical:0,High:1,Medium:2,Low:3};
     const _end=(a,b)=>a.endDate===b.endDate?0:(!a.endDate?1:(!b.endDate?-1:(a.endDate<b.endDate?-1:1)));
-    KB_COLS.forEach(c=>tasksByCol[c.id].sort((a,b)=>_end(a,b)||((_pr[a.priority]??4)-(_pr[b.priority]??4))||_cmpDue(a,b)));
+    _kbCols().forEach(c=>tasksByCol[c.id].sort((a,b)=>_end(a,b)||((_pr[a.priority]??4)-(_pr[b.priority]??4))||_cmpDue(a,b)));
   }
 
   return`<div class="fu">
@@ -6824,13 +6828,14 @@ function renderKanban(){
     <option value="auto" ${(S.kbSort||'auto')==='auto'?'selected':''}>Sort: due date, then priority</option>
     <option value="manual" ${S.kbSort==='manual'?'selected':''}>Sort: manual (drag to order)</option>
   </select>
+  <button class="btn btn-ghost btn-sm kb-blk-tg${S.kbShowBlocked?' on':''}" onclick="S.kbShowBlocked=!S.kbShowBlocked;try{save();}catch(_){}render()" title="Show or hide the Blocked column (remembered on this device)" aria-pressed="${S.kbShowBlocked?'true':'false'}">${S.kbShowBlocked?'Hide':'Show'} blocked column${S.kbShowBlocked?'':(()=>{const n=S.tasks.filter(t=>t.kStatus==='blocked'&&!t.done).length;return n?' ('+n+')':'';})()}</button>
   <div class="kb-phase-pills">
     ${PHASES.map(ph=>`<button class="kb-phase-pill${kPh===ph?' active':''}" onclick="S.kbFilter.phase=S.kbFilter.phase==='${ph}'?'':'${ph}';save();render()" style="border-color:${phaseColor(ph)};${kPh===ph?'background:'+phaseColor(ph)+';color:#fff;':'color:'+phaseColor(ph)+';'}">${ph}</button>`).join('')}
   </div>
   ${(kProj||kMem||kLbl||kPh)?`<button class="btn btn-ghost btn-sm" onclick="S.kbFilter={project:'',member:'',label:'',phase:''};save();render()">Clear filters</button>`:''}
 </div>
 <div class="kb-wrap">
-${KB_COLS.map(col=>`
+${_kbCols().map(col=>`
 <div class="kb-col" data-status="${col.id}">
   <div class="kb-col-hd">
     <div class="kb-col-name"><div class="kb-dot" style="background:${col.color};"></div>${col.name}</div>
@@ -12705,7 +12710,7 @@ function _dndDrop(e){
       const ct=pt?.closest('.kcard[data-task-id]');
       if(ct&&ct.dataset.taskId!==_dnd.data.taskId){
         const dropT=getTask(ct.dataset.taskId);if(!dropT)return;
-        const newSt=dropT.kStatus||'todo';
+        const newSt=ct.closest('.kb-cards[data-status]')?.dataset.status||dropT.kStatus||'todo';
         if(newSt==='blocked'){save();render();openModal('dependency',task.id);return;}
         applyKanbanStatusChange(task,newSt);
         const r=ct.getBoundingClientRect();
