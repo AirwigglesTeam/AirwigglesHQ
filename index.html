@@ -83,6 +83,8 @@ button,input,select,textarea,a{font-family:'Lexend',sans-serif;}
 .rbtn{height:44px;width:var(--rail-w);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;border:none;background:transparent;color:var(--muted);border-left:2px solid transparent;transition:color .15s,background .15s,border-color .15s;-webkit-tap-highlight-color:transparent;overflow:hidden;padding:0;}
 .rbtn-bookmark{height:36px;width:var(--rail-w);display:flex;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;border:none;background:transparent;border-left:2px solid transparent;transition:all .15s;padding:0;position:relative;}
 .rbtn-bookmark:hover{background:rgba(255,255,255,.06);}
+.rbtn-bookmark.active{border-left-color:var(--acc);background:var(--teal-dim);}
+.nitem.active[data-proj]{color:var(--acc);}
 .rbtn-bookmark .bm-dot{width:6px;height:6px;border-radius:50%;position:absolute;bottom:4px;left:50%;transform:translateX(-50%);}
 .rbtn svg{width:17px;height:17px;stroke-width:1.7;transition:transform .18s var(--ease);flex-shrink:0;display:block;}
 .rbtn:hover{color:var(--text);background:rgba(255,255,255,.04);}
@@ -4762,7 +4764,7 @@ function renderRailBookmarks(){
   return bms.map(id=>{
     const p=getProject(id);if(!p)return'';
     const initials=p.name.split(' ').map(w=>w[0]).join('').slice(0,2).toUpperCase();
-    return`<button class="rbtn-bookmark" data-tip="${p.name}" onclick="openDetail('${p.id}')" title="${p.name}">
+    return`<button class="rbtn-bookmark${S.detailId===p.id?' active':''}" data-proj="${p.id}" data-tip="${p.name}" onclick="openDetail('${p.id}')" title="${p.name}">
       <div style="width:26px;height:26px;border-radius:7px;background:${p.color};display:flex;align-items:center;justify-content:center;font-size:.55rem;font-weight:700;color:#fff;letter-spacing:-.02em;">${initials}</div>
     </button>`;
   }).join('');
@@ -4774,7 +4776,7 @@ function renderPanelBookmarks(){
   if(bms.length===0)return'';
   return bms.map(id=>{
     const p=getProject(id);if(!p)return'';
-    return`<div class="nav-row"><div class="nitem" onclick="closePanel();openDetail('${p.id}')" style="padding-left:28px;font-size:.78rem;gap:7px;">
+    return`<div class="nav-row"><div class="nitem${S.detailId===p.id?' active':''}" data-proj="${p.id}" onclick="closePanel();openDetail('${p.id}')" style="padding-left:28px;font-size:.78rem;gap:7px;">
       <div style="width:7px;height:7px;border-radius:2px;background:${p.color};flex-shrink:0;"></div>
       ${p.name}
       <svg width="9" height="9" viewBox="0 0 24 24" fill="var(--acc)" stroke="var(--acc)" stroke-width="1" stroke-linecap="round" style="margin-left:auto;flex-shrink:0;"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
@@ -4812,7 +4814,15 @@ document.addEventListener('touchstart',e=>{sx=e.touches[0].clientX;sy=e.touches[
 document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx,dy=Math.abs(e.changedTouches[0].clientY-sy);if(dy>40)return;if(sx<60&&dx>55&&!el('panel').classList.contains('open'))togglePanel();if(dx<-55&&el('panel').classList.contains('open'))closePanel();},{passive:true});
 
 /* ════ RENDER DISPATCH ════ */
-function render(){_rcOn();try{return _renderImpl();}finally{_rcOff();}}
+/* Sidebar highlight follows what is on screen: a bookmarked event lights its own bookmark, not the last tab */
+function _syncRailActive(){
+  const bm=S.detailId&&isBookmarked(S.detailId)?S.detailId:null;
+  document.querySelectorAll('.rbtn[data-v]').forEach(b=>b.classList.toggle('active',!bm&&b.dataset.v===V));
+  document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',!bm&&i.dataset.v===V));
+  document.querySelectorAll('.rbtn-bookmark[data-proj]').forEach(b=>b.classList.toggle('active',b.dataset.proj===bm));
+  document.querySelectorAll('.nitem[data-proj]').forEach(i=>i.classList.toggle('active',i.dataset.proj===bm));
+}
+function render(){_rcOn();try{return _renderImpl();}finally{_rcOff();try{_syncRailActive();}catch(_){}}}
 function _renderImpl(){
   const c=el('content');
   if(!c)return;
