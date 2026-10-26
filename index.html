@@ -10568,10 +10568,10 @@ function sponsorEditModalHtml(s,activeTab){
 
   <!-- Tab nav -->
   <div style="display:flex;gap:4px;margin-bottom:16px;flex-wrap:wrap;">
-    ${tabs.map(t=>`<button onclick="openEditSponsor('${s?.id||''}','${t}')"  style="padding:5px 12px;background:${tab===t?'var(--acc)':'var(--surface2)'};color:${tab===t?'var(--black)':'var(--text2)'};border:1px solid ${tab===t?'var(--acc)':'var(--border)'};border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .13s;">${tabLabels[t]}</button>`).join('')}
+    ${tabs.map(t=>`<button type="button" id="sp-tabn-${t}" onclick="switchSpTab('${t}')" style="padding:5px 12px;background:${tab===t?'var(--acc)':'var(--surface2)'};color:${tab===t?'var(--black)':'var(--text2)'};border:1px solid ${tab===t?'var(--acc)':'var(--border)'};border-radius:6px;font-size:.72rem;font-weight:600;cursor:pointer;transition:all .13s;">${tabLabels[t]}</button>`).join('')}
   </div>
 
-  ${tab==='main'?`
+  <div id="sp-tab-main" style="display:${tab==='main'?'block':'none'};">
   <div class="sp-detail-grid">
     <div class="field"><label class="flbl">Company Name *</label><input class="inp" id="sp-nm" value="${s?.name||''}" placeholder="e.g. Kilohearts" oninput="const m=el('sp-nm-mirror');if(m)m.value=this.value;"></div>
     <div class="field"><label class="flbl">Website</label><input class="inp" id="sp-web" value="${s?.website||''}" placeholder="kilohearts.com"></div>
@@ -10598,9 +10598,9 @@ function sponsorEditModalHtml(s,activeTab){
     </div>
   </div>
   <div class="field"><label class="flbl">General Notes</label><textarea class="txta" id="sp-nt" style="min-height:70px;">${s?.notes||''}</textarea></div>
-  `:''}
+  </div>
 
-  ${tab==='products'?`
+  <div id="sp-tab-products" style="display:${tab==='products'?'block':'none'};">
   <div style="font-size:.75rem;color:var(--text2);margin-bottom:12px;">Catalogue all products this sponsor makes. This helps with prize selection and integration ideas.</div>
 
 
@@ -10618,9 +10618,9 @@ function sponsorEditModalHtml(s,activeTab){
   </div>
   <div id="sp-products-list">${renderProductsEdit(s?.products||[])}</div>
   <button class="add-row-btn" onclick="addProductRow()">+ Add product</button>
-  `:''}
+  </div>
 
-  ${tab==='audience'?`
+  <div id="sp-tab-audience" style="display:${tab==='audience'?'block':'none'};">
   <div class="field"><label class="flbl">Audience Tags (press Enter to add)</label>
     <div style="display:flex;flex-wrap:wrap;gap:5px;padding:8px;background:var(--bg);border:1.5px solid var(--border);border-radius:7px;min-height:42px;margin-bottom:4px;" id="sp-audience-tags-wrap">
       ${(s?.audienceTags||[]).map(t=>`<span style="display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:20px;font-size:.68rem;" data-tag="${t}">${t}<span onclick="removeAudienceTag('${t}')" style="cursor:pointer;opacity:.7;margin-left:2px;">\u00d7</span></span>`).join('')}
@@ -10637,9 +10637,9 @@ function sponsorEditModalHtml(s,activeTab){
       ${['Free / Open Source','Freemium','Budget (under \u00a350)','Mid-range (\u00a350\u2013\u00a3200)','Professional (\u00a3200+)','Enterprise / Subscription'].map(t=>`<option value="${t}" ${s?.priceTier===t?'selected':''}>${t}</option>`).join('')}
     </select>
   </div>
-  `:''}
+  </div>
 
-  ${tab==='integrations'?`
+  <div id="sp-tab-integrations" style="display:${tab==='integrations'?'block':'none'};">
   <div class="field"><label class="flbl">Integration Types (what they can offer our events)</label>
     <div style="display:flex;flex-wrap:wrap;gap:6px;margin-top:6px;">
       ${['Prize Sponsor','Cash Sponsor','Featured Tutorial','Sponsored Post','Co-host','Exclusive Partner','Product Giveaway','Discount Code','Guest Speaker','Workshop','Streaming Partner','Award Category'].map(t=>`<label style="display:inline-flex;align-items:center;gap:5px;cursor:pointer;font-size:.73rem;padding:4px 10px;background:var(--surface2);border:1.5px solid ${(s?.integrationTypes||[]).includes(t)?'var(--acc)':'var(--border)'};border-radius:20px;transition:all .13s;" onclick="toggleIntegration('${t}',this)"><input type="checkbox" style="display:none;" ${(s?.integrationTypes||[]).includes(t)?'checked':''}><span id="spint-${t.replace(/\s+/g,'_')}">${t}</span></label>`).join('')}
@@ -10649,12 +10649,12 @@ function sponsorEditModalHtml(s,activeTab){
   <div class="field"><label class="flbl">Integration Ideas / Notes</label>
     <textarea class="txta" id="sp-integration-notes" style="min-height:100px;">${s?.integrationNotes||''}</textarea>
   </div>
-  `:''}
+  </div>
 
-  ${tab==='history'?`
+  <div id="sp-tab-history" style="display:${tab==='history'?'block':'none'};">
   <div id="sp-hist-edit">${renderHistEdit(s?.history||[])}</div>
   <button class="add-row-btn" onclick="addHistRow()">+ Add event</button>
-  `:''}
+  </div>
 
 </div>
 <div class="mo-ft" style="position:sticky;bottom:0;background:var(--surface);padding-top:10px;">
@@ -12323,25 +12323,25 @@ function saveSponsor(eid){
   const existing=eid?getSponsor(eid):{};
   const data={
     name,
-    website:el('sp-web')?.value.trim()||existing?.website||'',
-    description:el('sp-desc')?.value.trim()||existing?.description||'',
-    contactName:el('sp-cn')?.value.trim()||existing?.contactName||'',
-    contactRole:el('sp-cr')?.value.trim()||existing?.contactRole||'',
-    contactEmail:el('sp-ce')?.value.trim()||existing?.contactEmail||'',
-    backupContact:el('sp-bc')?.value.trim()||existing?.backupContact||'',
-    relationshipOwner:el('sp-ro')?.value.trim()||existing?.relationshipOwner||'',
-    bestContact:el('sp-bm')?.value.trim()||existing?.bestContact||'',
-    budgetCycle:el('sp-bc2')?.value.trim()||existing?.budgetCycle||'',
-    assetsUrl:el('sp-assets-url')?.value.trim()||existing?.assetsUrl||'',
-    assets:el('sp-as')?.value.trim()||existing?.assets||'',
+    website:(el('sp-web')?el('sp-web').value.trim():(existing?.website||'')),
+    description:(el('sp-desc')?el('sp-desc').value.trim():(existing?.description||'')),
+    contactName:(el('sp-cn')?el('sp-cn').value.trim():(existing?.contactName||'')),
+    contactRole:(el('sp-cr')?el('sp-cr').value.trim():(existing?.contactRole||'')),
+    contactEmail:(el('sp-ce')?el('sp-ce').value.trim():(existing?.contactEmail||'')),
+    backupContact:(el('sp-bc')?el('sp-bc').value.trim():(existing?.backupContact||'')),
+    relationshipOwner:(el('sp-ro')?el('sp-ro').value.trim():(existing?.relationshipOwner||'')),
+    bestContact:(el('sp-bm')?el('sp-bm').value.trim():(existing?.bestContact||'')),
+    budgetCycle:(el('sp-bc2')?el('sp-bc2').value.trim():(existing?.budgetCycle||'')),
+    assetsUrl:(el('sp-assets-url')?el('sp-assets-url').value.trim():(existing?.assetsUrl||'')),
+    assets:(el('sp-as')?el('sp-as').value.trim():(existing?.assets||'')),
     priorities:priorities.length?priorities:(existing?.priorities||[]),
-    notes:el('sp-nt')?.value.trim()||existing?.notes||'',
+    notes:(el('sp-nt')?el('sp-nt').value.trim():(existing?.notes||'')),
     products:products.length?products:(existing?.products||[]),
     audienceTags:audienceTags.length?audienceTags:(existing?.audienceTags||[]),
-    audienceNotes:el('sp-audience-notes')?.value.trim()||existing?.audienceNotes||'',
+    audienceNotes:(el('sp-audience-notes')?el('sp-audience-notes').value.trim():(existing?.audienceNotes||'')),
     priceTier:el('sp-price-tier')?.value||existing?.priceTier||'',
     integrationTypes:integrationTypes.length?integrationTypes:(existing?.integrationTypes||[]),
-    integrationNotes:el('sp-integration-notes')?.value.trim()||existing?.integrationNotes||'',
+    integrationNotes:(el('sp-integration-notes')?el('sp-integration-notes').value.trim():(existing?.integrationNotes||'')),
     history,
     deliverables:existing?.deliverables||[],
     logoDataUrl:window._spLogoDataUrl==='__remove__'?null:
