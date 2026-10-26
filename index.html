@@ -1733,7 +1733,7 @@ const withTimeout=(p,ms)=>new Promise((res,rej)=>{
    getState():S, replaceState(o), normalize(o) (apply defaults, detached),
    localKeys:[...]  keys that are per-device and never synced,
    transport:{ head()->{id,token}|null, get()->{id,token,data}|null,
-               put(str,id)->{token} },
+               put(str,id,baseToken)->{token}   (baseToken: version the write was merged against; a server may refuse a stale one by throwing {retry:true,conflict:true}) },
    readStored()->rec|null, writeStored(rec)->bool, peekMeta()->{tab,ts}|null (tiny record of who saved last), stash(str),
    validate(snap)->{ok,reason}, status(kind,msg), onApplied(), onSaved(snap),
    clientId, debounceMs, loadTimeoutMs, log
@@ -1986,7 +1986,7 @@ function create(env){
     lineage=lin;
     pushH({wid,seq,proj:snap,own:true});
     persistNow();
-    const res=await T.put(JSON.stringify(payload),head?head.id:null);
+    const res=await T.put(JSON.stringify(payload),head?head.id:null,R?R.token:null);   // R.token = the version we merged against
     rc={token:res.token,proj:snap,meta:{wid,seq,lineage:lin},seed:{},str:null};
     wrote=true;
     persistNow();
@@ -2006,7 +2006,7 @@ function create(env){
       else if(wrote){wrote=false;schedule(1500);}   // verify the write wasn't clobbered by a concurrent writer
     }catch(e){
       lastErr=e;
-      if(e&&e.retry){schedule(30);}                 // e.g. record was created by someone else meanwhile
+      if(e&&e.retry){schedule(e.conflict?40+Math.floor(Math.random()*260):30);}   // record changed/created elsewhere meanwhile: fetch, merge, try again
       else{
         if(e&&e.fatal){env.status('error','⚠ '+(e.message||'Save failed'));backoff=Math.min(Math.max(backoff*2,15000),120000);}
         else{env.status('offline',e&&e.message);backoff=Math.min(backoff?backoff*2:3000,60000);}
@@ -2199,14 +2199,17 @@ async function _pbGetFull(){
   _pbRecordId=it.id;
   return{id:it.id,token:_pbTok(it),data:it.data};
 }
-async function _pbPut(str,id){
+async function _pbPut(str,id,base){
   if(str.length>9000000)throw Object.assign(new Error('Data too large ('+(str.length/1e6).toFixed(1)+'M chars, limit 10M) — remove base64 images'),{fatal:true});
   const body=JSON.stringify({workspace:PB_WORKSPACE,data:str,updated_at:new Date().toISOString()});
   const hd={'Content-Type':'application/json'};
   let r;
   if(id){
-    r=await _pbReq('/api/collections/workspace_state/records/'+id+'?fields=id,updated,updated_at',{method:'PATCH',headers:hd,body},40000);
+    // pfbase = the server version this save was merged against; the optional server hook answers 409 if it has moved on
+    const pfb=base?'&pfbase='+encodeURIComponent(String(base).split('|')[0]):'';
+    r=await _pbReq('/api/collections/workspace_state/records/'+id+'?fields=id,updated,updated_at'+pfb,{method:'PATCH',headers:hd,body},40000);
     if(r.status===404){_pbRecordId=null;throw Object.assign(new Error('record missing'),{retry:true});}
+    if(r.status===409){throw Object.assign(new Error('changed elsewhere — merging again'),{retry:true,conflict:true});}
   }else{
     if(await _pbHead())throw Object.assign(new Error('record created elsewhere'),{retry:true}); // never create a 2nd record
     r=await _pbReq('/api/collections/workspace_state/records?fields=id,updated,updated_at',{method:'POST',headers:hd,body},40000);
@@ -2535,6 +2538,7 @@ function showSyncDetails(){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'
     +'<button class="btn btn-acc btn-sm" onclick="PF.saveNow();closeModal()">Retry now</button>'
     +'<button class="btn btn-ghost btn-sm" onclick="_pfRunHealth()">Run health check</button>'
+    +'<button class="btn btn-ghost btn-sm" onclick="_pfCheckGuard()">Check server guard</button>'
     +(sz.images.count?'<button class="btn btn-ghost btn-sm" onclick="_pfOptimiseImages(true).then(()=>showSyncDetails())">Shrink images</button>':'')
     +'<button class="btn btn-ghost btn-sm" onclick="_pfDownloadCopy()">Save a copy to this computer</button></div>'
     +'<div id="pf-health" style="font-size:.74rem;color:var(--text2);line-height:1.5"></div>'
@@ -2559,6 +2563,20 @@ function _pfStartConn(){
   document.head.appendChild(st);
 })();
 
+/* Is the optional PocketBase save-guard hook installed? Sends a harmless empty save that claims a version that
+   cannot be current: a guarded server refuses it (409), an unguarded one just accepts the no-op. */
+async function _pfCheckGuard(){
+  const out=document.getElementById('pf-health');if(!out)return;
+  out.textContent='Checking the server…';
+  try{
+    if(!_pbRecordId)await _pbHead();
+    if(!_pbRecordId){out.textContent='No workspace record on the server yet — save something first.';return;}
+    const r=await _pbReq('/api/collections/workspace_state/records/'+_pbRecordId+'?fields=id,updated&pfbase='+encodeURIComponent('guard-check-0000'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:'{}'},15000);
+    if(r.status===409)out.innerHTML='<b style="color:var(--green)">✓ Server guard is active.</b> Out-of-date saves are refused by the server and retried after a merge.';
+    else if(r.ok)out.innerHTML='<b style="color:var(--yellow)">Server guard not installed.</b> Saving works normally; install <code>projectflow_guard.pb.js</code> in PocketBase <code>pb_hooks</code> for the extra protection.';
+    else out.textContent='The server answered '+r.status+' — could not tell.';
+  }catch(e){out.textContent='Could not check: '+(e&&e.message||e);}
+}
 async function _pfRunHealth(){
   const out=document.getElementById('pf-health');if(!out)return;
   out.textContent='Checking…';
@@ -9386,10 +9404,12 @@ function renderSettings(){
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Data &amp; Backup</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Export all data to JSON, then re-import later to restore everything. Auto-backups are saved locally every 10 minutes.</p>
   <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-    <button class="btn btn-acc btn-sm" onclick="exportData()">⬇ Export data (.json)</button>
+    <button class="btn btn-acc btn-sm" onclick="downloadFullBackup()">⬇ Download full backup</button>
+    <button class="btn btn-ghost btn-sm" onclick="exportData()">Export this device's data (.json)</button>
     <button class="btn btn-ghost btn-sm" onclick="triggerImport()">⬆ Import data</button>
     <button class="btn btn-ghost btn-sm" onclick="_saveLocalBackup();showToast('Backup saved ✓');render()">💾 Save backup now</button>
   </div>
+  <div style="font-size:.74rem;margin:-6px 0 14px;line-height:1.5;"><div id="bk-age" style="color:var(--text2);">${_bkAgeHtml()}</div><div id="bk-st" style="color:var(--muted);"></div></div>
   <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importData(this)">
   <!-- Auto-backup list -->
   <div id="pf-backup-list"></div>
@@ -9679,6 +9699,38 @@ function setAccent(color,dot){
   S.settings.accentColor=color;saveNow();applyBranding();
 }
 
+/* Full backup: prefers the SERVER's copy (an independent source from this device); falls back to this device
+   when offline or when changes are still waiting to sync, so nothing recent is left out. */
+function _bkAgeHtml(){
+  let iso=null;try{iso=localStorage.getItem('pf_last_backup');}catch(_){}
+  if(!iso)return'<span style="color:var(--amber,#f59e0b);">No full backup downloaded from this device yet.</span>';
+  const days=Math.floor((Date.now()-new Date(iso).getTime())/864e5);
+  const when=new Date(iso).toLocaleString('en-GB',{day:'numeric',month:'short',year:'numeric',hour:'2-digit',minute:'2-digit'});
+  return days>=14?`<span style="color:var(--amber,#f59e0b);">Last full backup: ${when} (${days} days ago) — time for a fresh one.</span>`:`Last full backup: ${when}${days>0?' ('+days+' day'+(days===1?'':'s')+' ago)':''}`;
+}
+async function downloadFullBackup(){
+  const st=el('bk-st');const say=(m,c)=>{if(st){st.innerHTML=m;st.style.color=c||'var(--muted)';}};
+  say('Reading the latest copy…');
+  let data=null,src='server';
+  try{
+    let pending=0;try{pending=_pfPending().n||0;}catch(_){}
+    if(pending>0){src='this device (changes still waiting to sync)';}
+    else{const full=await _pbGetFull();if(full&&full.data)data=typeof full.data==='string'?JSON.parse(full.data):full.data;}
+  }catch(e){data=null;}
+  if(!data){data=JSON.parse(JSON.stringify(S));if(src==='server')src='this device (the server could not be reached)';}
+  ['_wid','_lineage','_clientId','_seq','_by','_byName','_spSearch'].forEach(k=>{delete data[k];});
+  if(data.finance&&typeof data.finance==='object')data.finance.finAuth=false;
+  const cnt=`${(data.projects||[]).length} events, ${(data.tasks||[]).length} tasks, ${(data.sponsors||[]).length} sponsors, ${(data.members||[]).length} members`;
+  try{
+    const blob=new Blob([JSON.stringify(data,null,2)],{type:'application/json'});
+    const a=document.createElement('a');a.href=URL.createObjectURL(blob);
+    a.download='projectflow-backup-'+new Date().toISOString().slice(0,16).replace(/[T:]/g,'-')+'.json';
+    document.body.appendChild(a);a.click();a.remove();setTimeout(()=>URL.revokeObjectURL(a.href),4000);
+    try{localStorage.setItem('pf_last_backup',new Date().toISOString());}catch(_){}
+    say('Saved ✓ from '+src+': '+cnt+'. Keep it somewhere outside this browser (e.g. cloud drive).','var(--green)');
+    const ag=el('bk-age');if(ag)ag.innerHTML=_bkAgeHtml();
+  }catch(e){say('Could not create the file: '+escHtml(e.message),'var(--red)');}
+}
 function exportData(){
   const blob=new Blob([JSON.stringify(S,null,2)],{type:'application/json'});
   const a=document.createElement('a');a.href=URL.createObjectURL(blob);
