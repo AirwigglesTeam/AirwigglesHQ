@@ -5321,7 +5321,9 @@ function digestText(){
   if(lines.length===1)lines.push('Nothing overdue or due this week. 🎉');
   return lines.join('\n');
 }
+let _digBusy=false;
 async function postDigest(auto){
+  if(_digBusy)return false;_digBusy=true;setTimeout(()=>{_digBusy=false;},4000);
   const url=S.slackWebhook;const st=el('digest-st');
   if(!url){if(st){st.textContent='Add a Slack webhook first.';st.style.color='var(--red)';}return false;}
   if(st){st.textContent='Sending…';st.style.color='var(--muted)';}
@@ -13794,7 +13796,9 @@ function saveSlack(){
   save();
   const st=el('slack-st');if(st){st.textContent='Saved ✓';st.style.color='var(--green)';setTimeout(()=>st.textContent='',2000);}
 }
+let _tsBusy=false;
 async function testSlack(){
+  if(_tsBusy)return;_tsBusy=true;setTimeout(()=>{_tsBusy=false;},4000);
   const url=S.slackWebhook;
   const st=el('slack-st');
   if(!url){if(st){st.textContent='No webhook URL saved.';st.style.color='var(--red)';}return;}
