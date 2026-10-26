@@ -248,7 +248,12 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 .ti-col-labels{width:76px;gap:3px;overflow:hidden;}
 .ti-col-labels .lchip{max-width:68px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex-shrink:0;}
 .ti-col-proj{width:100px;overflow:hidden;}
-.ti-col-av{width:68px;gap:2px;}
+.ti-col-av{width:auto;min-width:68px;max-width:176px;gap:2px;flex-shrink:1;}
+.ti-col-av.crowd{gap:0;}
+.ti-col-av.crowd .av,.ti-col-av.crowd img{margin-left:-5px;box-shadow:0 0 0 1.5px var(--surface);}
+.ti-col-av.crowd>:first-child{margin-left:0;}
+.ti-meta-zone{min-width:0;}
+.ti-name-col{min-width:120px;}
 .ti-col-date{width:78px;}
 .ti-col-prog{width:76px;gap:5px;}
 .ti-proj-chip{display:flex;align-items:center;gap:4px;overflow:hidden;max-width:100%;}
@@ -5598,8 +5603,8 @@ function renderTaskRow(t,depth=0,showProj=false){
   <div class="ti-col ti-col-proj">
     ${proj?`<span class="ti-proj-chip"><span style="width:6px;height:6px;border-radius:50%;background:${proj.color};flex-shrink:0;"></span><span class="ti-proj-name">${proj.name}</span></span>`:''}
   </div>
-  <div class="ti-col ti-col-av">
-    ${(t.assignees||[]).slice(0,10).map(id=>avHtml(id,18)).join('')}
+  <div class="ti-col ti-col-av${(t.assignees||[]).length>4?' crowd':''}">
+    ${(t.assignees||[]).map(id=>avHtml(id,18)).join('')}
   </div>
   <div class="ti-col ti-col-date">
     ${t.endDate?`<span class="ti-date${od?' od':''}">${od?`<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:inline-block;vertical-align:middle;margin-right:2px;"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>`:''} ${fmtD(t.endDate)}</span>`:''}
@@ -6862,7 +6867,7 @@ ${kBlocked?`<div class="kcard-blocked-badge"><svg width="8" height="8" viewBox="
     ${ch>0?`<span style="font-size:.6rem;color:var(--muted);">${comp}%</span>`:''}
   </div>
   <div style="display:flex;margin-left:-4px;gap:2px;align-items:center;">
-    ${(t.assignees||[]).slice(0,3).map(id=>avHtml(id,17)).join('')}
+    ${(t.assignees||[]).slice(0,6).map(id=>avHtml(id,17)).join('')}${(t.assignees||[]).length>6?`<span style="font-size:.6rem;color:var(--muted);">+${t.assignees.length-6}</span>`:''}
     <button style="background:none;border:none;cursor:pointer;padding:2px;color:${t.done?'var(--acc)':'var(--muted)'};" onclick="event.stopPropagation();toggleKanbanDone('${t.id}')" title="${t.done?'Mark incomplete':'Mark complete'}">
       <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>
     </button>
