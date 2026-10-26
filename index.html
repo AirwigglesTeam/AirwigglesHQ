@@ -5831,7 +5831,7 @@ function quickAddSub(parentId){
       onmousedown="event.preventDefault()"
       onclick="isub_togglePhase(this)">${ph}</span>`).join(''):''}
     ${hasPhases&&hasLabels?'<div style="width:1px;height:12px;background:var(--border2);flex-shrink:0;"></div>':''}
-    ${hasLabels?S.labels.map(l=>{const parentLabels=effectiveLabels(parent);const inh=parentLabels.some(pl=>pl.id===l.id);return`<span class="qa-label-dot${inh?' active':''}" data-lid="${l.id}" data-name="${l.name}"
+    ${hasLabels?S.labels.map(l=>{const parentLabels=effectiveLabels(parent);const inh=parentLabels.includes(l.id);return`<span class="qa-label-dot${inh?' active':''}" data-lid="${l.id}" data-name="${l.name}"
       style="background:${l.color};--label-c:${l.color};${inh?'opacity:1;box-shadow:0 0 0 2px var(--acc);':'opacity:.55;'}"
       onmousedown="event.preventDefault()"
       onclick="this.classList.toggle('active');this.style.opacity=this.classList.contains('active')?'1':'0.55';this.style.boxShadow=this.classList.contains('active')?'0 0 0 2px var(--acc)':'none';" title="${l.name}">${l.name}</span>`;}).join(''):''}
@@ -5884,7 +5884,8 @@ function _commitInlineSub(inp,parentId,projectId,subAddEl){
   const phase=subAddEl?.querySelector('.qa-phase-pill.active')?.dataset.phase||'';
   const rawLabels=Array.from(subAddEl?.querySelectorAll('.qa-label-dot.active')||[]).map(d=>d.dataset.lid);
   // null = inherit parent labels; only store explicit array when user picked something
-  const labels=rawLabels.length>0?rawLabels:null;
+  const _pl=effectiveLabels(getTask(parentId)||{})||[];
+  const labels=(rawLabels.length>0&&!(rawLabels.length===_pl.length&&rawLabels.every(x=>_pl.includes(x))))?rawLabels:null;   // unchanged = keep inheriting
   const endDate=subAddEl?.querySelector('input[type="date"]')?.value||'';
   const assignees=Array.from(subAddEl?.querySelectorAll('[data-mid]')||[]).filter(d=>d.style.opacity==='1').map(d=>d.dataset.mid);
   const description=subAddEl?.querySelector('.inline-sub-desc')?.value.trim()||'';
@@ -5897,7 +5898,7 @@ function _commitInlineSub(inp,parentId,projectId,subAddEl){
   // Reset meta fields
   if(subAddEl){
     subAddEl.querySelectorAll('.qa-phase-pill.active').forEach(p=>{p.classList.remove('active');p.style.background='transparent';p.style.color=phaseColor(p.dataset.phase);});
-    subAddEl.querySelectorAll('.qa-label-dot.active').forEach(d=>d.classList.remove('active'));
+    subAddEl.querySelectorAll('.qa-label-dot').forEach(d=>d.classList.toggle('active',_pl.includes(d.dataset.lid)));
     subAddEl.querySelectorAll('[data-mid]').forEach(d=>{d.style.opacity='0.4';d.style.outline='';});
     const di=subAddEl.querySelector('input[type="date"]');if(di)di.value='';
     const de=subAddEl.querySelector('.inline-sub-desc');if(de){de.value='';de.classList.remove('open');}
@@ -9661,6 +9662,7 @@ function taskModalHtml(data){
     defAssignees=data.assignees||[];
     if(data._fromTemplate)defFromTmpl=data._fromTemplate;
     if(data._quickSub){isQuickSub=true;defParent=data.parentId;defProj=data.projectId;defAssignees=data.assignees||[];}
+    if(defParent&&!task){const _pp=getTask(defParent);if(_pp)defLabels=[...effectiveLabels(_pp)];}
   }
   const activeProjs=S.projects.filter(p=>p.status==='active');
   const parentOpts=(defProj||task?.projectId)?S.tasks.filter(t=>t.projectId===(defProj||task?.projectId)&&!t.parentId&&t.id!==task?.id).map(t=>`<option value="${t.id}" ${defParent===t.id?'selected':''}>${t.name}</option>`).join(''):'';
@@ -9708,7 +9710,7 @@ function taskModalHtml(data){
 
   ${S.members.length>0?`<div class="field"><label class="flbl">Assignees</label><div class="av-toggle-grid" id="tm-av-grid">${S.members.map(m=>`<div class="av-toggle${defAssignees.includes(m.id)?' active':''}" onclick="this.classList.toggle('active')" data-id="${m.id}">${avHtml(m.id,18)}<span>${m.name.split(' ')[0]}</span></div>`).join('')}</div></div>`:''}
 
-  ${S.labels.length>0?`<div class="field"><label class="flbl">Labels${(task&&labelsInherited(task))?'<span id="tm-lb-inherit-note" style="font-size:.62rem;font-weight:400;color:var(--muted);margin-left:6px;">(inherited from parent)</span>':''}</label><div class="pill-sel" id="tm-lb-pills" data-inherited="${(task&&labelsInherited(task))?'1':'0'}">${S.labels.map(l=>`<span class="pill-opt${defLabels.includes(l.id)?' active':''}" style="border-color:${l.color}44;color:${l.color}88;${defLabels.includes(l.id)?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':''}" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';document.getElementById('tm-lb-pills').dataset.inherited='0';const n=document.getElementById('tm-lb-inherit-note');if(n)n.style.display='none';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
+  ${S.labels.length>0?`<div class="field"><label class="flbl">Labels${((task&&labelsInherited(task))||(!task&&defParent&&defLabels.length))?'<span id="tm-lb-inherit-note" style="font-size:.62rem;font-weight:400;color:var(--muted);margin-left:6px;">(inherited from parent)</span>':''}</label><div class="pill-sel" id="tm-lb-pills" data-inherited="${((task&&labelsInherited(task))||(!task&&defParent&&defLabels.length))?'1':'0'}">${S.labels.map(l=>`<span class="pill-opt${defLabels.includes(l.id)?' active':''}" style="border-color:${l.color}44;color:${l.color}88;${defLabels.includes(l.id)?'background:'+l.color+'22;border-color:'+l.color+';color:'+l.color+';':''}" onclick="this.classList.toggle('active');this.style.background=this.classList.contains('active')?'${l.color}22':'';this.style.borderColor=this.classList.contains('active')?'${l.color}':'${l.color}44';this.style.color=this.classList.contains('active')?'${l.color}':'${l.color}88';document.getElementById('tm-lb-pills').dataset.inherited='0';const n=document.getElementById('tm-lb-inherit-note');if(n)n.style.display='none';" data-id="${l.id}">${l.name}</span>`).join('')}</div></div>`:''}
 
   ${parentOpts?`<div>
     <button type="button" onclick="const b=el('tm-parent-body');const ico=el('tm-parent-ico');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'flex';ico.style.transform=open?'':'rotate(180deg)';}" style="background:none;border:none;cursor:pointer;color:var(--text2);font-size:.75rem;display:flex;align-items:center;gap:5px;padding:2px 0;font-family:'Lexend',sans-serif;">
