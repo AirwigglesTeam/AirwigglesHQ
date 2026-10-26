@@ -2399,6 +2399,7 @@ function showSyncDetails(){
     +'<div style="display:flex;gap:8px;flex-wrap:wrap;margin-top:4px">'
     +'<button class="btn btn-acc btn-sm" onclick="PF.saveNow();closeModal()">Retry now</button>'
     +'<button class="btn btn-ghost btn-sm" onclick="_pfRunHealth()">Run health check</button>'
+    +(sz.images.count?'<button class="btn btn-ghost btn-sm" onclick="_pfOptimiseImages(true).then(()=>showSyncDetails())">Shrink images</button>':'')
     +'<button class="btn btn-ghost btn-sm" onclick="_pfDownloadCopy()">Save a copy to this computer</button></div>'
     +'<div id="pf-health" style="font-size:.74rem;color:var(--text2);line-height:1.5"></div>'
     +'</div></div></div>';
@@ -2443,6 +2444,7 @@ let _pfSizeChecked=false;
 function _pfCheckSizeOnce(){
   if(_pfSizeChecked)return;_pfSizeChecked=true;
   setTimeout(()=>{try{const r=_pfSizeReport();if(r.pct>=70)showToast('Workspace is '+r.pct+'% of its size limit — see the sync details',6000);}catch(_){}},4000);
+  setTimeout(()=>{try{_pfOptimiseImages(false);}catch(_){}},9000);   // one quiet pass per session: shrinks oversized photos/logos
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
@@ -2558,7 +2560,7 @@ async function _pfHealth(){
   const saveS=S;S={tasks:snap,projects:[],_t:1};try{_pfRepairState();}finally{S=saveS;}
   if(PFSync.stable(snap)!==before)rep.problems.push('Some tasks break the consistency rules (they will be repaired automatically on the next sync)');
   if(rep.size.pct>=70)rep.problems.push('Workspace is '+rep.size.pct+'% of the 10 MB limit');
-  if(rep.size.images.count)rep.problems.push(rep.size.images.count+' embedded image(s) using '+_pfKB(rep.size.images.bytes));
+  if(rep.size.images.bytes>500000)rep.problems.push(rep.size.images.count+' embedded image(s) using '+_pfKB(rep.size.images.bytes)+' — use "Shrink images" in the sync details');
   if(_pfSchemaTooNew)rep.problems.push('This workspace was saved by a newer version of ProjectFlow — refresh the page');
   // does the server hold what this screen shows?
   try{
@@ -2576,6 +2578,51 @@ async function _pfHealth(){
   return rep;
 }
 window._pfHealth=_pfHealth;window._pfSize=()=>{const r=_pfSizeReport();console.table(r.keys.slice(0,10).map(([k,n])=>({key:k,size:_pfKB(n)})));return r;};
+
+/* ── Embedded images: shrink anything oversized (every save sends the whole workspace, so photos dominate its size) ── */
+function _pfShrinkDataUrl(src,maxPx,q){
+  return new Promise(res=>{
+    if(typeof src!=='string'||!/^data:image\/(png|jpe?g|webp)/i.test(src))return res(src);
+    const im=new Image();
+    im.onload=()=>{try{
+      const sc=Math.min(1,maxPx/Math.max(im.width,im.height));
+      const w=Math.max(1,Math.round(im.width*sc)),h=Math.max(1,Math.round(im.height*sc));
+      const c=document.createElement('canvas');c.width=w;c.height=h;
+      c.getContext('2d').drawImage(im,0,0,w,h);
+      let out=c.toDataURL('image/webp',q);
+      if(!/^data:image\/webp/.test(out))out=/^data:image\/jpe?g/i.test(src)?c.toDataURL('image/jpeg',q):c.toDataURL('image/png');
+      res(out.length<src.length?out:src);
+    }catch(e){res(src);}};
+    im.onerror=()=>res(src);
+    im.src=src;
+  });
+}
+let _pfImgBusy=false;
+async function _pfOptimiseImages(manual){
+  if(_pfImgBusy)return 0;_pfImgBusy=true;
+  try{
+    const min=manual?30000:100000;
+    const want=v=>typeof v==='string'&&/^data:image\/(png|jpe?g|webp)/i.test(v)&&v.length>min;
+    const jobs=[];
+    (S.members||[]).forEach(m=>{if(want(m.photoUrl))jobs.push({c:'members',id:m.id,k:'photoUrl',v:m.photoUrl,max:512});});
+    (S.sponsors||[]).forEach(s=>{if(want(s.logoDataUrl))jobs.push({c:'sponsors',id:s.id,k:'logoDataUrl',v:s.logoDataUrl,max:400});});
+    if(want(S.settings&&S.settings.logoUrl))jobs.push({c:'settings',k:'logoUrl',v:S.settings.logoUrl,max:400});
+    let n=0,saved=0;
+    for(const j of jobs){
+      const after=await _pfShrinkDataUrl(j.v,j.max,0.82);
+      if(after.length>=j.v.length*0.9)continue;
+      const o=j.c==='settings'?S.settings:(S[j.c]||[]).find(x=>x.id===j.id);   // look up again: a sync may have replaced the objects meanwhile
+      if(o&&o[j.k]===j.v){o[j.k]=after;n++;saved+=j.v.length-after.length;}
+    }
+    if(n){
+      saveNow();
+      if(typeof applyBranding==='function')try{applyBranding();updateFavicon();}catch(_){}
+      render();
+      showToast('Shrank '+n+' image'+(n!==1?'s':'')+', freed '+_pfKB(saved),4500);
+    }else if(manual)showToast('Images are already small',3000);
+    return n;
+  }finally{_pfImgBusy=false;}
+}
 
 /* ── Sync state ── */
 let _lastSavedAt=null;       // ISO string of last save we wrote
@@ -9284,7 +9331,7 @@ async function uploadLogo(input){
     // Fallback to base64 if PocketBase images collection not set up yet
     console.warn('PB image upload failed, falling back to base64:',e);
     const reader=new FileReader();
-    reader.onload=ev=>{S.settings.logoUrl=ev.target.result;saveNow();applyBranding();updateFavicon();render();};
+    reader.onload=async ev=>{S.settings.logoUrl=await _pfShrinkDataUrl(ev.target.result,400,.85);saveNow();applyBranding();updateFavicon();render();};
     reader.readAsDataURL(file);
     if(statusEl){statusEl.textContent='';statusEl.style.display='none';}
   }
@@ -10552,7 +10599,7 @@ function saveMember(eid){
       }catch(e){
         // Fallback to base64
         console.warn('PB photo upload failed, falling back to base64:',e);
-        await new Promise(res=>{const r=new FileReader();r.onload=ev=>{member.photoUrl=ev.target.result;res();};r.readAsDataURL(photoFile);});
+        await new Promise(res=>{const r=new FileReader();r.onload=async ev=>{member.photoUrl=await _pfShrinkDataUrl(ev.target.result,512,.82);res();};r.readAsDataURL(photoFile);});
       }
       saveWithUndo(eid?'Edit member':'Add member');
       if(eid){_pfApplyEdit('members',eid,member);}else S.members.push(member);
