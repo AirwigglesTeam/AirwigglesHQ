@@ -5016,8 +5016,8 @@ function _dsPopHtml(){
 
 /* ════ DASHBOARD: events grouped by what is happening ════ */
 function _projWin(p){
-  if(!p.startDate&&!p.endDate)return null;
-  let s=p.startDate||p.endDate,e=p.endDate||p.startDate;
+  if(!p.endDate)return null;      // no end date = shown as "No dates", so it is grouped that way
+  let s=p.startDate||p.endDate,e=p.endDate;
   const seg=getPhaseBars(p);
   if(seg.length){s=seg.reduce((a,x)=>x.startDate<a?x.startDate:a,seg[0].startDate);e=seg.reduce((a,x)=>x.endDate>a?x.endDate:a,seg[0].endDate);}
   return{s,e};
