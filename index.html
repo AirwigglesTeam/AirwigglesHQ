@@ -1818,6 +1818,37 @@ function create(env){
     if(isObj(st.finance))st.finance.finAuth=fin||false;
   }
 
+  /* A write with no writer id came from an OLD build of the app that saves its whole in-memory state.
+     Such a write may simply lack things it never loaded, so what it omits is not trusted as a deletion:
+     anything we both knew about (in the ancestor) and still hold is put back before merging, and the repaired
+     state is written back to the server. */
+  function restoreLegacyRemovals(b,l,r){
+    let n=0;
+    const go=(b,l,r)=>{
+      if(Array.isArray(r)&&Array.isArray(l)&&Array.isArray(b)&&(isIdArr(l)||isIdArr(b))){
+        const lm=new Map(),bm=new Map(),rIds=new Set();
+        for(const x of l)if(hasId(x))lm.set(x.id,x);
+        for(const x of b)if(hasId(x))bm.set(x.id,x);
+        for(const x of r)if(hasId(x))rIds.add(x.id);
+        const out=r.map(x=>(hasId(x)&&lm.has(x.id)&&bm.has(x.id))?go(bm.get(x.id),lm.get(x.id),x):x);
+        for(const[id,x]of lm)if(bm.has(id)&&!rIds.has(id)){out.push(clone(x));n++;}
+        return out;
+      }
+      if(isObj(r)&&isObj(l)&&isObj(b)){
+        const out={...r};
+        for(const k of Object.keys(b)){
+          if(k==='_tomb'||k.charAt(0)==='_')continue;
+          if(!(k in r)){if(l[k]!==undefined){out[k]=clone(l[k]);n++;}}
+          else if(l[k]!==undefined)out[k]=go(b[k],l[k],r[k]);
+        }
+        return out;
+      }
+      return r;
+    };
+    const res=go(b,l,r);
+    return{proj:res,n};
+  }
+
   /* The heart of it: merge a remote snapshot into live local state.
      Synchronous — nothing can interleave between reading S and adopting. */
   function mergeStep(R){
@@ -1827,6 +1858,12 @@ function create(env){
     stampTombs(st,H.length?H[0].proj:null,R.proj._tomb);
     const Lp=project(st);
     const ls=stable(Lp);
+    let restored=0;
+    if(b!==null&&!R.meta.wid&&!R.legacyChecked){
+      R.legacyChecked=true;
+      const fx=restoreLegacyRemovals(b,Lp,R.proj);
+      if(fx.n){R.proj=fx.proj;R.str=null;restored=fx.n;}
+    }
     const rs=R.str||(R.str=stable(R.proj));
     let M=null,changed=false,needWrite=false,changes=null;
     if(b===null){                         // no shared history at all: remote is the truth
@@ -1852,6 +1889,7 @@ function create(env){
     lineage=[...new Set([...(R.meta.lineage||[]),...lineage])].slice(0,LINEAGE_CAP);
     seqNow=Math.max(seqNow,R.meta.seq||0);
     pushH({wid:R.meta.wid,seq:R.meta.seq||0,proj:R.proj});
+    if(restored){needWrite=true;try{env.onLegacy&&env.onLegacy({restored});}catch(e){}}
     return{changed,needWrite,changes};
   }
 
@@ -2146,6 +2184,10 @@ const PF=PFSync.create({
   author:()=>_pbUser?(_pbUser.id||_pbUser.email||null):null,
   authorName:()=>_pbUser?(_pbUser.name||_pbUser.email||null):null,
   beforeWrite:changes=>_pfLogActivity(changes),
+  onLegacy:info=>{                                          // an OLD build of the app saved over the shared record
+    try{_pfNoteErr('An older version of ProjectFlow saved over the workspace; '+info.restored+' item(s) were restored');}catch(_){}
+    try{showToast('An older version of ProjectFlow saved over the workspace. Your data was restored. Refresh every open tab and device (including the installed app) so they all run the latest version.',12000);}catch(_){}
+  },
   onApplied:info=>{
     _lastKnownCounts={projects:(S.projects||[]).length,tasks:(S.tasks||[]).length,members:(S.members||[]).length,sponsors:(S.sponsors||[]).length};
     const me=_pbUser&&(_pbUser.id||_pbUser.email);
@@ -9461,6 +9503,7 @@ function importData(input){
 }
 
 function applyNavIcons(){
+  if(S.settings?.navIcons){try{localStorage.setItem('pf_navicons',JSON.stringify(S.settings.navIcons));}catch(_){}}
   if(!S.settings?.navIcons)return;
   Object.entries(S.settings.navIcons).forEach(([view,iconId])=>{
     const opts=NAV_ICON_OPTIONS[view]||[];
@@ -9474,6 +9517,7 @@ function applyNavIcons(){
   });
 }
 
+(function(){try{const m=JSON.parse(localStorage.getItem('pf_navicons')||'null');if(m&&typeof m==='object'){const keep=S.settings;S.settings={...(keep||{}),navIcons:m};try{applyNavIcons();}finally{S.settings=keep;}}}catch(_){}})();
 function openIconPickerModal(view){
   const opts=NAV_ICON_OPTIONS[view]||[];
   const curId=S.settings?.navIcons?.[view]||opts[0]?.id;
