@@ -5113,7 +5113,7 @@ function ecShowTab(projId,tab,save=true){
 function _dKey(){return (typeof _pbUser!=='undefined'&&_pbUser&&(_pbUser.id||_pbUser.email))||'device';}
 function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
 function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
-const DASH_SECTIONS=[['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['focus','Due this week'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team']];
+const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team']];
 function _dsOn(id){return !(_dprefRead().hide||[]).includes(id);}
 function dsToggle(id){_dprefSet(p=>{const h=new Set(p.hide||[]);h.has(id)?h.delete(id):h.add(id);p.hide=[...h];});render();}
 function dsShowAll(){_dprefSet(p=>{p.hide=[];});render();}
@@ -5667,15 +5667,16 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
   <!-- RIGHT: Focus + Team -->
   <div style="display:flex;flex-direction:column;gap:14px;min-width:0;">
 
-    ${_dsOn('mywork')?_myWorkCardHtml():''}
-
-    ${_dsOn('cowork')?_coworkCardHtml(mf):''}
-
     <!-- Focus: due this week -->
     ${_dsOn('focus')?`<div class="card">
       <div class="card-hd"><span class="card-title">Due This Week</span>${mf?`<button class="btn btn-ghost btn-xs" onclick="S.activeMember=null;save();render()">✕ ${escHtml(getMember(mf)?.name||'')}</button>`:''}</div>
       <div class="card-bd">
         ${focusTasks.length===0?`<div style="color:var(--muted);font-size:.78rem;">Nothing due — all clear!</div>`:''}
+
+    ${_dsOn('mywork')?_myWorkCardHtml():''}
+
+    ${_dsOn('cowork')?_coworkCardHtml(mf):''}
+
         ${focusTasks.map(t=>{
           const proj=getProject(t.projectId);
           const od=t.endDate<todayStr;
