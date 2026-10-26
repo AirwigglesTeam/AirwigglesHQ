@@ -4824,7 +4824,7 @@ function _syncRailActive(){
   document.querySelectorAll('.rbtn-bookmark[data-proj]').forEach(b=>b.classList.toggle('active',b.dataset.proj===bm));
   document.querySelectorAll('.nitem[data-proj]').forEach(i=>i.classList.toggle('active',i.dataset.proj===bm));
 }
-function render(){_rcOn();try{return _renderImpl();}finally{_rcOff();try{_syncRailActive();}catch(_){}}}
+function render(){_rcOn();try{return _renderImpl();}finally{_rcOff();try{_syncRailActive();applyNavIcons();}catch(_){}}}
 function _renderImpl(){
   const c=el('content');
   if(!c)return;
@@ -9208,7 +9208,10 @@ function applyNavIcons(){
     const icon=opts.find(o=>o.id===iconId);if(!icon)return;
     const svgContent=`<svg viewBox=\"0 0 24 24\" fill=\"none\" stroke=\"currentColor\" stroke-linecap=\"round\" stroke-linejoin=\"round\" width=\"18\" height=\"18\">${icon.d}</svg>`;
     // Rail button
-    document.querySelectorAll(`.rbtn[data-v=\"${view}\"]`).forEach(btn=>{btn.innerHTML=svgContent;});
+    document.querySelectorAll(`.rbtn[data-v=\"${view}\"]`).forEach(btn=>{if(btn.dataset.ic!==iconId){btn.innerHTML=svgContent;btn.dataset.ic=iconId;}});
+    // Sidebar panel: first entry for this view
+    const ni=document.querySelector(`.nitem[data-v=\"${view}\"]`);
+    if(ni&&ni.dataset.ic!==iconId){const sv=ni.querySelector('svg');if(sv){sv.setAttribute('viewBox','0 0 24 24');sv.setAttribute('stroke-width','1.8');sv.innerHTML=icon.d;ni.dataset.ic=iconId;}}
   });
 }
 
