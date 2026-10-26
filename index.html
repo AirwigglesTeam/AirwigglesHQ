@@ -12350,10 +12350,11 @@ async function init(){
   applyNavVis();
   applyNavIcons();
   // Link logged-in account to app member
+  S.activeMember=null;      // every load starts unfiltered; the member filter is a per-visit choice
+  if(S.dashFilters)S.dashFilters.member='';
   const _myMember=_findMyMember(_pbUser);
   if(_myMember){
     window._myMemberId=_myMember.id;
-    if(!S.activeMember)S.activeMember=_myMember.id;
   }
   _updateRailAvatar(); // show member photo if linked
   _updateMyTasksBtn();
