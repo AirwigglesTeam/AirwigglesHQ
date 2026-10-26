@@ -6917,7 +6917,23 @@ function ganttDayOffset(dateStr){
 }
 function ganttTotalDays(){return getGanttMonths().reduce((a,m)=>a+m.days,0);}
 
+/* Timeline order: running now first (soonest to finish), then upcoming (soonest to start), then finished (latest first). Projects with no dates are left out. */
+function _ganttOrder(projects){
+  const today=new Date().toISOString().slice(0,10);
+  const info=p=>{
+    if(!p.startDate&&!p.endDate)return null;
+    let s=p.startDate||p.endDate,e=p.endDate||p.startDate;
+    const seg=getPhaseBars(p);                       // include planning / post-event windows when they are drawn
+    if(seg.length){s=seg.reduce((a,x)=>x.startDate<a?x.startDate:a,seg[0].startDate);e=seg.reduce((a,x)=>x.endDate>a?x.endDate:a,seg[0].endDate);}
+    const g=today<s?1:(today>e?2:0);
+    return{p,g,s,e,key:g===0?(p.endDate||e):g===1?s:e};
+  };
+  return projects.map(info).filter(Boolean)
+    .sort((a,b)=>a.g-b.g||(a.g===2?(a.key<b.key?1:a.key>b.key?-1:0):(a.key<b.key?-1:a.key>b.key?1:0)))
+    .map(x=>x.p);
+}
 function renderGantt(projects,fullPage=false){
+  projects=_ganttOrder(projects);
   const gmonths=getGanttMonths();
   const totalDays=ganttTotalDays();
   const totalW=totalDays*DPX;
@@ -6968,15 +6984,17 @@ function renderGantt(projects,fullPage=false){
       const safeRange=dateRange.replace(/'/g,"\\'");
       return'<div style="position:absolute;left:'+seg.l+'px;width:'+seg.w+'px;height:14px;background:'+bg+';border:1px solid '+col+'44;border-radius:3px;display:flex;align-items:center;overflow:hidden;cursor:default;" onmouseenter="showPhaseTip(event,\''+safeTip+'\',\''+safeStatus+'\',\''+safeDays+'\',\''+safeRange+'\')" onmouseleave="hidePhaseTip()">'+label+'</div>';
     }).join(''):'';
-    const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);
+    const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(t.startDate||t.endDate))
+      .sort((a,b)=>((a.endDate||a.startDate)<(b.endDate||b.startDate)?-1:(a.endDate||a.startDate)>(b.endDate||b.startDate)?1:0));   // dated tasks only, soonest first
     rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')"><button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button><div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${p.name}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
     if(isExp)top.forEach(t=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" style="left:${tb.l}px;width:${tb.w}px;height:11px;background:${p.color}18;border:1px solid ${p.color}35;"><div class="gbar-fill" style="width:${tc}%;background:${p.color}80;"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub"><span class="grow-lbl-name" style="font-size:.68rem;color:var(--text2);">${t.name}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;});
   });
-  const inner=`<div class="gantt-scroll" id="gantt-scroll"><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;"><div class="today-ln" style="left:${175+Math.max(0,todayOffset)*DPX}px;height:100%;"><span class="today-tag">TODAY</span></div>${renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No active projects.</div></div>`:rows}</div></div></div>`;
+  const inner=`<div class="gantt-scroll" id="gantt-scroll"><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;"><div class="today-ln" style="left:${175+Math.max(0,todayOffset)*DPX}px;height:100%;"><span class="today-tag">TODAY</span></div>${renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
   if(fullPage)return`<div class="fu"><div class="page-hd"><div class="page-title">Gantt <em>Timeline</em></div></div>${inner}</div>`;
   return inner;
 }
 function barP(s,e){
+  s=s||e;e=e||s;                      // a single date still draws a (short) bar
   if(!s||!e)return null;
   const sd=ganttDayOffset(s),ed=ganttDayOffset(e);
   if(sd===null||ed===null)return null;
