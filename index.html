@@ -12190,19 +12190,6 @@ function memberProfileModalHtml(id,tab){
     </div>
   </div>
 
-  <!-- Motivations & Aspirations -->
-  <div style="border-top:1px solid var(--border);padding-top:16px;">
-    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Motivations &amp; Aspirations</div>
-    ${motFields.map(f=>`<div style="margin-bottom:12px;">
-      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round">${f.icon}</svg>
-        <label style="font-size:.75rem;font-weight:600;color:var(--text2);">${escHtml(f.label)}</label>
-      </div>
-      ${_mpListHtml(f.key,memListItems(m,f.key),f.placeholder)}
-    </div>`).join('')}
-  </div>
-
-
   <!-- OKRs -->
   <div style="border-top:1px solid var(--border);padding-top:16px;margin-top:4px;">
     <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:10px;">Objectives &amp; Key Results</div>
@@ -12229,6 +12216,18 @@ function memberProfileModalHtml(id,tab){
       <input class="inp" id="mp-new-okr-obj" placeholder="New objective…" style="flex:1;font-size:.78rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();addMpOkr();}">
       <button class="btn btn-ghost btn-xs" onclick="addMpOkr()">+ Add objective</button>
     </div>
+  </div>
+
+  <!-- Motivations & Aspirations -->
+  <div style="border-top:1px solid var(--border);padding-top:16px;">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Motivations &amp; Aspirations</div>
+    ${motFields.map(f=>`<div style="margin-bottom:12px;">
+      <div style="display:flex;align-items:center;gap:6px;margin-bottom:5px;">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round">${f.icon}</svg>
+        <label style="font-size:.75rem;font-weight:600;color:var(--text2);">${escHtml(f.label)}</label>
+      </div>
+      ${_mpListHtml(f.key,memListItems(m,f.key),f.placeholder)}
+    </div>`).join('')}
   </div>
 
 </div>
