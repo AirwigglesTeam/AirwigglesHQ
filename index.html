@@ -1324,6 +1324,18 @@ body.mcal-dragging *{cursor:grabbing !important;}
 
 .dash-quick.notes-open{gap:12px;}
 #dash-notes-wrap{margin-bottom:0!important;}
+
+/* v64: flat dashboard notes (same look as project notes) + compact editor; 4-column project grid */
+.qn-flat{padding:2px 0 0;}
+.qn-hint{font-size:.62rem;color:var(--muted);margin:0 0 6px 2px;}
+.qn-ed{min-height:44px;}
+.qn-note{margin-bottom:6px;}
+@media(max-width:600px){.qn-key{display:none;}}
+.dash-pgrid{grid-template-columns:repeat(4,minmax(0,1fr));}
+@media(max-width:1180px){.dash-pgrid{grid-template-columns:repeat(3,minmax(0,1fr));}}
+@media(max-width:860px){.dash-pgrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:560px){.dash-pgrid{grid-template-columns:minmax(0,1fr);}}
+.dash-main .dash-pgrid{gap:12px;}
 </style>
 </head>
 <body>
@@ -5470,11 +5482,12 @@ function _qnBody(sc){
   const btn=(cmd,label,tip)=>'<button type="button" class="btn btn-ghost btn-xs" title="'+tip+'" onmousedown="event.preventDefault()" onclick="document.execCommand(\''+cmd+'\')" style="min-width:26px;">'+label+'</button>';
   return '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">'+btn('bold','<b>B</b>','Bold')+btn('italic','<i>I</i>','Italic')+btn('underline','<u>U</u>','Underline')+btn('insertUnorderedList','• List','Bullet list')+btn('insertOrderedList','1. List','Numbered list')+'</div>'
    +'<div id="qn-new'+sx+'" class="qn-ed" contenteditable="true" data-ph="'+(sc?'Add a note for this project…':'Jot down a task, idea or reminder…')+'" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();qnAdd('+q+');}"></div>'
-   +'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;"><button class="btn btn-acc btn-xs" onclick="qnAdd('+q+')">Add note</button><span style="font-size:.62rem;color:var(--muted);">Ctrl/Cmd + Enter</span></div>'
-   +'<div id="qn-list'+sx+'" style="max-height:380px;overflow:auto;">'+_qnListHtml(sc)+'</div>';
+   +'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 8px;"><button class="btn btn-acc btn-xs" onclick="qnAdd('+q+')">Add note</button><span class="qn-key" style="font-size:.62rem;color:var(--muted);">Ctrl/Cmd + Enter</span></div>'
+   +'<div id="qn-list'+sx+'" style="max-height:300px;overflow:auto;">'+_qnListHtml(sc)+'</div>';
 }
 function _quickNotesCardHtml(){
-  return '<div class="card" id="dash-quick-notes"><div class="card-hd"><span class="card-title">Quick Notes</span><span style="font-size:.62rem;color:var(--muted);">Shared with the team</span></div><div class="card-bd">'+_qnBody('')+'</div></div>';
+  /* Same layout as the project page's notes: no card or green heading, the grey Notes pill above is the header */
+  return '<div id="dash-quick-notes" class="qn-flat"><div class="qn-hint">Shared with the team</div>'+_qnBody('')+'</div>';
 }
 /* Project notes: collapsed by default, open state is remembered for the session only */
 function renderProjectNotes(p){
