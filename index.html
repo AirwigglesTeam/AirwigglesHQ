@@ -1192,6 +1192,53 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 .ln-col.ln-over{border-color:var(--acc);background:var(--teal-dim);}
 .ln-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;margin-bottom:8px;cursor:grab;}
 .ln-card:active{cursor:grabbing;}
+
+/* ── month calendar (mcal-*; separate from the small date picker's cal-*) ── */
+.mcal-nav{display:flex;align-items:center;gap:8px;margin-bottom:8px;}
+.mcal-title{font-weight:700;font-size:.9rem;min-width:130px;text-align:center;}
+.mcal-grid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:1px;background:var(--border);border:1px solid var(--border);border-radius:9px;overflow:hidden;}
+.mcal-dow{background:var(--surface2);font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:5px 6px;text-align:center;}
+.mcal-cell{background:var(--surface);min-height:92px;padding:4px 5px;cursor:pointer;min-width:0;overflow:hidden;position:relative;}
+.mcal-cell.out{background:var(--surface2);opacity:.55;}
+.mcal-cell.wk:not(.out){background:color-mix(in srgb,var(--surface) 92%,var(--muted));}
+.mcal-cell.cw{box-shadow:inset 0 0 0 1.5px var(--acc);}
+.mcal-cell.today .mcal-dn{background:var(--acc);color:#0b1210;border-radius:10px;padding:0 6px;}
+.mcal-cell.sel{outline:2px solid var(--acc);outline-offset:-2px;}
+.mcal-dn{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;color:var(--text2);margin-bottom:3px;}
+.mcal-cwtag{font-size:.5rem;font-weight:800;color:var(--acc);letter-spacing:.04em;}
+.mcal-chip,.mcal-mark{display:flex;align-items:center;gap:4px;font-size:.64rem;line-height:1.25;padding:1px 4px;border-radius:4px;background:var(--surface2);margin-bottom:2px;white-space:nowrap;overflow:hidden;}
+.mcal-chip span,.mcal-mark{text-overflow:ellipsis;overflow:hidden;}
+.mcal-chip i,.mcal-mark i,.mcal-row i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
+.mcal-chip:hover{background:var(--surface3);}
+.mcal-chip.done{opacity:.5;text-decoration:line-through;}
+.mcal-chip.over{box-shadow:inset 2px 0 0 var(--red);}
+.mcal-mark{color:var(--muted);background:none;padding-left:0;}
+.mcal-more{font-size:.6rem;color:var(--muted);padding-left:4px;}
+.mcal-dots{display:none;font-size:.62rem;gap:4px;align-items:center;}
+.mcal-dots b{background:var(--acc);color:#0b1210;border-radius:8px;padding:0 6px;}
+.mcal-dots em{font-style:normal;color:var(--muted);}
+.mcal-detail{margin-top:10px;border:1px solid var(--border);border-radius:9px;padding:9px 11px;background:var(--surface2);}
+.mcal-dt-hd{font-weight:700;font-size:.8rem;margin-bottom:6px;}
+.mcal-today-tag{font-size:.58rem;background:var(--acc);color:#0b1210;border-radius:8px;padding:0 6px;margin-left:4px;}
+.mcal-row{display:flex;align-items:center;gap:8px;font-size:.76rem;padding:4px 0;border-bottom:1px solid var(--border);flex-wrap:wrap;}
+.mcal-row:last-child{border-bottom:none;}
+.mcal-trow{cursor:pointer;}
+.mcal-trow.done .mcal-tn{text-decoration:line-through;opacity:.55;}
+.mcal-tn{flex:1;min-width:120px;}
+.mcal-muted{color:var(--muted);font-size:.68rem;}
+.mcal-late{color:var(--red);font-size:.64rem;font-weight:700;}
+.mcal-avs{display:inline-flex;gap:2px;}
+.mcal-empty{font-size:.74rem;color:var(--muted);}
+.mcal-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.62rem;color:var(--muted);margin-top:8px;}
+.mcal-lg{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
+.mcal-lg.cw{box-shadow:inset 0 0 0 1.5px var(--acc);}
+.mcal-lg.td{background:var(--acc);}
+@media(max-width:700px){
+  .mcal-cell{min-height:52px;padding:3px;}
+  .mcal-chips{display:none;}
+  .mcal-dots{display:flex;}
+  .mcal-dow{padding:4px 0;font-size:.56rem;}
+}
 </style>
 </head>
 <body>
@@ -5165,9 +5212,11 @@ function ecShowTab(projId,tab,save=true){
 function _dKey(){return (typeof _pbUser!=='undefined'&&_pbUser&&(_pbUser.id||_pbUser.email))||'device';}
 function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
 function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
-const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team']];
-function _dsOn(id){return !(_dprefRead().hide||[]).includes(id);}
-function dsToggle(id){_dprefSet(p=>{const h=new Set(p.hide||[]);h.has(id)?h.delete(id):h.add(id);p.hide=[...h];});render();}
+const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team'],['calendar','Calendar']];
+/* Most sections are on unless hidden. Opt-in sections (new ones) stay off until someone switches them on, so nobody's dashboard changes under them. */
+const DASH_OPT_IN=['calendar'];
+function _dsOn(id){return DASH_OPT_IN.includes(id)?(_dprefRead().on||[]).includes(id):!(_dprefRead().hide||[]).includes(id);}
+function dsToggle(id){_dprefSet(p=>{const k=DASH_OPT_IN.includes(id)?'on':'hide';const h=new Set(p[k]||[]);h.has(id)?h.delete(id):h.add(id);p[k]=[...h];});render();}
 function dsShowAll(){_dprefSet(p=>{p.hide=[];});render();}
 function dsPopToggle(){window._dsOpen=!window._dsOpen;render();}
 function _dsPopHtml(){
@@ -5432,6 +5481,91 @@ function maybeAutoDigest(){
     postDigest(true).then(ok=>{if(ok){S.settings.digestLast=iso;save();}});   // only mark as sent once it really went out
   }catch(_){}
 }
+/* ════ MONTH CALENDAR ════
+   Read-only month view of tasks (by due date), co-working days and project start/end markers.
+   scope '' = the dashboard (all active projects); a project id scopes it to that project (used by project pages later).
+   Uses only ISO date strings and UTC arithmetic, so daylight-saving changes can't shift a day. */
+const _MC_MON=['January','February','March','April','May','June','July','August','September','October','November','December'];
+const _MC_DOW=['Mon','Tue','Wed','Thu','Fri','Sat','Sun'];
+function _mcState(sc){
+  window._mc=window._mc||{};
+  if(!window._mc[sc]){const t=_localToday();window._mc[sc]={y:+t.slice(0,4),m:+t.slice(5,7)-1,sel:t};}
+  return window._mc[sc];
+}
+function _mcIso(y,m,d){return new Date(Date.UTC(y,m,d)).toISOString().slice(0,10);}
+/* the 6 weeks (42 days, Monday first) that cover a month */
+function mcGridDays(y,m){
+  const first=new Date(Date.UTC(y,m,1)).getUTCDay();   // 0 = Sunday
+  const lead=(first+6)%7;
+  const out=[];for(let i=0;i<42;i++)out.push(_mcIso(y,m,1-lead+i));
+  return out;
+}
+/* everything that happens, grouped by date. Pure: reads S, returns data. */
+function mcCollect(sc,days){
+  const lo=days[0],hi=days[days.length-1];
+  const by={};const at=d=>by[d]||(by[d]={tasks:[],cw:[],marks:[]});
+  const mf=S.activeMember;
+  const projs=sc?[getProject(sc)].filter(Boolean):S.projects.filter(p=>p.status==='active');
+  const pids=new Set(projs.map(p=>p.id));
+  S.tasks.forEach(t=>{
+    if(!pids.has(t.projectId))return;
+    if(mf&&!(t.assignees||[]).includes(mf))return;
+    const d=t.endDate||t.startDate;if(!d||d<lo||d>hi)return;
+    at(d).tasks.push(t);
+  });
+  (S.coworkDays||[]).forEach(c=>{
+    if(!c.date||c.date<lo||c.date>hi)return;
+    if(mf&&(c.members||[]).length&&!(c.members||[]).includes(mf))return;
+    at(c.date).cw.push(c);
+  });
+  projs.forEach(p=>{
+    if(p.startDate&&p.startDate>=lo&&p.startDate<=hi)at(p.startDate).marks.push({p,kind:'start'});
+    if(p.endDate&&p.endDate>=lo&&p.endDate<=hi&&projType(p)!=='ongoing')at(p.endDate).marks.push({p,kind:'end'});
+  });
+  return by;
+}
+function _mcChip(t,today){
+  const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
+  return '<div class="mcal-chip'+(t.done?' done':'')+(over?' over':'')+'" data-task="'+t.id+'" title="'+escHtml(t.name)+'" onclick="event.stopPropagation();openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span>'+escHtml(t.name)+'</span></div>';
+}
+function _mcDayDetail(iso,data,today,sc){
+  const d=data[iso]||{tasks:[],cw:[],marks:[]};
+  const q=_isoParts(iso);const dow=_MC_DOW[(new Date(Date.UTC(q[0],q[1]-1,q[2])).getUTCDay()+6)%7];
+  let h='<div class="mcal-detail" data-detail="'+iso+'"><div class="mcal-dt-hd">'+dow+' '+_updDate(iso)+(iso===today?' <span class="mcal-today-tag">Today</span>':'')+'</div>';
+  if(!d.tasks.length&&!d.cw.length&&!d.marks.length)return h+'<div class="mcal-empty">Nothing scheduled.</div></div>';
+  d.cw.forEach(c=>{h+='<div class="mcal-row mcal-cw"><b>Co-working</b> '+escHtml(c.title||'')+' <span class="mcal-muted">'+escHtml((c.startTime||'')+(c.endTime?'–'+c.endTime:''))+'</span>'+((c.members||[]).length?'<span class="mcal-avs">'+(c.members||[]).map(id=>avHtml(id,16)).join('')+'</span>':'')+(c.notes?'<div class="mcal-muted">'+escHtml(c.notes)+'</div>':'')+'</div>';});
+  d.marks.forEach(m=>{h+='<div class="mcal-row"><i style="background:'+(m.p.color||'var(--acc)')+'"></i> '+escHtml(m.p.name)+' '+(m.kind==='start'?'starts':'ends')+'</div>';});
+  d.tasks.slice().sort((a,b)=>(a.done-b.done)||a.name.localeCompare(b.name)).forEach(t=>{
+    const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
+    h+='<div class="mcal-row mcal-trow'+(t.done?' done':'')+'" data-task="'+t.id+'" onclick="openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span class="mcal-tn">'+escHtml(t.name)+'</span>'+(sc?'':'<span class="mcal-muted">'+escHtml(p?p.name:'')+'</span>')+(over?'<span class="mcal-late">overdue</span>':'')+((t.assignees||[]).length?'<span class="mcal-avs">'+(t.assignees||[]).slice(0,3).map(id=>avHtml(id,16)).join('')+'</span>':'')+'</div>';
+  });
+  return h+'</div>';
+}
+function renderMonthCal(sc){
+  sc=sc||'';const st=_mcState(sc);const today=_localToday();
+  const days=mcGridDays(st.y,st.m);const data=mcCollect(sc,days);
+  const q="'"+sc+"'";
+  let h='<div class="mcal" data-mcal="'+sc+'"><div class="mcal-nav"><button class="btn btn-ghost btn-xs" onclick="mcNav('+q+',-1)" aria-label="Previous month">‹</button><span class="mcal-title">'+_MC_MON[st.m]+' '+st.y+'</span><button class="btn btn-ghost btn-xs" onclick="mcNav('+q+',1)" aria-label="Next month">›</button><button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="mcToday('+q+')">Today</button></div>';
+  h+='<div class="mcal-grid">'+_MC_DOW.map(d=>'<div class="mcal-dow">'+d+'</div>').join('');
+  days.forEach((iso,i)=>{
+    const d=data[iso]||{tasks:[],cw:[],marks:[]};const inM=+iso.slice(5,7)-1===st.m;const wk=i%7>=5;
+    const open=d.tasks.filter(t=>!t.done).length;
+    const shown=d.tasks.slice().sort((a,b)=>(a.done-b.done)).slice(0,3);
+    h+='<div class="mcal-cell'+(inM?'':' out')+(wk?' wk':'')+(iso===today?' today':'')+(iso===st.sel?' sel':'')+(d.cw.length?' cw':'')+'" data-iso="'+iso+'" onclick="mcSel('+q+',\''+iso+'\')">'
+      +'<div class="mcal-dn">'+(+iso.slice(8))+(d.cw.length?'<span class="mcal-cwtag" title="Co-working day">CW</span>':'')+'</div>'
+      +'<div class="mcal-chips">'+d.marks.map(m=>'<div class="mcal-mark" title="'+escHtml(m.p.name)+(m.kind==='start'?' starts':' ends')+'"><i style="background:'+(m.p.color||'var(--acc)')+'"></i>'+(m.kind==='start'?'▶ ':'⚑ ')+escHtml(m.p.name)+'</div>').join('')+shown.map(t=>_mcChip(t,today)).join('')+(d.tasks.length>3?'<div class="mcal-more">+'+(d.tasks.length-3)+' more</div>':'')+'</div>'
+      +((d.tasks.length||d.marks.length)?'<div class="mcal-dots">'+(open?'<b>'+open+'</b>':'')+(d.marks.length?'<em>⚑</em>':'')+'</div>':'')
+      +'</div>';
+  });
+  h+='</div>';
+  h+=st.sel?_mcDayDetail(st.sel,data,today,sc):'';
+  h+='<div class="mcal-legend"><span><i class="mcal-lg cw"></i>Co-working day</span><span><i class="mcal-lg td"></i>Today</span><span class="mcal-late">Overdue</span><span>▶ start · ⚑ end</span></div></div>';
+  return h;
+}
+function mcRefresh(sc){const e=document.querySelector('[data-mcal-host="'+(sc||'')+'"]');if(e)e.innerHTML=renderMonthCal(sc);}
+function mcNav(sc,dir){const s=_mcState(sc);let m=s.m+dir,y=s.y;if(m>11){m=0;y++;}if(m<0){m=11;y--;}s.m=m;s.y=y;mcRefresh(sc);}
+function mcToday(sc){const s=_mcState(sc);const t=_localToday();s.y=+t.slice(0,4);s.m=+t.slice(5,7)-1;s.sel=t;mcRefresh(sc);}
+function mcSel(sc,iso){_mcState(sc).sel=iso;mcRefresh(sc);}
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
@@ -5567,6 +5701,12 @@ ${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;">
     <svg class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
   </div>
   <div id="dash-gantt">${renderGantt(active,false)}</div>
+</div>`:''}
+
+<!-- CALENDAR (opt-in via Customise) -->
+${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
+  <div class="sec-hd" style="margin-bottom:10px;"><span class="sec-lbl">Calendar</span></div>
+  <div class="card"><div class="card-bd" data-mcal-host="">${renderMonthCal('')}</div></div>
 </div>`:''}
 
 <!-- TEAM OKRs -->
