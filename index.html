@@ -5329,10 +5329,11 @@ function _quickNotesCardHtml(){
 function renderProjectNotes(p){
   const open=!!(window._pnOpen&&window._pnOpen[p.id]);
   const n=(p.notes||[]).filter(x=>!x.org).length;
-  return '<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;" data-pnotes-hd="'+p.id+'" onclick="pnToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
-    +'<span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(open?'':'transform:rotate(-90deg);')+'">&#9662;</span>Notes'
-    +(n?'<span style="font-size:.68rem;color:var(--muted);font-weight:400;">'+n+'</span>':'')
-    +'<span style="font-size:.62rem;color:var(--muted);font-weight:400;">Shared with the team</span></div>'
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;user-select:none;" data-pnotes-hd="'+p.id+'" onclick="pnToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
+    +'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg>'
+    +'<span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Notes</span>'
+    +(n?'<span style="font-size:.68rem;color:var(--muted);">'+n+'</span>':'')
+    +'<span style="font-size:.62rem;color:var(--muted);">Shared with the team</span></div>'
     +(open?'<div data-pnotes-body="'+p.id+'">'+_qnBody(p.id)+'</div>':'');
 }
 function pnToggle(pid){window._pnOpen=window._pnOpen||{};window._pnOpen[pid]=!window._pnOpen[pid];const h=document.querySelector('[data-pnotes="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectNotes(p);else render();}
@@ -5654,9 +5655,10 @@ document.addEventListener('contextmenu',e=>{if(_mcDrag&&_mcDrag.touch&&e.target.
 /* ── Inside event / project / admin pages: collapsed by default, scoped to that project ── */
 function renderProjectCalendar(p){
   const open=!!(window._pcOpen&&window._pcOpen[p.id]);
-  return '<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;" data-pcal-hd="'+p.id+'" onclick="pcToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
-    +'<span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(open?'':'transform:rotate(-90deg);')+'">&#9662;</span>Calendar'
-    +'<span style="font-size:.62rem;color:var(--muted);font-weight:400;">tasks and co-working days by month</span></div>'
+  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;user-select:none;" data-pcal-hd="'+p.id+'" onclick="pcToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
+    +'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg>'
+    +'<span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Calendar</span>'
+    +'<span style="font-size:.62rem;color:var(--muted);">tasks and co-working days by month</span></div>'
     +(open?'<div class="card"><div class="card-bd" data-mcal-host="'+p.id+'">'+renderMonthCal(p.id)+'</div></div>':'');
 }
 function pcToggle(pid){window._pcOpen=window._pcOpen||{};window._pcOpen[pid]=!window._pcOpen[pid];const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectCalendar(p);else render();}
