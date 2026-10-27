@@ -1186,6 +1186,12 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 #bell-panel .bell-row:hover{background:rgba(255,255,255,.05);}
 #rail-bell.has-alerts{color:var(--acc);}
 @media (max-width:640px){#bell-panel{left:12px;right:12px;top:60px;width:auto;}}
+
+.ln-board{display:grid;grid-template-columns:repeat(auto-fit,minmax(250px,1fr));gap:12px;align-items:start;}
+.ln-col{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:11px;min-height:130px;min-width:0;transition:border-color .12s,background .12s;}
+.ln-col.ln-over{border-color:var(--acc);background:var(--teal-dim);}
+.ln-card{background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:9px 10px;margin-bottom:8px;cursor:grab;}
+.ln-card:active{cursor:grabbing;}
 </style>
 </head>
 <body>
@@ -3699,6 +3705,27 @@ function addDays(dateStr,n){if(!dateStr)return'';const d=new Date(dateStr+'T00:0
 
 
 function taskComp(t){const ch=kids(t.id);if(!ch.length)return t.done?100:0;const d=ch.filter(c=>c.done).length;return Math.round(d/ch.length*100);}
+const PROJ_TYPES={
+  event:{label:'Event',plural:'Events',blurb:'Dated, with sponsors, prizes and phases.'},
+  ongoing:{label:'Ongoing',plural:'Ongoing',blurb:'Multi-year work with no end date.'},
+  improvement:{label:'Improvement',plural:'Improvements',blurb:'A finite piece of work, e.g. a website change.'},
+  admin:{label:'Admin & compliance',plural:'Admin & compliance',blurb:'Company housekeeping, filings and renewals.'}
+};
+/* Projects saved before types existed have no p.type: they are events, exactly as before. */
+function projType(p){return(p&&PROJ_TYPES[p.type])?p.type:'event';}
+function isEvt(p){return projType(p)==='event';}
+const LANES=[['now','Now','Actively working on'],['next','Next','Up next'],['later','Later','Ideas and someday']];
+const NOW_CAP=5;
+/* Tasks without a lane sit in Next, so converting an existing project to Ongoing needs no clean-up. */
+function taskLane(t){return t.lane==='now'||t.lane==='later'?t.lane:'next';}
+function _nextUp(p,n){
+  const rank=t=>projType(p)==='ongoing'?{now:0,next:1,later:2}[taskLane(t)]:0;
+  const dk=t=>t.endDate||'9999';
+  return S.tasks.filter(t=>t.projectId===p.id&&!t.done)
+    .sort((a,b)=>rank(a)-rank(b)||(dk(a)<dk(b)?-1:dk(a)>dk(b)?1:0)||String(a.name).localeCompare(String(b.name))).slice(0,n);
+}
+function projSecToggle(t){if(!window._projSecOff)window._projSecOff={};window._projSecOff[t]=!window._projSecOff[t];render();}
+function newProjOfType(t){window._newProjType=PROJ_TYPES[t]?t:null;window._pendingProjTmpl=null;openModal('project',null);}
 function projComp(p){const ts=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);if(!ts.length)return 0;return Math.round(ts.filter(t=>t.done).length/ts.length*100);}
 
 function avHtml(id,sz=20){
@@ -5538,16 +5565,16 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
   <div style="${(_dsOn('events')||_dsOn('notes'))?'':'display:none;'}container-type:inline-size;container-name:ec-two-left;min-width:0;">
     ${_dsOn('notes')?`<div style="margin-bottom:14px;">${_quickNotesCardHtml()}</div>`:''}
     <div style="${_dsOn('events')?'display:flex;':'display:none;'}align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;">
-      <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.length})</button>
-      <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>p.status==='active').length})</button>
-      <button class="chip${(S.projFilter||'active')==='backlog'?' on':''}" onclick="S.projFilter='backlog';save();render()">Backlog (${S.projects.filter(p=>p.status==='backlog').length})</button>
-      <button class="chip${(S.projFilter||'active')==='completed'?' on':''}" onclick="S.projFilter='completed';save();render()">Completed (${S.projects.filter(p=>p.status==='completed').length})</button>
-      <button class="btn btn-acc btn-sm" style="margin-left:auto;" onclick="openModal('project',null)">+ New Event</button>
+      <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.filter(isEvt).length})</button>
+      <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>isEvt(p)&&p.status==='active').length})</button>
+      <button class="chip${(S.projFilter||'active')==='backlog'?' on':''}" onclick="S.projFilter='backlog';save();render()">Backlog (${S.projects.filter(p=>isEvt(p)&&p.status==='backlog').length})</button>
+      <button class="chip${(S.projFilter||'active')==='completed'?' on':''}" onclick="S.projFilter='completed';save();render()">Completed (${S.projects.filter(p=>isEvt(p)&&p.status==='completed').length})</button>
+      <button class="btn btn-acc btn-sm" style="margin-left:auto;" onclick="newProjOfType('')">+ New Event</button>
     </div>
     ${(()=>{
       if(!_dsOn('events'))return'';
       const filter=S.projFilter||'active';
-      let filtered=filter==='all'?[...S.projects]:S.projects.filter(p=>p.status===filter);
+      let filtered=filter==='all'?S.projects.filter(isEvt):S.projects.filter(p=>isEvt(p)&&p.status===filter);
       // Sort: active first, then everything else (greyed) when showing all
       if(filter==='all'){
         filtered.sort((a,b)=>{
@@ -5556,18 +5583,12 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
           return aActive?-1:1;
         });
       }
-      if(filtered.length===0)return`<div class="empty"><div class="empty-ico">${ICO.folder}</div><div class="empty-txt">No projects here. <span style="color:var(--acc);cursor:pointer;" onclick="openModal('project',null)">Create one →</span></div></div>`;
+      const _other=Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>[t,S.projects.filter(p=>projType(p)===t&&(filter==='all'||p.status===filter)).sort((a,b)=>(a.status==='active'?0:1)-(b.status==='active'?0:1))]).filter(x=>x[1].length);
+      if(filtered.length===0&&!_other.length)return`<div class="empty"<div class="empty-ico">${ICO.folder}</div><div class="empty-txt">No projects here. <span style="color:var(--acc);cursor:pointer;" onclick="openModal('project',null)">Create one →</span></div></div>`;
       const _gi=(filter==='active'||filter==='all')?_dashGroups(filtered.filter(p=>p.status==='active')):null;
       if(_gi)filtered=[..._gi.ordered,...filtered.filter(p=>p.status!=='active')];
       let _lastG='';
-      return filtered.map(p=>{
-      const _g=_gi?(p.status==='active'?_gi.of(p):'other'):'other';
-      let _pre='';
-      if(_g!==_lastG){_lastG=_g;if(_gi&&_g!=='other')_pre=_dashGroupHd(_g,_gi);}
-      if(_gi&&_g!=='other'){
-        if(!_dashGrpOpen(_g))return _pre;
-        if(_g==='later'||_g==='finished'||(_g==='soon'&&_gi.idx(p)>=4))return _pre+_dashCompactRow(p);
-      }
+      const _card=(p,_pre)=>{
       const isInactive=filter==='all'&&p.status!=='active';const comp=projComp(p);
       const mf=S.activeMember;
       const top=sortTasksDoneToBottom(S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(!mf||(t.assignees||[]).includes(mf))));
@@ -5575,7 +5596,7 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
       const totalCt=S.tasks.filter(t=>t.projectId===p.id).length;
       const memberTaskCt=mf?S.tasks.filter(t=>t.projectId===p.id&&!t.done&&(t.assignees||[]).includes(mf)).length:null;
       const overdueCt=S.tasks.filter(t=>t.projectId===p.id&&!t.done&&t.endDate&&t.endDate<todayStr&&(!mf||(t.assignees||[]).includes(mf))).length;
-      const spons=p.sponsors||[];
+      const spons=isEvt(p)?(p.sponsors||[]):[];
       const isExp=window._ecExpanded[p.id]===true||window._ecExpanded[p.id]===undefined?(!mf?!!window._ecExpanded[p.id]:true):false;
       // When a member filter is active, always expand projects that have their tasks
       const forceExp=mf&&S.tasks.some(t=>t.projectId===p.id&&!t.done&&(t.assignees||[]).includes(mf));
@@ -5591,6 +5612,8 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
           <div style="flex:1;min-width:0;">
             <div class="ec-name">${escHtml(p.name)}</div>
             <div class="ec-subtext" style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap;">
+              ${isEvt(p)?'':`<span style="font-size:.6rem;font-weight:700;color:var(--text2);padding:1px 6px;background:var(--surface3);border-radius:4px;">${PROJ_TYPES[projType(p)].label}</span>`}
+              ${isEvt(p)?'':(()=>{const nu=_nextUp(p,1)[0];return nu?`<span style="font-size:.65rem;color:var(--text2);">Next: ${escHtml(nu.name)}${nu.endDate?' · '+fmtD(nu.endDate):''}</span>`:'';})()}
               ${datesStr?`<span style="font-size:.65rem;color:var(--muted);font-family:'DM Mono',monospace;">${datesStr}</span>`:''}
               ${overdueCt>0?`<span style="font-size:.62rem;color:var(--red);font-weight:700;">⚠ ${overdueCt} overdue</span>`:''}
               ${spons.length>0?`<span style="font-size:.62rem;color:var(--text2);">${spons.length} sponsor${spons.length!==1?'s':''}</span>`:''}
@@ -5598,13 +5621,13 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
             </div>
           </div>
           <div class="ec-meta">
-            <div class="ec-prog-wrap">
+            <div class="ec-prog-wrap"${projType(p)==='ongoing'?' style="display:none;"':''}>
               <div class="ec-prog"><div class="ec-prog-fill" style="width:${comp}%;background:${p.color};"></div></div>
               <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);min-width:28px;">${comp}%</span>
             </div>
             <div class="ec-owners" style="display:flex;gap:2px;">${mems.map(m=>avHtml(m,18)).join('')}</div>
             ${p.graphicsUrl?`<a href="${p.graphicsUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;align-items:center;" title="Graphics folder"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></a>`:''}
-            ${p.eventUrl?`<a href="${p.eventUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;align-items:center;" title="Event page"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></a>`:''}
+            ${(p.eventUrl&&isEvt(p))?`<a href="${p.eventUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;align-items:center;" title="Event page"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></a>`:''}
             <div class="ec-btns" style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
               <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openModal('project','${p.id}')" style="font-size:.65rem;">Edit</button>
               <button class="btn btn-ghost btn-xs ec-bookmark" onclick="event.stopPropagation();toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Remove from sidebar':'Pin to sidebar'}" style="padding:0 6px;">
@@ -5660,7 +5683,31 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
           </div>`:''}
         </div>
       </div>`;
-    }).join('');
+      };
+      let _out=filtered.map(p=>{
+      const _g=_gi?(p.status==='active'?_gi.of(p):'other'):'other';
+      let _pre='';
+      if(_g!==_lastG){_lastG=_g;if(_gi&&_g!=='other')_pre=_dashGroupHd(_g,_gi);}
+      if(_gi&&_g!=='other'){
+        if(!_dashGrpOpen(_g))return _pre;
+        if(_g==='later'||_g==='finished'||(_g==='soon'&&_gi.idx(p)>=4))return _pre+_dashCompactRow(p);
+      }
+      return _card(p,_pre);
+      }).join('');
+      const _sec=_other.map(([t,items])=>{
+        const off=!!(window._projSecOff||{})[t];
+        return`<div style="margin:18px 0 6px;" data-proj-sec="${t}">
+          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;" onclick="projSecToggle('${t}')">
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .15s;transform:rotate(${off?-90:0}deg);"><polyline points="6 9 12 15 18 9"/></svg>
+            <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">${PROJ_TYPES[t].plural}</span>
+            <span style="font-size:.68rem;color:var(--muted);">${items.length}</span>
+            <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="event.stopPropagation();newProjOfType('${t}')">+ New</button>
+          </div>
+          ${off?'':items.map(p=>_card(p,'')).join('')}
+        </div>`;}).join('');
+      const _add=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:.7rem;color:var(--muted);" data-proj-add="1">Add:${Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>`<button class="btn btn-ghost btn-xs" onclick="newProjOfType('${t}')">+ ${PROJ_TYPES[t].label}</button>`).join('')}</div>`;
+      return _out+_sec+_add;
+
     })()}
   </div>
 
@@ -6324,7 +6371,8 @@ function toggleDone(id){
   saveNow(); // immediate save — task completion must persist even if user navigates away quickly
   // Full render when: parent task toggled (children states changed), recurring spawned,
   // or currently on kanban board (so the card moves to the correct column)
-  if(ch.length>0||didSpawn||V==='kanban'){render();}else{
+  const _onBoard=S.detailId&&S.detailId===t.projectId&&projType(getProject(t.projectId))==='ongoing';   // board cards aren't task rows: redraw so the card moves to Done
+  if(ch.length>0||didSpawn||V==='kanban'||_onBoard){render();}else{
     // Always update in-place — never trigger a full render from a task toggle
     _updateTaskRowInPlace(id);
     // Update blocker rows in-place too
@@ -6760,6 +6808,7 @@ function projCardHtml(p){
 }
 
 /* ════ PROJECTS + BACKLOG (combined) ════ */
+function projSecToggle(t){if(!window._projSecOff)window._projSecOff={};window._projSecOff[t]=!window._projSecOff[t];render();}
 function renderProjects(){
   const filter=S.projFilter||'all';
   const all=S.projects;
@@ -6816,6 +6865,7 @@ function renderDetail(id){
     <div style="flex:1;min-width:0;">
       <h1 class="detail-title" style="margin:0 0 4px 0;">${escHtml(p.name)}</h1>
       <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${p.priority||'Medium'}</span>
+      ${isEvt(p)?'':`<span style="font-size:.62rem;font-weight:700;color:var(--text2);padding:2px 8px;background:var(--surface3);border-radius:4px;margin-left:5px;">${PROJ_TYPES[projType(p)].label}</span>`}
     </div>
   </div>
   <!-- Description -->
@@ -6848,7 +6898,7 @@ ${(()=>{
   const totalTasks=allTasks.length;
   const overdueTasks=allTasks.filter(t=>!t.done&&t.endDate&&t.endDate<toISO(new Date())).length;
 
-  const spons=p.sponsors||[];
+  const spons=isEvt(p)?(p.sponsors||[]):[];   // sponsors/prizes only apply to events
   const sponsorCount=spons.length;
 
   // Prize & delivery counts
@@ -6911,7 +6961,7 @@ ${(()=>{
     // Event in progress (started, not ended yet)
     if(daysToEnd!==null&&daysToEnd>0){
       return{
-        label:'Event ends in',
+        label:isEvt(p)?'Event ends in':'Ends in',
         value:`${daysToEnd}d`,
         color:'var(--acc)',
         sub:`Ends ${fmtD(p.endDate)}`
@@ -6924,7 +6974,7 @@ ${(()=>{
     // Event has ended
     if(daysSinceEnd!==null&&daysSinceEnd>0){
       return{
-        label:'Event ended',
+        label:isEvt(p)?'Event ended':'Ended',
         value:`${daysSinceEnd}d ago`,
         color:'var(--muted)',
         sub:fmtD(p.endDate)
@@ -7003,13 +7053,13 @@ ${(()=>{
 <!-- EVENT OKRs -->
 <div style="margin-bottom:18px;" id="detail-okr-${p.id}">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="(function(){const b=el('ev-okr-body-${p.id}');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Event Objectives</span></div>
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="(function(){const b=el('ev-okr-body-${p.id}');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">${isEvt(p)?'Event Objectives':'Objectives'}</span></div>
     <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')">Edit</button>
   </div>
   <div id="ev-okr-body-${p.id}">
   ${(()=>{
     const okrs=p.okrs||[];
-    if(okrs.length===0)return`<div style="font-size:.75rem;color:var(--muted);padding:4px 0;">No objectives set for this event yet. Use the Edit button to add them.</div>`;
+    if(okrs.length===0)return`<div style="font-size:.75rem;color:var(--muted);padding:4px 0;">No objectives set for this ${isEvt(p)?'event':'project'} yet. Use the Edit button to add them.</div>`;
     return okrs.map(okr=>`<div style="margin-bottom:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
       <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:6px;">◈ ${okr.objective}</div>
       ${(okr.keyResults||[]).map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:3px 0;border-left:2px solid ${kr.done?'var(--green)':'var(--border2)'};padding-left:8px;margin-bottom:3px;">
@@ -7069,7 +7119,7 @@ ${(()=>{
 </div>
 
 <!-- SPONSORS IN PROJECT -->
-${((p.sponsors||[]).length>0||(S.sponsors||[]).length>0)?`<div style="margin-bottom:18px;">
+${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style="margin-bottom:18px;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;cursor:pointer;" onclick="toggleSponsorsExpanded('${p.id}')">
     <div style="display:flex;align-items:center;gap:10px;flex:1;">
       <svg id="sp-toggle-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._spExpanded||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
@@ -7254,7 +7304,81 @@ ${((p.sponsors||[]).length>0||(S.sponsors||[]).length>0)?`<div style="margin-bot
 }
 
 /* ════ PHASE SECTIONS (project detail) ════ */
+/* ════ NOW / NEXT / LATER board (Ongoing projects) ════ */
+function lnCard(t){
+  const ch=kids(t.id);const doneCh=ch.filter(c=>c.done).length;
+  const od=overdue(t.endDate)&&!t.done;const blocked=isBlocked(t);
+  const lane=taskLane(t);
+  const prioMap={'Critical':'#e06060','High':'#f08c3c','Medium':'#f0c96b','Low':'#62D0AA'};
+  const mv=(to,label)=>`<button class="btn btn-ghost btn-xs" style="font-size:.6rem;padding:2px 7px;" onclick="event.stopPropagation();lnMove('${t.id}','${to}')">${label}</button>`;
+  return`<div class="ln-card" draggable="true" data-ln-task="${t.id}" ondragstart="event.dataTransfer.setData('text/plain','${t.id}');event.dataTransfer.effectAllowed='move'">
+    <div style="display:flex;align-items:flex-start;gap:8px;">
+      <div class="ti-check${t.done?' done':''}" style="margin-top:2px;flex-shrink:0;" onclick="${blocked?`showBlockedAlert('${t.id}')`:`toggleDone('${t.id}')`}"></div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.8rem;font-weight:600;line-height:1.3;cursor:pointer;word-break:break-word;" onclick="openModal('task','${t.id}')">${escHtml(t.name)}</div>
+        <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:5px;">
+          <span title="${escHtml(t.priority||'Medium')}" style="width:7px;height:7px;border-radius:50%;background:${prioMap[t.priority]||'var(--border2)'};"></span>
+          ${t.endDate?`<span style="font-family:'DM Mono',monospace;font-size:.62rem;color:${od?'var(--red)':'var(--muted)'};">${od?'⚠ ':''}${fmtD(t.endDate)}</span>`:''}
+          ${ch.length?`<span style="font-size:.62rem;color:var(--muted);">${doneCh}/${ch.length} subtasks</span>`:''}
+          ${blocked?'<span style="font-size:.62rem;color:var(--yellow);">⏸ blocked</span>':''}
+          <span style="display:flex;gap:2px;margin-left:auto;">${(t.assignees||[]).map(id=>avHtml(id,17)).join('')}</span>
+        </div>
+      </div>
+    </div>
+    <div style="display:flex;gap:5px;margin-top:7px;">${lane==='now'?mv('next','↓ Next'):lane==='next'?mv('now','↑ Now')+mv('later','↓ Later'):mv('next','↑ Next')}</div>
+  </div>`;
+}
+function renderDetailBoard(p,top){
+  const open=top.filter(t=>!t.done);const done=top.filter(t=>t.done);
+  const dk=t=>t.endDate||'9999';
+  const cols=LANES.map(([id,label,hint])=>{
+    const items=open.filter(t=>taskLane(t)===id).sort((a,b)=>dk(a)<dk(b)?-1:dk(a)>dk(b)?1:0);
+    const over=id==='now'&&items.length>NOW_CAP;
+    const inp='ln-in-'+p.id+'-'+id;
+    return`<div class="ln-col" data-ln-lane="${id}" ondragover="event.preventDefault();this.classList.add('ln-over')" ondragleave="this.classList.remove('ln-over')" ondrop="lnDrop(event,'${id}')">
+      <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
+        <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${id==='now'?'var(--acc)':'var(--text2)'};">${label}</span>
+        <span style="font-size:.68rem;color:${over?'var(--red)':'var(--muted)'};font-weight:${over?'700':'400'};">${id==='now'?items.length+'/'+NOW_CAP:items.length}</span>
+        <span style="font-size:.62rem;color:var(--muted);margin-left:auto;">${hint}</span>
+      </div>
+      ${over?`<div style="font-size:.68rem;color:var(--red);margin-bottom:8px;">Over capacity: move something to Next to stay focused.</div>`:''}
+      <div style="display:flex;gap:5px;margin-bottom:9px;"><input class="inp" id="${inp}" placeholder="Add to ${label}…" style="font-size:.76rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();lnAdd('${p.id}','${id}')}"><button class="btn btn-acc btn-xs" onclick="lnAdd('${p.id}','${id}')" title="Add">+</button></div>
+      ${items.length?items.map(lnCard).join(''):`<div style="font-size:.72rem;color:var(--muted);text-align:center;padding:14px 4px;opacity:.7;">Nothing here</div>`}
+    </div>`;
+  }).join('');
+  const dOpen=!!(window._lnDone||{})[p.id];
+  return`<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Board<span style="font-size:.68rem;color:var(--muted);font-weight:400;">${open.length} open · ${done.length} done</span></div>
+  <div class="ln-board">${cols}</div>
+  ${done.length?`<div style="margin-top:14px;"><div style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.72rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);" onclick="lnToggleDone('${p.id}')"><span>${dOpen?'▾':'▸'}</span>Done (${done.length})</div>
+    ${dOpen?`<div style="margin-top:8px;">${done.map(t=>`<div style="display:flex;align-items:center;gap:8px;padding:5px 2px;border-bottom:1px solid var(--border2);font-size:.76rem;color:var(--muted);"><div class="ti-check done" style="flex-shrink:0;" onclick="toggleDone('${t.id}')" title="Reopen"></div><span style="text-decoration:line-through;flex:1;min-width:0;word-break:break-word;cursor:pointer;" onclick="openModal('task','${t.id}')">${escHtml(t.name)}</span></div>`).join('')}</div>`:''}
+  </div>`:''}`;
+}
+function lnToggleDone(pid){if(!window._lnDone)window._lnDone={};window._lnDone[pid]=!window._lnDone[pid];render();}
+function lnMove(id,lane){
+  const t=getTask(id);if(!t||!LANES.some(l=>l[0]===lane)||taskLane(t)===lane)return;
+  saveWithUndo('Move task');t.lane=lane;save();render();
+  if(lane==='now'){const n=S.tasks.filter(x=>x.projectId===t.projectId&&!x.parentId&&!x.done&&taskLane(x)==='now').length;if(n>NOW_CAP)showToast('Now has '+n+' items: consider moving one to Next');}
+}
+function lnDrop(ev,lane){ev.preventDefault();const c=ev.currentTarget;if(c&&c.classList)c.classList.remove('ln-over');const id=ev.dataTransfer&&ev.dataTransfer.getData('text/plain');if(id)lnMove(id,lane);}
+function lnAdd(pid,lane){
+  const inp=el('ln-in-'+pid+'-'+lane);const name=inp&&inp.value.trim();if(!name||!LANES.some(l=>l[0]===lane))return;
+  saveWithUndo('Add task');
+  S.tasks.unshift({id:uid(),name,description:'',projectId:pid,parentId:null,priority:'Medium',phase:'',assignees:[],labels:[],blockedBy:[],startDate:'',endDate:'',kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{},lane});
+  saveNow();render();
+  setTimeout(()=>{const n=el('ln-in-'+pid+'-'+lane);if(n)n.focus();},60);
+}
+function renderDetailFlatTasks(p,top){
+  let html='<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Tasks';
+  if(top.length>0)html+=`<span style="font-size:.68rem;color:var(--muted);font-weight:400;">${top.length} total</span>`;
+  html+='</div>';
+  html+=quickAddBarHtml(p.id);
+  html+=top.length===0?'<div style="color:var(--muted);font-size:.73rem;padding:6px 4px;text-align:center;opacity:.6;">No tasks yet</div>'
+    :`<div class="ec-tasks" style="container-type:inline-size;container-name:task-card;">${applyTaskSort(top).map(t=>renderTaskRow(t,0,false)).join('')}</div>`;
+  return html;
+}
 function renderDetailPhaseSections(p,top){
+  if(projType(p)==='ongoing')return renderDetailBoard(p,top);
+  if(!isEvt(p))return renderDetailFlatTasks(p,top);   // event phases (Planning / Pre-launch / Live / Post-event) are event-only
   // Group top-level tasks by phase
   const byPhase={};
   PHASES.forEach(ph=>{byPhase[ph]=[];});
@@ -9917,7 +10041,7 @@ function saveProject(eid){
   const _pwPre=el('pm-pw-prelaunch')?.value.trim();
   const _pwPost=el('pm-pw-postEvent')?.value.trim();
   const newPhaseWeeks={planning:_pwP!==''?Number(_pwP):null,prelaunch:_pwPre!==''?Number(_pwPre):null,postEvent:_pwPost!==''?Number(_pwPost):null};
-  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs,phaseWeeks:newPhaseWeeks};
+  const proj={id:eid||uid(),name,description:el('pm-desc')?.value.trim()||'',area:'',priority:el('pm-prio')?.value||'',ownerId:el('pm-owner')?.value||'',isAirCon,type:el('pm-type')?.value||(eid&&getProject(eid)?.type)||'event',startDate:el('pm-s-v')?.value||dpVal('pm-s'),endDate:el('pm-e-v')?.value||dpVal('pm-e'),status:el('pm-status')?.value||'active',color:el('pm-clr')?.value||COLORS[0],graphicsUrl:el('pm-graphics')?.value.trim()||'',eventUrl:el('pm-eventurl')?.value.trim()||'',expenses:[],sponsors:newSponsors,okrs:newOkrs,phaseWeeks:newPhaseWeeks};
   if(eid){
     const i=S.projects.findIndex(p=>p.id===eid);
     if(i>=0){
@@ -9939,6 +10063,7 @@ function saveProject(eid){
     }
   } else {
     S.projects.push(proj);
+    window._newProjType=null;
   }
   saveWithUndo(eid?'Edit project':'New project');
   closeModal();
@@ -9980,6 +10105,8 @@ function projectModalHtml(id){
   const defPrio=p?.priority||tmpl?.priority||'';
   const defColor=p?.color||tmpl?.color||COLORS[0];
   const projTmpls=S.projectTemplates||[];
+  const defType=p?projType(p):(PROJ_TYPES[window._newProjType]?window._newProjType:'event');
+  const evS=defType==='event'?'':'display:none;';
   return`<div class="mo-box">
 <div class="mo-hd"><span class="mo-title">${p?'Edit Project':'New Project'}</span><button class="mo-close" onclick="closeModal()">\u00d7</button></div>
 <div class="mo-body">
@@ -9993,6 +10120,11 @@ function projectModalHtml(id){
     </div>
     ${tmpl?`<div style="font-size:.7rem;color:var(--acc);margin-top:7px;">\u2713 Will create ${tmpl.tasks?.length||0} tasks from template</div>`:''}
   </div><hr class="div" style="margin:0 0 14px 0;">`:''}
+  <div class="field"><label class="flbl">Type</label>
+    <div style="display:flex;gap:6px;flex-wrap:wrap;" id="pm-types">${Object.entries(PROJ_TYPES).map(([k,v])=>`<button type="button" class="btn btn-ghost btn-xs" data-ptype="${k}" onclick="pmSetType('${k}')" style="${defType===k?'border-color:var(--acc);color:var(--acc);background:var(--teal-dim);':''}">${v.label}</button>`).join('')}</div>
+    <input type="hidden" id="pm-type" value="${defType}">
+    <div id="pm-type-blurb" style="font-size:.7rem;color:var(--muted);margin-top:5px;">${PROJ_TYPES[defType].blurb}</div>
+  </div>
   <div class="field"><label class="flbl">Name *</label><input class="inp" id="pm-name" value="${escHtml(defName)}" placeholder="Project name"></div>
   <div class="field"><label class="flbl">Description</label><textarea class="txta" id="pm-desc">${defDesc}</textarea></div>
   <div class="inp-row">
@@ -10005,9 +10137,10 @@ function projectModalHtml(id){
   </div>
   <div class="field"><label class="flbl">Status</label><select class="sel" id="pm-status"><option value="active" ${(!p||p.status==='active')?'selected':''}>Active</option><option value="backlog" ${p?.status==='backlog'?'selected':''}>Backlog</option><option value="completed" ${p?.status==='completed'?'selected':''}>Completed</option></select></div>
   <div class="field"><label class="flbl">Graphics Folder URL (Google Drive, Dropbox, etc.)</label><input class="inp" id="pm-graphics" type="url" placeholder="https://drive.google.com/..." value="${p?.graphicsUrl||''}" style="margin-bottom:2px;"></div>
-  <div class="field"><label class="flbl">Event URL</label><input class="inp" id="pm-eventurl" type="url" placeholder="https://airwiggles.com/c/conference/aircon26" value="${p?.eventUrl||''}"></div>
+  <div class="field pm-evt-only" style="${evS}"><label class="flbl">Event URL</label><input class="inp" id="pm-eventurl" type="url" placeholder="https://airwiggles.com/c/conference/aircon26" value="${p?.eventUrl||''}"></div>
 
   <!-- PHASE OVERRIDES -->
+  <div class="pm-evt-only" style="${evS}">
   <hr class="div" style="margin:10px 0;">
   <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px;">Phase Duration Overrides</div>
   <div style="font-size:.7rem;color:var(--muted);margin-bottom:10px;">Leave blank to use global defaults (Planning: ${S.settings?.phaseDefaults?.planning??2}w, Pre-launch: ${S.settings?.phaseDefaults?.prelaunch??6}w, Post-event: ${S.settings?.phaseDefaults?.postEvent??2}w)</div>
@@ -10017,10 +10150,11 @@ function projectModalHtml(id){
     <div class="field" style="flex:1;"><label class="flbl">Post-event (weeks)</label><input class="inp" id="pm-pw-postEvent" type="number" min="0" max="52" placeholder="e.g. 2" value="${p?.phaseWeeks?.postEvent!=null?p.phaseWeeks.postEvent:''}"></div>
   </div>
 
+  </div>
   <!-- EVENT OBJECTIVES -->
   <hr class="div" style="margin:10px 0;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
-    <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Event Objectives</div>
+    <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;" id="pm-okr-title">${defType==='event'?'Event Objectives':'Objectives'}</div>
   </div>
   <div id="pm-okr-list">${(p?.okrs||[]).map((okr,oi)=>`<div class="pm-okr-item" data-okr-idx="${oi}" data-okr-id="${okr.id||''}" style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:9px 11px;margin-bottom:7px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:6px;"><span style="font-size:.65rem;font-weight:700;color:var(--acc);text-transform:uppercase;">◈ Objective</span><button onclick="this.closest('.pm-okr-item').remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;margin-left:auto;padding:0;">×</button></div><input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Grow community awareness" value="${escHtml(okr.objective||'')}" id="pm-okr-obj-${oi}"><div id="pm-okr-krs-${oi}">${(okr.keyResults||[]).map((kr,ki)=>`<div style="display:flex;gap:5px;margin-bottom:4px;" data-kr-id="${kr.id||''}" data-kr-done="${kr.done||false}"><span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="pm-okr-kr-${oi}-${ki}" value="${escHtml(kr.text||'')}"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button></div>`).join('')}</div><button class="btn btn-ghost btn-xs" style="font-size:.66rem;margin-top:4px;" onclick="addPmKr(${oi})">+ Key result</button></div>`).join('')}</div>
   <div style="display:flex;gap:6px;margin-bottom:4px;">
@@ -10029,6 +10163,7 @@ function projectModalHtml(id){
   </div>
 
   <!-- SPONSOR ASSIGNMENT -->
+  <div class="pm-evt-only" style="${evS}">
   <hr class="div" style="margin:10px 0;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:10px;">
     <div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;">Sponsors</div>
@@ -10041,6 +10176,7 @@ function projectModalHtml(id){
   <div id="pm-sponsors-list">${renderProjSponsorsEdit(p?.sponsors||[],p?.id||'')}</div>
   ${S.sponsors.length>0?`<button class="add-row-btn" onclick="addProjSponsorRow()">+ Add sponsor</button>`:`<div style="font-size:.73rem;color:var(--muted);">No sponsors yet. <span style="color:var(--acc);cursor:pointer;" onclick="closeModal();nav('sponsors')">Add sponsors \u2192</span></div>`}
 
+  </div>
   <div style="margin-top:20px;"></div>
   <div class="field"><label class="flbl">Colour</label><div class="clr-grid" id="pm-clrs">${COLORS.map(c=>`<svg class="clr-dot${defColor===c?' sel':''}" width="26" height="26" viewBox="0 0 26 26" onclick="pickC('pm-clrs','pm-clr','${c}',this)" style="cursor:pointer;flex:none;"><circle cx="13" cy="13" r="10" fill="${c}"/><circle class="ring-hover" cx="13" cy="13" r="11.5" fill="none" stroke="rgba(255,255,255,0.4)" stroke-width="1.2" opacity="0" style="transition:opacity .15s;"/><circle class="ring" cx="13" cy="13" r="11.5" fill="none" stroke="white" stroke-width="1.5" opacity="0" style="transition:opacity .15s;"/></svg>`).join('')}</div><input type="hidden" id="pm-clr" value="${defColor}"></div>
 </div>
@@ -10048,6 +10184,16 @@ function projectModalHtml(id){
 ${p?'Save changes':'Create project'}</button></div></div>`;
 }
 
+function pmSetType(t){
+  if(!PROJ_TYPES[t])return;
+  const h=el('pm-type');if(h)h.value=t;
+  window._newProjType=t==='event'?null:t;
+  document.querySelectorAll('#pm-types [data-ptype]').forEach(b=>{const on=b.dataset.ptype===t;b.style.borderColor=on?'var(--acc)':'';b.style.color=on?'var(--acc)':'';b.style.background=on?'var(--teal-dim)':'';});
+  const bl=el('pm-type-blurb');if(bl)bl.textContent=PROJ_TYPES[t].blurb;
+  const ot=el('pm-okr-title');if(ot)ot.textContent=t==='event'?'Event Objectives':'Objectives';
+  /* hidden, not removed: sponsor/phase data in the form is still read back on save, so switching type never wipes anything */
+  document.querySelectorAll('.pm-evt-only').forEach(x=>{x.style.display=t==='event'?'':'none';});
+}
 function renderProjSponsorsEdit(sponsors,projId){
   if(!sponsors||sponsors.length===0)return`<div id="pm-sponsors-rows" data-proj-id="${projId||''}" style="margin-bottom:8px;"></div>`;
   return`<div id="pm-sponsors-rows" data-proj-id="${projId||''}" style="margin-bottom:8px;">${sponsors.map((sp,i)=>_projSponsorRow(sp,i)).join('')}</div>`;
