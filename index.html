@@ -5816,13 +5816,13 @@ ${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
 <!-- TEAM OKRs -->
 ${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="toggleEl('dash-team-okr-body')"><span class="sec-lbl">Team Objectives</span></div>
+    <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="dashOkrToggle()" role="button" aria-expanded="${window._dashOkrOpen!==false}"><span class="sec-lbl">Team Objectives</span><svg id="dash-okr-chev" class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${window._dashOkrOpen!==false?'':'transform:rotate(-90deg);'}"><polyline points="6 9 12 15 18 9"/></svg></div>
     <div style="display:flex;gap:5px;">
       <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'ns\')">+ North Star</button>
       <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'yr\')">+ Yearly Goal</button>
     </div>
   </div>
-  <div id="dash-team-okr-body">${renderTeamOkrs()}</div>
+  <div id="dash-team-okr-body" style="display:${window._dashOkrOpen!==false?'block':'none'};">${renderTeamOkrs()}</div>
 </div>`:''}
 
 <!-- QUICK LINKS -->
@@ -6096,6 +6096,29 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
 /* ════ OKR FUNCTIONS ════ */
 
 // ── Utility ──
+function campGanttToggle(){
+  window._campGanttOpen=window._campGanttOpen===false;
+  const open=window._campGanttOpen!==false,w=el('campaign-gantt'),i=el('camp-gantt-chev'),b=el('camp-gantt-btn');
+  if(w)w.style.display=open?'':'none';
+  if(i)i.style.transform=open?'none':'rotate(-90deg)';
+  if(b)b.textContent=open?'Hide timeline':'Show timeline';
+  if(i&&i.parentNode)i.parentNode.setAttribute('aria-expanded',open);
+}
+function toggleProjOkr(pid){
+  window._okrOpen=window._okrOpen||{};window._okrOpen[pid]=window._okrOpen[pid]===false;
+  const open=window._okrOpen[pid]!==false,b=el('ev-okr-body-'+pid),i=el('okr-ico-'+pid);
+  if(b)b.style.display=open?'block':'none';
+  if(i)i.style.transform=open?'rotate(0deg)':'rotate(-90deg)';
+  const h=i&&i.parentNode;if(h)h.setAttribute('aria-expanded',open);
+}
+/* Dashboard 'Team Objectives': same pattern as the Timeline header (label, then arrow) */
+function dashOkrToggle(){
+  window._dashOkrOpen=window._dashOkrOpen===false;
+  const open=window._dashOkrOpen!==false,b=el('dash-team-okr-body'),i=el('dash-okr-chev');
+  if(b)b.style.display=open?'block':'none';
+  if(i)i.style.transform=open?'':'rotate(-90deg)';
+  if(i&&i.parentNode)i.parentNode.setAttribute('aria-expanded',open);
+}
 function toggleEl(id){const b=el(id);if(b)b.style.display=b.style.display==='none'?'block':'none';}
 
 // ── Render team OKRs (called from template, no IIFE needed) ──
@@ -7362,10 +7385,12 @@ ${(()=>{
 <!-- EVENT OKRs -->
 <div style="margin-bottom:18px;" id="detail-okr-${p.id}">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;" onclick="(function(){const b=el('ev-okr-body-${p.id}');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">${isEvt(p)?'Event Objectives':'Objectives'}</span></div>
+    <div style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleProjOkr('${p.id}')" role="button" aria-expanded="${(window._okrOpen||{})[p.id]!==false}">
+      <svg id="okr-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._okrOpen||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
+      <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">${isEvt(p)?'Event Objectives':'Objectives'}</span></div>
     <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')">Edit</button>
   </div>
-  <div id="ev-okr-body-${p.id}">
+  <div id="ev-okr-body-${p.id}" style="display:${(window._okrOpen||{})[p.id]!==false?'block':'none'};">
   ${(()=>{
     const okrs=p.okrs||[];
     if(okrs.length===0)return`<div style="font-size:.75rem;color:var(--muted);padding:4px 0;">No objectives set for this ${isEvt(p)?'event':'project'} yet. Use the Edit button to add them.</div>`;
@@ -8294,13 +8319,13 @@ function renderCampaign(){
 <!-- Timeline -->
 <div style="margin-bottom:18px;">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-    <span style="font-size:.7rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;">Timeline</span>
+    <span style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:.7rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;" onclick="campGanttToggle()" role="button" aria-expanded="${window._campGanttOpen!==false}">Timeline<svg id="camp-gantt-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${window._campGanttOpen!==false?'none':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg></span>
     <div style="display:flex;gap:6px;">
       <button class="btn btn-ghost btn-xs" onclick="scrollGanttToday()" style="font-size:.65rem;">Today</button>
-      <button class="btn btn-ghost btn-xs" onclick="var w=document.getElementById('campaign-gantt');var open=w.style.display!=='none';w.style.display=open?'none':'';this.textContent=open?'Show timeline':'Hide timeline';" style="font-size:.65rem;">Hide timeline</button>
+      <button class="btn btn-ghost btn-xs" id="camp-gantt-btn" onclick="campGanttToggle()" style="font-size:.65rem;">${window._campGanttOpen!==false?'Hide timeline':'Show timeline'}</button>
     </div>
   </div>
-  <div id="campaign-gantt" style="background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;">
+  <div id="campaign-gantt" style="${window._campGanttOpen!==false?'':'display:none;'}background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;">
     ${renderGantt(allProjs)}
   </div>
 </div>
