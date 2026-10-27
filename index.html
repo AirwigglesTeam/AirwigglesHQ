@@ -1201,11 +1201,12 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 .mcal-cell{background:var(--surface);min-height:92px;padding:4px 5px;cursor:pointer;min-width:0;overflow:hidden;position:relative;}
 .mcal-cell.out{background:var(--surface2);opacity:.55;}
 .mcal-cell.wk:not(.out){background:color-mix(in srgb,var(--surface) 92%,var(--muted));}
-.mcal-cell.cw{box-shadow:inset 0 0 0 1.5px var(--acc);}
+.mcal-cell.cw{background:color-mix(in srgb,var(--purple) 13%,var(--surface));box-shadow:inset 0 3px 0 var(--purple);}
 .mcal-cell.today .mcal-dn{background:var(--acc);color:#0b1210;border-radius:10px;padding:0 6px;}
 .mcal-cell.sel{outline:2px solid var(--acc);outline-offset:-2px;}
 .mcal-dn{display:inline-flex;align-items:center;gap:4px;font-size:.7rem;font-weight:700;color:var(--text2);margin-bottom:3px;}
-.mcal-cwtag{font-size:.5rem;font-weight:800;color:var(--acc);letter-spacing:.04em;}
+.mcal-cwlab{font-size:.58rem;font-weight:700;color:var(--purple);background:color-mix(in srgb,var(--purple) 18%,transparent);border-radius:4px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.mcal-cwrow{display:flex;margin-bottom:3px;min-width:0;}
 .mcal-chip,.mcal-mark{display:flex;align-items:center;gap:4px;font-size:.64rem;line-height:1.25;padding:1px 4px;border-radius:4px;background:var(--surface2);margin-bottom:2px;white-space:nowrap;overflow:hidden;}
 .mcal-chip span,.mcal-mark{text-overflow:ellipsis;overflow:hidden;}
 .mcal-chip i,.mcal-mark i,.mcal-row i{width:7px;height:7px;border-radius:50%;flex-shrink:0;display:inline-block;}
@@ -1231,11 +1232,13 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 .mcal-empty{font-size:.74rem;color:var(--muted);}
 .mcal-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.62rem;color:var(--muted);margin-top:8px;}
 .mcal-lg{display:inline-block;width:10px;height:10px;border-radius:3px;margin-right:4px;vertical-align:-1px;}
-.mcal-lg.cw{box-shadow:inset 0 0 0 1.5px var(--acc);}
+.mcal-lg.cw{background:color-mix(in srgb,var(--purple) 30%,var(--surface));box-shadow:inset 0 2px 0 var(--purple);}
+.mcal-lg.sl{outline:2px solid var(--acc);outline-offset:-2px;}
 .mcal-lg.td{background:var(--acc);}
 @media(max-width:700px){
   .mcal-cell{min-height:52px;padding:3px;}
   .mcal-chips{display:none;}
+  .mcal-cwlab{display:none;}
   .mcal-dots{display:flex;}
   .mcal-dow{padding:4px 0;font-size:.56rem;}
 }
@@ -1246,6 +1249,11 @@ body.mcal-dragging{cursor:grabbing;}
 body.mcal-dragging *{cursor:grabbing !important;}
 .mcal-mvw{position:relative;display:inline-flex;}
 .mcal-mv{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none;}
+
+.dash-crow.backlog{opacity:.5;}
+.dash-crow.backlog:hover{opacity:.85;}
+.dash-crow.backlog .dash-crow-nm{color:var(--text2);font-weight:500;}
+.dash-crow.backlog>span:first-child{filter:grayscale(1);}
 </style>
 </head>
 <body>
@@ -5269,7 +5277,7 @@ function _dashCompactRow(p){
   const comp=projComp(p);
   const ds=p.startDate&&p.endDate?fmtD(p.startDate)+' → '+fmtD(p.endDate):p.endDate?'Due '+fmtD(p.endDate):'No dates';
   const open=S.tasks.filter(t=>t.projectId===p.id&&!t.done).length;
-  return '<div class="dash-crow" onclick="openDetail(\''+p.id+'\')"><span style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;"></span>'
+  return '<div class="dash-crow'+(p.status==='backlog'?' backlog':'')+'" onclick="openDetail(\''+p.id+'\')"><span style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;"></span>'
    +'<span class="dash-crow-nm">'+escHtml(p.name)+'</span>'+(p.status==='backlog'?'<span class="dash-crow-meta" style="font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">Backlog</span>':'')+(isEvt(p)?'':'<span class="dash-crow-meta" style="font-size:.58rem;">'+PROJ_TYPES[projType(p)].label+'</span>')+'<span class="dash-crow-meta dash-crow-dt">'+ds+'</span><span class="dash-crow-meta dash-crow-dt">'+open+' open</span>'
    +'<span class="dash-crow-meta" style="min-width:30px;text-align:right;">'+comp+'%</span></div>';
 }
@@ -5541,7 +5549,7 @@ function _mcDayDetail(iso,data,today,sc){
   const q=_isoParts(iso);const dow=_MC_DOW[(new Date(Date.UTC(q[0],q[1]-1,q[2])).getUTCDay()+6)%7];
   let h='<div class="mcal-detail" data-detail="'+iso+'"><div class="mcal-dt-hd">'+dow+' '+_updDate(iso)+(iso===today?' <span class="mcal-today-tag">Today</span>':'')+'</div>';
   if(!d.tasks.length&&!d.cw.length&&!d.marks.length)return h+'<div class="mcal-empty">Nothing scheduled.</div></div>';
-  d.cw.forEach(c=>{h+='<div class="mcal-row mcal-cw"><b>Co-working</b> '+escHtml(c.title||'')+' <span class="mcal-muted">'+escHtml((c.startTime||'')+(c.endTime?'–'+c.endTime:''))+'</span>'+((c.members||[]).length?'<span class="mcal-avs">'+(c.members||[]).map(id=>avHtml(id,16)).join('')+'</span>':'')+(c.notes?'<div class="mcal-muted">'+escHtml(c.notes)+'</div>':'')+'</div>';});
+  d.cw.forEach(c=>{h+='<div class="mcal-row mcal-cw"><span class="mcal-cwlab">Co-working day</span> '+escHtml(c.title&&c.title!=='Co-working Day'?c.title:'')+' <span class="mcal-muted">'+escHtml((c.startTime||'')+(c.endTime?'–'+c.endTime:''))+'</span>'+((c.members||[]).length?'<span class="mcal-avs">'+(c.members||[]).map(id=>avHtml(id,16)).join('')+'</span>':'')+(c.notes?'<div class="mcal-muted">'+escHtml(c.notes)+'</div>':'')+'</div>';});
   d.marks.forEach(m=>{h+='<div class="mcal-row"><i style="background:'+(m.p.color||'var(--acc)')+'"></i> '+escHtml(m.p.name)+' '+(m.kind==='start'?'starts':'ends')+'</div>';});
   d.tasks.slice().sort((a,b)=>(a.done-b.done)||a.name.localeCompare(b.name)).forEach(t=>{
     const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
@@ -5560,14 +5568,14 @@ function renderMonthCal(sc){
     const open=d.tasks.filter(t=>!t.done).length;
     const shown=d.tasks.slice().sort((a,b)=>(a.done-b.done)).slice(0,3);
     h+='<div class="mcal-cell'+(inM?'':' out')+(wk?' wk':'')+(iso===today?' today':'')+(iso===st.sel?' sel':'')+(d.cw.length?' cw':'')+'" data-iso="'+iso+'" onclick="mcSel('+q+',\''+iso+'\')">'
-      +'<div class="mcal-dn">'+(+iso.slice(8))+(d.cw.length?'<span class="mcal-cwtag" title="Co-working day">CW</span>':'')+'</div>'
+      +'<div class="mcal-dn">'+(+iso.slice(8))+'</div>'+(d.cw.length?'<div class="mcal-cwrow"><span class="mcal-cwlab" title="'+escHtml(d.cw.map(c=>c.title||'Co-working day').join(', '))+'">Co-working day</span></div>':'')
       +'<div class="mcal-chips">'+d.marks.map(m=>'<div class="mcal-mark" title="'+escHtml(m.p.name)+(m.kind==='start'?' starts':' ends')+'"><i style="background:'+(m.p.color||'var(--acc)')+'"></i>'+(m.kind==='start'?'▶ ':'⚑ ')+escHtml(m.p.name)+'</div>').join('')+shown.map(t=>_mcChip(t,today)).join('')+(d.tasks.length>3?'<div class="mcal-more">+'+(d.tasks.length-3)+' more</div>':'')+'</div>'
       +((d.tasks.length||d.marks.length)?'<div class="mcal-dots">'+(open?'<b>'+open+'</b>':'')+(d.marks.length?'<em>⚑</em>':'')+'</div>':'')
       +'</div>';
   });
   h+='</div>';
   h+=st.sel?_mcDayDetail(st.sel,data,today,sc):'';
-  h+='<div class="mcal-legend"><span><i class="mcal-lg cw"></i>Co-working day</span><span><i class="mcal-lg td"></i>Today</span><span class="mcal-late">Overdue</span><span>▶ start · ⚑ end</span></div></div>';
+  h+='<div class="mcal-legend"><span><i class="mcal-lg cw"></i>Co-working day</span><span><i class="mcal-lg td"></i>Today</span><span><i class="mcal-lg sl"></i>Selected</span><span class="mcal-late">Overdue</span><span>▶ start · ⚑ end</span></div></div>';
   return h;
 }
 function mcRefresh(sc){const e=document.querySelector('[data-mcal-host="'+(sc||'')+'"]');if(e)e.innerHTML=renderMonthCal(sc);}
