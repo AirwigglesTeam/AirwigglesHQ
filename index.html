@@ -5234,6 +5234,15 @@ function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
 function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
 const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team'],['calendar','Calendar']];
 /* Most sections are on unless hidden. Opt-in sections (new ones) stay off until someone switches them on, so nobody's dashboard changes under them. */
+/* Collapsible dashboard section header: left chevron + uppercase accent label, same pattern as the project page sections. */
+function dashSecHd(key,label,open){
+  return '<div data-dsec-hd="'+key+'" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;user-select:none;" onclick="dashSecToggle(\''+key+'\')" role="button" aria-expanded="'+open+'"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg><span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">'+label+'</span></div>';
+}
+function dashSecToggle(key){
+  if(key==='tl')window._dashTlOpen=(window._dashTlOpen===false);
+  else if(key==='cal')window._dashCalOpen=!window._dashCalOpen;
+  render();
+}
 const DASH_OPT_IN=['calendar'];
 function _dsOn(id){return DASH_OPT_IN.includes(id)?(_dprefRead().on||[]).includes(id):!(_dprefRead().hide||[]).includes(id);}
 function dsToggle(id){_dprefSet(p=>{const k=DASH_OPT_IN.includes(id)?'on':'hide';const h=new Set(p[k]||[]);h.has(id)?h.delete(id):h.add(id);p[k]=[...h];});render();}
@@ -5909,13 +5918,16 @@ function renderDash(){
   <div style="position:relative;"><button class="btn btn-ghost btn-sm" onclick="dsPopToggle()" title="Choose what shows on your dashboard">Customise</button>${_dsPopHtml()}</div>
 </div>
 
-<!-- TIMELINE (collapsible) -->
-${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;">
-  <div class="sec-hd" style="margin-bottom:10px;cursor:pointer;" onclick="const g=el('dash-gantt');if(g){const open=g.style.display!=='none';g.style.display=open?'none':'block';this.querySelector('.sec-chev').style.transform=open?'rotate(-90deg)':'';}">
-    <span class="sec-lbl">Timeline</span>
-    <svg class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;"><polyline points="6 9 12 15 18 9"/></svg>
-  </div>
-  <div id="dash-gantt">${renderGantt(active,false)}</div>
+<!-- TIMELINE (collapsible; open by default) -->
+${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;" id="dash-timeline">
+  ${dashSecHd('tl','Timeline',window._dashTlOpen!==false)}
+  ${window._dashTlOpen!==false?`<div id="dash-gantt">${renderGantt(active,false)}</div>`:''}
+</div>`:''}
+
+<!-- CALENDAR (opt-in via Customise; collapsed by default) -->
+${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
+  ${dashSecHd('cal','Calendar',!!window._dashCalOpen)}
+  ${window._dashCalOpen?`<div class="card"><div class="card-bd" data-mcal-host="">${renderMonthCal('')}</div></div>`:''}
 </div>`:''}
 
 <!-- TEAM OBJECTIVES + TEAM (two columns on wide screens, stacked on narrow ones) -->
@@ -5953,12 +5965,6 @@ ${(!(_dsOn('team')&&window._teamExp)&&(_dsOn('okrs')||_dsOn('team')))?`<div clas
         }).join('')}
       </div>
     </div></div>`:''}
-</div>`:''}
-
-<!-- CALENDAR (opt-in via Customise) -->
-${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
-  <div class="sec-hd" style="margin-bottom:10px;"><span class="sec-lbl">Calendar</span></div>
-  <div class="card"><div class="card-bd" data-mcal-host="">${renderMonthCal('')}</div></div>
 </div>`:''}
 
 <!-- QUICK LINKS -->
