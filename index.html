@@ -1254,6 +1254,11 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .dash-crow.backlog:hover{opacity:.85;}
 .dash-crow.backlog .dash-crow-nm{color:var(--text2);font-weight:500;}
 .dash-crow.backlog>span:first-child{filter:grayscale(1);}
+
+/* dashboard: Team Objectives (left) and Team (right) share a row on wide screens */
+.dash-okr-team.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start;margin-bottom:18px;}
+.dash-okr-team.two>#dash-team-okrs{margin-bottom:0 !important;}
+@media(max-width:1000px){.dash-okr-team.two{grid-template-columns:1fr;gap:0;}.dash-okr-team.two>#dash-team-okrs{margin-bottom:18px !important;}}
 </style>
 </head>
 <body>
@@ -5807,14 +5812,9 @@ ${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;">
   <div id="dash-gantt">${renderGantt(active,false)}</div>
 </div>`:''}
 
-<!-- CALENDAR (opt-in via Customise) -->
-${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
-  <div class="sec-hd" style="margin-bottom:10px;"><span class="sec-lbl">Calendar</span></div>
-  <div class="card"><div class="card-bd" data-mcal-host="">${renderMonthCal('')}</div></div>
-</div>`:''}
-
-<!-- TEAM OKRs -->
-${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
+<!-- TEAM OBJECTIVES + TEAM (two columns on wide screens, stacked on narrow ones) -->
+${(_dsOn('okrs')||_dsOn('team'))?`<div class="dash-okr-team${_dsOn('okrs')&&_dsOn('team')?' two':''}">
+  ${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
     <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="dashOkrToggle()" role="button" aria-expanded="${window._dashOkrOpen!==false}"><span class="sec-lbl">Team Objectives</span><svg id="dash-okr-chev" class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${window._dashOkrOpen!==false?'':'transform:rotate(-90deg);'}"><polyline points="6 9 12 15 18 9"/></svg></div>
     <div style="display:flex;gap:5px;">
@@ -5823,6 +5823,35 @@ ${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
     </div>
   </div>
   <div id="dash-team-okr-body" style="display:${window._dashOkrOpen!==false?'block':'none'};">${renderTeamOkrs()}</div>
+</div>`:''}
+  ${_dsOn('team')?`<div id="dash-team-col" style="min-width:0;"><div class="card">
+      <div class="card-hd">
+        <span class="card-title">Team</span>
+        <button class="btn btn-acc btn-xs" onclick="openModal('member',null)" style="font-size:.68rem;">+ Add member</button>
+      </div>
+      <div class="card-bd">
+        ${S.members.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">No members yet.</div>`:''}
+        ${S.members.map(m=>{
+          const tc=memberTaskCounts[m.id]||0;
+          const isSel=S.activeMember===m.id;
+          const hours=memberHoursTotal(m);
+          return`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;margin:1px -8px;transition:background .12s;${isSel?'background:var(--teal-dim);':''}cursor:pointer;" onclick="filterMemberAndExpand('${m.id}')" title="Filter dashboard by ${escHtml(m.name)}">
+            ${m.photoUrl?`<img src="${escHtml(m.photoUrl)}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">`:`<div class="av" style="width:26px;height:26px;background:${m.color};font-size:.52rem;flex-shrink:0;">${escHtml(m.initials)}</div>`}
+            <span style="flex:1;font-size:.8rem;font-weight:${isSel?'700':'500'};color:${isSel?'var(--acc)':'var(--text)'};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(m.name)}</span>
+            ${isSel?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`:''}
+            <span onclick="event.stopPropagation();openMemberProfile('${m.id}','tasks')" style="font-family:'DM Mono',monospace;font-size:.68rem;color:${tc>0?'var(--acc)':'var(--muted)'};cursor:pointer;flex-shrink:0;padding:2px 4px;" title="View tasks">${tc} open</span>
+            <button class="btn btn-ghost btn-xs team-row-hours" style="font-size:.6rem;padding:2px 5px;flex-shrink:0;" onclick="event.stopPropagation();openModal('memberTime','${m.id}')" title="Log hours">+h</button>
+            <button class="btn btn-ghost btn-xs team-row-info" style="font-size:.62rem;flex-shrink:0;" onclick="event.stopPropagation();openMemberProfile('${m.id}')">Info</button>
+          </div>`;
+        }).join('')}
+      </div>
+    </div></div>`:''}
+</div>`:''}
+
+<!-- CALENDAR (opt-in via Customise) -->
+${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
+  <div class="sec-hd" style="margin-bottom:10px;"><span class="sec-lbl">Calendar</span></div>
+  <div class="card"><div class="card-bd" data-mcal-host="">${renderMonthCal('')}</div></div>
 </div>`:''}
 
 <!-- QUICK LINKS -->
@@ -6063,29 +6092,6 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
     </div>`;
     })():''}
 
-    <!-- Team workload -->
-    ${_dsOn('team')?`<div class="card">
-      <div class="card-hd">
-        <span class="card-title">Team</span>
-        <button class="btn btn-acc btn-xs" onclick="openModal('member',null)" style="font-size:.68rem;">+ Add member</button>
-      </div>
-      <div class="card-bd">
-        ${S.members.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">No members yet.</div>`:''}
-        ${S.members.map(m=>{
-          const tc=memberTaskCounts[m.id]||0;
-          const isSel=S.activeMember===m.id;
-          const hours=memberHoursTotal(m);
-          return`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;margin:1px -8px;transition:background .12s;${isSel?'background:var(--teal-dim);':''}cursor:pointer;" onclick="filterMemberAndExpand('${m.id}')" title="Filter dashboard by ${escHtml(m.name)}">
-            ${m.photoUrl?`<img src="${escHtml(m.photoUrl)}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">`:`<div class="av" style="width:26px;height:26px;background:${m.color};font-size:.52rem;flex-shrink:0;">${escHtml(m.initials)}</div>`}
-            <span style="flex:1;font-size:.8rem;font-weight:${isSel?'700':'500'};color:${isSel?'var(--acc)':'var(--text)'};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(m.name)}</span>
-            ${isSel?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`:''}
-            <span onclick="event.stopPropagation();openMemberProfile('${m.id}','tasks')" style="font-family:'DM Mono',monospace;font-size:.68rem;color:${tc>0?'var(--acc)':'var(--muted)'};cursor:pointer;flex-shrink:0;padding:2px 4px;" title="View tasks">${tc} open</span>
-            <button class="btn btn-ghost btn-xs team-row-hours" style="font-size:.6rem;padding:2px 5px;flex-shrink:0;" onclick="event.stopPropagation();openModal('memberTime','${m.id}')" title="Log hours">+h</button>
-            <button class="btn btn-ghost btn-xs team-row-info" style="font-size:.62rem;flex-shrink:0;" onclick="event.stopPropagation();openMemberProfile('${m.id}')">Info</button>
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`:''}
 
   </div>
 </div>
@@ -11995,6 +12001,44 @@ function openMemberProfile(id,tab){
   openModal('memberProfile',{id,tab:tab||'overview'});
 }
 
+/* ── Member profile lists ──
+   The five 'Motivations & Aspirations' answers used to be one block of text each (m.motivWhy …). They are now lists of items
+   (m.motivWhyItems …). Nothing is rewritten up front: until someone saves the profile, the old text is split into items on the fly
+   with deterministic ids (so two people opening it at once derive the same items, never duplicates). The old text is kept as-is. */
+const MEM_LIST_KEYS=['motivWhy','motivWant','motivTravel','motivExperiences','motivProducts'];
+function memLines(txt){return String(txt||'').split(/\r?\n/).map(l=>l.replace(/^\s*(?:[-•*·]|\d+[.)])\s+/,'').trim()).filter(Boolean);}
+function memListItems(m,key){
+  const a=m[key+'Items'];
+  if(Array.isArray(a))return a.filter(x=>x&&typeof x==='object'&&x.id!==undefined).map(x=>({id:x.id,text:String(x.text==null?'':x.text)}));
+  return memLines(m[key]).map((t,i)=>({id:'mig_'+key+'_'+i,text:t}));
+}
+function memResponsibilities(m){return Array.isArray(m.responsibilities)?m.responsibilities.filter(x=>x&&typeof x==='object'&&x.id!==undefined):[];}
+function _mpRowHtml(it){
+  return '<div class="mp-li" data-item-id="'+escHtml(it.id)+'" style="display:flex;gap:6px;margin-bottom:4px;align-items:flex-start;"><span style="color:var(--acc);font-size:.8rem;padding-top:6px;line-height:1;">•</span>'
+   +'<textarea class="txta mp-li-t" rows="1" maxlength="500" style="flex:1;font-size:.75rem;min-height:30px;padding:6px 9px;resize:none;overflow:hidden;" oninput="mpAuto(this)" onkeydown="if(event.key===\'Enter\'){event.preventDefault();this.blur();}">'+escHtml(it.text)+'</textarea>'
+   +'<button type="button" onclick="this.parentNode.remove()" title="Remove" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;padding:4px 2px;">×</button></div>';
+}
+function _mpListHtml(key,items,placeholder){
+  return '<div class="mp-list" data-list="'+key+'" id="mp-list-'+key+'">'+items.map(_mpRowHtml).join('')+'</div>'
+   +'<div style="display:flex;gap:6px;margin-top:4px;"><input class="inp mp-li-new" id="mp-new-'+key+'" placeholder="'+escHtml(placeholder)+'" maxlength="500" style="flex:1;font-size:.75rem;" onkeydown="if(event.key===\'Enter\'){event.preventDefault();mpListAdd(\''+key+'\');}">'
+   +'<button type="button" class="btn btn-ghost btn-xs" onclick="mpListAdd(\''+key+'\')">+ Add</button></div>';
+}
+function mpAuto(t){t.style.height='auto';t.style.height=Math.max(30,t.scrollHeight)+'px';}
+function mpAutoAll(){document.querySelectorAll('.mp-li-t').forEach(mpAuto);}
+function mpListAdd(key){
+  const inp=el('mp-new-'+key),list=el('mp-list-'+key);if(!inp||!list)return;
+  const t=inp.value.trim().slice(0,500);if(!t)return;
+  list.insertAdjacentHTML('beforeend',_mpRowHtml({id:uid(),text:t}));inp.value='';mpAutoAll();inp.focus();
+}
+/* reads a list editor back: existing rows keep their ids; anything typed in the add box but not yet added is kept too */
+function _mpReadList(key){
+  const out=[];
+  document.querySelectorAll('#mp-list-'+key+' .mp-li').forEach(r=>{const t=(r.querySelector('textarea').value||'').trim().slice(0,500);if(t)out.push({id:r.dataset.itemId||uid(),text:t});});
+  const pend=(el('mp-new-'+key)?.value||'').trim().slice(0,500);if(pend)out.push({id:uid(),text:pend});
+  return out;
+}
+function _mpSame(a,b){return a.length===b.length&&a.every((x,i)=>x.id===b[i].id&&x.text===b[i].text);}
+
 function memberProfileModalHtml(id,tab){
   const m=getMember(id);if(!m)return'';
   const hours=memberHoursTotal(m);
@@ -12011,6 +12055,7 @@ function memberProfileModalHtml(id,tab){
     {key:'motivProducts',label:'What products would I like to get?',placeholder:'Software, gear, tools, prizes…',icon:'<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>'},
   ];
 
+  setTimeout(mpAutoAll,40);
   return`<div class="mo-box mo-wide" style="max-width:620px;">
 <div class="mo-hd">
   <div style="display:flex;align-items:center;gap:12px;">
@@ -12062,6 +12107,19 @@ function memberProfileModalHtml(id,tab){
     </div>`).join('')}
   </div>`:''}
 
+  <!-- Role & capacity -->
+  <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px;">
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Role &amp; capacity</div>
+    <div style="margin-bottom:12px;">
+      <label style="font-size:.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Areas &amp; responsibilities</label>
+      ${_mpListHtml('responsibilities',memResponsibilities(m),'e.g. Community, Partnerships, Finance…')}
+    </div>
+    <div>
+      <label style="font-size:.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;" for="mp-hpw">Hours per week</label>
+      <input class="inp" type="number" id="mp-hpw" min="0" max="168" step="0.5" value="${m.hoursPerWeek>0?m.hoursPerWeek:''}" placeholder="Contracted or expected hours" style="width:200px;font-size:.78rem;">
+    </div>
+  </div>
+
   <!-- Motivations & Aspirations -->
   <div style="border-top:1px solid var(--border);padding-top:16px;">
     <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Motivations &amp; Aspirations</div>
@@ -12070,7 +12128,7 @@ function memberProfileModalHtml(id,tab){
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round">${f.icon}</svg>
         <label style="font-size:.75rem;font-weight:600;color:var(--text2);">${escHtml(f.label)}</label>
       </div>
-      <textarea class="txta" id="mp-${f.key}" style="min-height:56px;font-size:.78rem;resize:vertical;" placeholder="${f.placeholder}">${escHtml(m[f.key]||'')}</textarea>
+      ${_mpListHtml(f.key,memListItems(m,f.key),f.placeholder)}
     </div>`).join('')}
   </div>
 
@@ -12114,10 +12172,21 @@ function memberProfileModalHtml(id,tab){
 
 function saveMemberProfile(id){
   const m=getMember(id);if(!m)return;
-  ['motivWhy','motivWant','motivTravel','motivExperiences','motivProducts'].forEach(k=>{
-    const inp=el('mp-'+k);
-    if(inp)m[k]=inp.value.trim();
+  saveWithUndo('Edit member profile');
+  MEM_LIST_KEYS.forEach(k=>{
+    if(!el('mp-list-'+k))return;
+    const now=_mpReadList(k);
+    if(!_mpSame(now,memListItems(m,k)))m[k+'Items']=now;     // untouched lists stay exactly as they were
   });
+  if(el('mp-list-responsibilities')){
+    const now=_mpReadList('responsibilities');
+    if(!_mpSame(now,memResponsibilities(m)))m.responsibilities=now;
+  }
+  if(el('mp-hpw')){
+    const h=parseFloat(el('mp-hpw').value);
+    const nh=(isFinite(h)&&h>0&&h<=168)?Math.round(h*2)/2:null;
+    if((m.hoursPerWeek||null)!==nh)m.hoursPerWeek=nh;
+  }
   // Save OKRs
   const okrItems=document.querySelectorAll('#mp-okr-list .mp-okr-item');
   const okrs=[];
@@ -12141,7 +12210,7 @@ function saveMemberProfile(id){
     okrs.push({id:existingOkrId,objective:objText,keyResults});
   });
   m.okrs=okrs;
-  saveWithUndo('Edit member profile');saveNow();closeModal();showToast('Profile saved');
+  saveNow();closeModal();showToast('Profile saved');
 }
 
 
