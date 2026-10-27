@@ -1259,6 +1259,51 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .dash-okr-team.two{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);gap:18px;align-items:start;margin-bottom:18px;}
 .dash-okr-team.two>#dash-team-okrs{margin-bottom:0 !important;}
 @media(max-width:1000px){.dash-okr-team.two{grid-template-columns:1fr;gap:0;}.dash-okr-team.two>#dash-team-okrs{margin-bottom:18px !important;}}
+
+/* ── DASHBOARD REDESIGN: top row, quick strip, compact project cards, folding row ── */
+.dash-top{margin-bottom:14px;}
+.dtabs{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.dteam{margin-left:auto;display:flex;align-items:center;gap:6px;flex-wrap:wrap;justify-content:flex-end;min-width:0;}
+.dtab{font:inherit;display:inline-flex;align-items:center;gap:8px;padding:8px 14px;border:1px solid var(--border);border-radius:9px;background:var(--surface);color:var(--muted);cursor:pointer;font-size:.7rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;transition:border-color .14s,color .14s;}
+.dtab:hover{border-color:var(--acc);color:var(--acc);}
+.dtab[aria-expanded="true"]{color:var(--acc);border-color:var(--acc);background:var(--teal-dim);}
+.dtab-sm{padding:5px 11px;font-size:.66rem;}
+.dtab b{font-family:'DM Mono',monospace;font-weight:500;color:var(--text2);letter-spacing:0;}
+.dchip{font:inherit;display:inline-flex;align-items:center;gap:6px;padding:3px 10px 3px 4px;border:1px solid var(--border);border-radius:20px;background:var(--surface);color:var(--text2);cursor:pointer;font-size:.74rem;}
+.dchip:hover{border-color:var(--acc);}
+.dchip.sel{border-color:var(--acc);background:var(--teal-dim);color:var(--acc);}
+.dchip b{font-family:'DM Mono',monospace;font-weight:500;color:var(--acc);}
+.dash-panel{margin-bottom:4px;}
+.dash-quick{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:18px;}
+.dq-lbl{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);}
+.dq-sp{flex:1;}
+.dash-quick .ql-btn{padding:4px 10px;font-size:.74rem;}
+.dash-pgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(250px,1fr));gap:10px;align-items:start;}
+.dash-pgrid>.dash-grp-hd,.dash-pgrid>.dash-crow,.dash-pgrid>.ec-card.expanded{grid-column:1/-1;}
+.dash-pgrid .ec-card,.dash-pgrid .dash-crow{margin-bottom:0;}
+.dash-pgrid>.dash-grp-hd{margin:10px 0 0;}
+.dash-pgrid>.dash-grp-hd:first-child{margin-top:0;}
+.pcc-h{display:flex;flex-direction:column;gap:6px;padding:10px 12px;cursor:pointer;user-select:none;min-width:0;}
+.pcc-r1{display:flex;align-items:center;gap:8px;min-width:0;}
+.pcc-r2{display:flex;align-items:center;gap:8px;min-width:0;font-size:.68rem;color:var(--muted);}
+.pcc-r3{display:flex;align-items:center;justify-content:space-between;gap:6px;flex-wrap:wrap;min-width:0;}
+.pcc-meta{font-family:'DM Mono',monospace;font-size:.66rem;color:var(--muted);white-space:nowrap;}
+.pcc-btns{display:flex;align-items:center;gap:5px;margin-left:auto;}
+.pcc-pct{font-family:'DM Mono',monospace;font-size:.66rem;color:var(--muted);}
+.pcc-od{font-size:.6rem;font-weight:700;padding:1px 7px;border-radius:10px;background:color-mix(in srgb,var(--red) 16%,transparent);color:var(--red);white-space:nowrap;}
+.pcc-type{font-size:.6rem;font-weight:700;color:var(--text2);padding:1px 6px;background:var(--surface3);border-radius:4px;}
+.pcc-next{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pcc-h .ec-name{font-size:.88rem;}
+.dash-row3{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr));gap:12px;align-items:start;margin-top:18px;}
+.dash-fhd{cursor:pointer;user-select:none;}
+.dash-fchev{display:inline-flex;color:var(--acc);}
+.dash-folded .dash-fchev svg{transform:rotate(-90deg)!important;}
+.dash-folded .card-bd{display:none;}
+.dash-folded .card-hd{border-bottom:0;}
+@media(max-width:600px){.dteam{margin-left:0;justify-content:flex-start;width:100%;}.dash-pgrid{grid-template-columns:minmax(0,1fr);}}
+.dash-pgrid>.dash-grp-hd{color:var(--acc);font-size:.72rem;}
+.dash-pgrid>.dash-grp-hd span{color:var(--acc)!important;}
+.pcc-btns .ec-bookmark{display:inline-flex!important;}
 </style>
 </head>
 <body>
@@ -5234,14 +5279,80 @@ function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
 function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
 const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team'],['calendar','Calendar']];
 /* Most sections are on unless hidden. Opt-in sections (new ones) stay off until someone switches them on, so nobody's dashboard changes under them. */
-/* Collapsible dashboard section header: left chevron + uppercase accent label, same pattern as the project page sections. */
-function dashSecHd(key,label,open){
-  return '<div data-dsec-hd="'+key+'" style="display:flex;align-items:center;gap:10px;margin-bottom:10px;cursor:pointer;user-select:none;" onclick="dashSecToggle(\''+key+'\')" role="button" aria-expanded="'+open+'"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg><span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">'+label+'</span></div>';
+/* Dashboard top row: Timeline, Calendar and Team share one panel. Opening one closes the others; clicking the open one closes it. */
+function dashTopSet(k){window._dashTop=(_dashTopCur()===k)?'none':k;render();}
+function _dashTopAvail(active){
+  const av=[];
+  if(active.length>0&&_dsOn('timeline'))av.push('tl');
+  if(_dsOn('calendar'))av.push('cal');
+  if(_dsOn('team')||_dsOn('okrs'))av.push('team');
+  return av;
 }
-function dashSecToggle(key){
-  if(key==='tl')window._dashTlOpen=(window._dashTlOpen===false);
-  else if(key==='cal')window._dashCalOpen=!window._dashCalOpen;
-  render();
+function _dashTopCur(){
+  const av=_dashTopAvail(S.projects.filter(p=>p.status==='active'));
+  const v=window._dashTop;
+  if(v==='none')return'';
+  if(v&&av.includes(v))return v;
+  return av.includes('tl')?'tl':'';
+}
+function _dashChev(open){return '<svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'none':'rotate(-90deg)')+';flex-shrink:0;"><polyline points="6 9 12 15 18 9"/></svg>';}
+function _dashTopHtml(active,counts){
+  const av=_dashTopAvail(active);if(!av.length)return'';
+  const cur=_dashTopCur();
+  const tab=(k,label)=>'<button class="dtab" id="dtab-'+k+'" aria-expanded="'+(cur===k)+'" aria-controls="dpanel-'+k+'" onclick="dashTopSet(\''+k+'\')">'+_dashChev(cur===k)+label+'</button>';
+  let h='<div class="dash-top" id="dash-top"><div class="dtabs">';
+  if(av.includes('tl'))h+=tab('tl','Timeline');
+  if(av.includes('cal'))h+=tab('cal','Calendar');
+  h+='<div class="dteam">';
+  if(_dsOn('team'))S.members.forEach(m=>{
+    const sel=S.activeMember===m.id,n=counts[m.id]||0;
+    h+='<button class="dchip'+(sel?' sel':'')+'" data-chip="'+escHtml(m.id)+'" onclick="filterMemberAndExpand(\''+m.id+'\')" title="'+escHtml(m.name)+': '+n+' open task'+(n===1?'':'s')+'. Click to filter the dashboard.">'
+      +(m.photoUrl?'<img src="'+escHtml(m.photoUrl)+'" alt="" style="width:20px;height:20px;border-radius:50%;object-fit:cover;">':'<span class="av" style="width:20px;height:20px;background:'+escHtml(m.color)+';font-size:.5rem;">'+escHtml(m.initials)+'</span>')
+      +'<span class="dchip-n">'+escHtml(String(m.name||'').split(' ')[0])+'</span><b>'+n+'</b></button>';
+  });
+  if(av.includes('team'))h+=tab('team',_dsOn('team')?'Team':'Objectives');
+  h+='</div></div>';
+  if(cur==='tl')h+='<div class="dash-panel" id="dpanel-tl"><div id="dash-timeline"><div id="dash-gantt">'+renderGantt(active,false)+'</div></div></div>';
+  if(cur==='cal')h+='<div class="dash-panel" id="dpanel-cal"><div id="dash-calendar"><div class="card"><div class="card-bd" data-mcal-host="">'+renderMonthCal('')+'</div></div></div></div>';
+  if(cur==='team')h+='<div class="dash-panel" id="dpanel-team">'+renderTeam()+'</div>';
+  return h+'</div>';
+}
+function _dashOkrsHtml(){
+  return `<div style="margin-bottom:18px;" id="dash-team-okrs">
+  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
+    <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="dashOkrToggle()" role="button" aria-expanded="${window._dashOkrOpen!==false}"><span class="sec-lbl">Team Objectives</span><svg id="dash-okr-chev" class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${window._dashOkrOpen!==false?'':'transform:rotate(-90deg);'}"><polyline points="6 9 12 15 18 9"/></svg></div>
+    <div style="display:flex;gap:5px;">
+      <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'ns\')">+ North Star</button>
+      <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'yr\')">+ Yearly Goal</button>
+    </div>
+  </div>
+  <div id="dash-team-okr-body" style="display:${window._dashOkrOpen!==false?'block':'none'};">${renderTeamOkrs()}</div>
+</div>`;
+}
+
+/* Quick links as one row of chips, with the shared notes behind a single toggle */
+function _qlBtn(q){return `<a href="${escHtml(q.url)}" target="_blank" rel="noopener" class="ql-btn"${q.category?` title="${escHtml(q.category)}"`:''}><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${escHtml(q.name)}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteQL('${q.id}')">×</span><span style="margin-left:2px;color:var(--muted);font-size:10px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();editQL('${q.id}')">✎</span></a>`;}
+function _pccDate(iso){const t=fmtD(iso);return String(iso).slice(0,4)===String(_localToday()).slice(0,4)?t.replace(/\s\d{4}$/,''):t;}
+function dashNotesToggle(){window._dashNotesOpen=!window._dashNotesOpen;render();}
+function _dashQuickHtml(){
+  const links=_dsOn('links'),notes=_dsOn('notes');
+  if(!links&&!notes)return'';
+  const n=(S.quickNotes||[]).filter(x=>!x.org).length,open=!!window._dashNotesOpen;
+  let h='<div class="dash-quick" id="dash-quick">';
+  if(links)h+='<span class="dq-lbl">Quick links</span><div class="ql-grid" style="margin:0;">'+(S.quickLinks||[]).map(_qlBtn).join('')+'<button class="ql-btn add-ql" onclick="openModal(\'quickLink\',null)">+ Add link</button></div>';
+  h+='<span class="dq-sp"></span>';
+  if(notes)h+='<button class="dtab dtab-sm" id="dash-notes-btn" aria-expanded="'+open+'" onclick="dashNotesToggle()">'+_dashChev(open)+'Notes'+(n?' <b>'+n+'</b>':'')+'</button>';
+  h+='</div>';
+  if(notes&&open)h+='<div style="margin:-6px 0 18px;" id="dash-notes-wrap">'+_quickNotesCardHtml()+'</div>';
+  return h;
+}
+/* Rows of cards that fold from their header: My work, Due this week, Co-working */
+function dashFoldToggle(k){window._dashFoldOff=window._dashFoldOff||{};window._dashFoldOff[k]=!window._dashFoldOff[k];render();}
+function _dashFold(k,html){
+  const off=!!(window._dashFoldOff&&window._dashFoldOff[k]);
+  return html.replace('<div class="card"','<div class="card dash-fcard'+(off?' dash-folded':'')+'" data-fold="'+k+'"')
+    .replace('<div class="card-hd">','<div class="card-hd dash-fhd" role="button" aria-expanded="'+(!off)+'" onclick="if(!event.target.closest(\'button\'))dashFoldToggle(\''+k+'\')">')
+    .replace('<span class="card-title">','<span class="card-title" style="display:flex;align-items:center;gap:8px;"><span class="dash-fchev">'+_dashChev(true)+'</span>');
 }
 const DASH_OPT_IN=['calendar'];
 function _dsOn(id){return DASH_OPT_IN.includes(id)?(_dprefRead().on||[]).includes(id):!(_dprefRead().hide||[]).includes(id);}
@@ -5687,7 +5798,7 @@ function pcToggle(pid){window._pcOpen=window._pcOpen||{};window._pcOpen[pid]=!wi
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution, capacity, and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
-function teamExpandToggle(){window._teamExp=!window._teamExp;render();}
+function teamExpandToggle(){dashTopSet('team');}
 function _tmFmt(n){return (Math.round(n*10)/10).toString();}
 /* Numbers for one person. Counts open work in active projects, the same rule the dashboard Team card uses. */
 function teamStats(m,today){
@@ -5768,7 +5879,9 @@ function _tmCard(m,s,idx,n){
 function renderTeam(){
   const today=_localToday();const sum=teamSummary(today);
   const maxOpen=Math.max(1,...sum.stats.map(x=>x.s.open));
-  let h='<div style="margin-bottom:18px;" id="dash-team-expanded"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;"><div class="sec-hd" style="margin-bottom:0;"><span class="sec-lbl">Team</span></div><span style="display:flex;gap:6px;"><button class="btn btn-ghost btn-xs" onclick="teamExpandToggle()">Collapse</button><button class="btn btn-acc btn-xs" onclick="openModal(\'member\',null)">+ Add member</button></span></div>';
+  let h='<div id="dash-team-expanded">'+(_dsOn('okrs')?'<div style="margin-bottom:14px;">'+_dashOkrsHtml()+'</div>':'');
+  if(_dsOn('team'))h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;"><div class="sec-hd" style="margin-bottom:0;"><span class="sec-lbl">Members</span></div><button class="btn btn-acc btn-xs" onclick="openModal(\'member\',null)">+ Add member</button></div>';
+  else return h+'</div>';
   if(!S.members.length)return h+'<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.8rem;">No team members yet.</div></div></div>';
   // workload + capacity
   h+='<div class="card" style="margin-bottom:14px;"><div class="card-hd"><span class="card-title">Workload distribution</span><span style="font-size:.66rem;color:var(--muted);">open tasks in active projects</span></div><div class="card-bd" id="tm-dist">';
@@ -5918,95 +6031,17 @@ function renderDash(){
   <div style="position:relative;"><button class="btn btn-ghost btn-sm" onclick="dsPopToggle()" title="Choose what shows on your dashboard">Customise</button>${_dsPopHtml()}</div>
 </div>
 
-<!-- TIMELINE (collapsible; open by default) -->
-${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;" id="dash-timeline">
-  ${dashSecHd('tl','Timeline',window._dashTlOpen!==false)}
-  ${window._dashTlOpen!==false?`<div id="dash-gantt">${renderGantt(active,false)}</div>`:''}
-</div>`:''}
+<!-- TOP ROW: Timeline / Calendar / Team (one open at a time) -->
+${_dashTopHtml(active,memberTaskCounts)}
 
-<!-- CALENDAR (opt-in via Customise; collapsed by default) -->
-${_dsOn('calendar')?`<div style="margin-bottom:18px;" id="dash-calendar">
-  ${dashSecHd('cal','Calendar',!!window._dashCalOpen)}
-  ${window._dashCalOpen?`<div class="card"><div class="card-bd" data-mcal-host="">${renderMonthCal('')}</div></div>`:''}
-</div>`:''}
-
-<!-- TEAM OBJECTIVES + TEAM (two columns on wide screens, stacked on narrow ones) -->
-${(_dsOn('team')&&window._teamExp)?renderTeam():''}
-${(!(_dsOn('team')&&window._teamExp)&&(_dsOn('okrs')||_dsOn('team')))?`<div class="dash-okr-team${_dsOn('okrs')&&_dsOn('team')?' two':''}">
-  ${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="dashOkrToggle()" role="button" aria-expanded="${window._dashOkrOpen!==false}"><span class="sec-lbl">Team Objectives</span><svg id="dash-okr-chev" class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${window._dashOkrOpen!==false?'':'transform:rotate(-90deg);'}"><polyline points="6 9 12 15 18 9"/></svg></div>
-    <div style="display:flex;gap:5px;">
-      <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'ns\')">+ North Star</button>
-      <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'yr\')">+ Yearly Goal</button>
-    </div>
-  </div>
-  <div id="dash-team-okr-body" style="display:${window._dashOkrOpen!==false?'block':'none'};">${renderTeamOkrs()}</div>
-</div>`:''}
-  ${_dsOn('team')?`<div id="dash-team-col" style="min-width:0;"><div class="card">
-      <div class="card-hd">
-        <span class="card-title">Team</span>
-        <span style="display:flex;gap:6px;"><button class="btn btn-ghost btn-xs" onclick="teamExpandToggle()" title="Workload, hours, co-working and objectives for everyone" style="font-size:.68rem;">Expand</button><button class="btn btn-acc btn-xs" onclick="openModal('member',null)" style="font-size:.68rem;">+ Add member</button></span>
-      </div>
-      <div class="card-bd">
-        ${S.members.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">No members yet.</div>`:''}
-        ${S.members.map(m=>{
-          const tc=memberTaskCounts[m.id]||0;
-          const isSel=S.activeMember===m.id;
-          const hours=memberHoursTotal(m);
-          return`<div style="display:flex;align-items:center;gap:6px;padding:6px 8px;border-radius:8px;margin:1px -8px;transition:background .12s;${isSel?'background:var(--teal-dim);':''}cursor:pointer;" onclick="filterMemberAndExpand('${m.id}')" title="Filter dashboard by ${escHtml(m.name)}">
-            ${m.photoUrl?`<img src="${escHtml(m.photoUrl)}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">`:`<div class="av" style="width:26px;height:26px;background:${m.color};font-size:.52rem;flex-shrink:0;">${escHtml(m.initials)}</div>`}
-            <span style="flex:1;font-size:.8rem;font-weight:${isSel?'700':'500'};color:${isSel?'var(--acc)':'var(--text)'};min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(m.name)}</span>
-            ${isSel?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;"><polyline points="20 6 9 17 4 12"/></svg>`:''}
-            <span onclick="event.stopPropagation();openMemberProfile('${m.id}','tasks')" style="font-family:'DM Mono',monospace;font-size:.68rem;color:${tc>0?'var(--acc)':'var(--muted)'};cursor:pointer;flex-shrink:0;padding:2px 4px;" title="View tasks">${tc} open</span>
-            <button class="btn btn-ghost btn-xs team-row-hours" style="font-size:.6rem;padding:2px 5px;flex-shrink:0;" onclick="event.stopPropagation();openModal('memberTime','${m.id}')" title="Log hours">+h</button>
-            <button class="btn btn-ghost btn-xs team-row-info" style="font-size:.62rem;flex-shrink:0;" onclick="event.stopPropagation();openMemberProfile('${m.id}')">Info</button>
-          </div>`;
-        }).join('')}
-      </div>
-    </div></div>`:''}
-</div>`:''}
-
-<!-- QUICK LINKS -->
-${_dsOn('links')?`<div style="margin-bottom:18px;">
-  <div class="sec-hd" style="margin-bottom:9px;"><span class="sec-lbl">Quick Links</span></div>
-  ${(()=>{
-    const cats=[...new Set(S.quickLinks.map(q=>q.category||''))];
-    const hasCategories=cats.some(c=>c!=='');
-    const qlBtnHtml=q=>`<a href="${escHtml(q.url)}" target="_blank" rel="noopener" class="ql-btn"><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${escHtml(q.name)}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteQL('${q.id}')">×</span><span style="margin-left:2px;color:var(--muted);font-size:10px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();editQL('${q.id}')">✎</span></a>`;
-    if(!hasCategories){
-      return`<div class="ql-grid">
-        ${S.quickLinks.map(qlBtnHtml).join('')}
-        <button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>
-      </div>`;
-    }
-    const grouped={};
-    S.quickLinks.forEach(q=>{const cat=q.category||'__none__';if(!grouped[cat])grouped[cat]=[];grouped[cat].push(q);});
-    // Named categories first, uncategorised last
-    const orderedKeys=[...Object.keys(grouped).filter(k=>k!=='__none__'),...(grouped['__none__']?['__none__']:[])];
-    return orderedKeys.map(cat=>{
-      const links=grouped[cat];
-      const title=cat==='__none__'?'Other':cat;
-      return`<div style="margin-bottom:16px;">
-        <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;">
-          <span style="font-size:.72rem;font-weight:700;color:var(--text);letter-spacing:.02em;">${title}</span>
-          <div style="flex:1;height:1px;background:var(--border2);"></div>
-          <button class="ql-btn add-ql" style="padding:3px 8px;font-size:.68rem;margin-bottom:0;" onclick="openModal('quickLink',null);setTimeout(()=>{const el=document.getElementById('ql-cat');if(el)el.value='${cat==='__none__'?'':cat}';},60)">+ Add</button>
-        </div>
-        <div class="ql-grid" style="margin-bottom:0;">
-          ${links.map(qlBtnHtml).join('')}
-        </div>
-      </div>`;
-    }).join('')+`<button class="ql-btn add-ql" onclick="openModal('quickLink',null)">+ Add link</button>`;
-  })()}
-</div>`:''}
+<!-- QUICK LINKS + NOTES -->
+${_dashQuickHtml()}
 
 <!-- TWO COLUMN: events + focus -->
-<div class="ec-two-col">
+<div class="dash-main">
 
   <!-- LEFT: Event cards with filter -->
   <div style="${(_dsOn('events')||_dsOn('notes'))?'':'display:none;'}container-type:inline-size;container-name:ec-two-left;min-width:0;">
-    ${_dsOn('notes')?`<div style="margin-bottom:14px;">${_quickNotesCardHtml()}</div>`:''}
     <div style="${_dsOn('events')?'display:flex;':'display:none;'}align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;">
       <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.filter(p=>p.status!=='completed').length})</button>
       <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>p.status==='active').length})</button>
@@ -6050,38 +6085,26 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
       const datesStr=p.startDate&&p.endDate?`${fmtD(p.startDate)} → ${fmtD(p.endDate)}`:p.endDate?`Due ${fmtD(p.endDate)}`:'';
 
       return _pre+`<div class="ec-card${actuallyExp?' expanded':''}" ${isInactive?'data-inactive="1"':''} data-proj="${p.id}">
-        <!-- Header — always visible -->
-        <div class="ec-header" onclick="ecToggle('${p.id}')">
-          <div class="ec-color" style="background:${p.color};"></div>
-          <div style="flex:1;min-width:0;">
-            <div class="ec-name">${escHtml(p.name)}</div>
-            <div class="ec-subtext" style="display:flex;align-items:center;gap:8px;margin-top:3px;flex-wrap:wrap;">
-              ${isEvt(p)?'':`<span style="font-size:.6rem;font-weight:700;color:var(--text2);padding:1px 6px;background:var(--surface3);border-radius:4px;">${PROJ_TYPES[projType(p)].label}</span>`}
-              ${isEvt(p)?'':(()=>{const nu=_nextUp(p,1)[0];return nu?`<span style="font-size:.65rem;color:var(--text2);">Next: ${escHtml(nu.name)}${nu.endDate?' · '+fmtD(nu.endDate):''}</span>`:'';})()}
-              ${datesStr?`<span style="font-size:.65rem;color:var(--muted);font-family:'DM Mono',monospace;">${datesStr}</span>`:''}
-              ${overdueCt>0?`<span style="font-size:.62rem;color:var(--red);font-weight:700;">⚠ ${overdueCt} overdue</span>`:''}
-              ${spons.length>0?`<span style="font-size:.62rem;color:var(--text2);">${spons.length} sponsor${spons.length!==1?'s':''}</span>`:''}
-              <span style="font-size:.62rem;color:var(--muted);">${mf&&memberTaskCt!==null?`${memberTaskCt} open for ${getMember(mf)?.name?.split(' ')[0]||'them'}`:doneCt+'/'+totalCt+' tasks'}</span>
-            </div>
-            ${_latestUpdateLine(p)}
+        <!-- Header: compact card (name, progress, dates, actions) -->
+        <div class="pcc-h" onclick="ecToggle('${p.id}')">
+          <div class="pcc-r1"><span class="ec-color" style="background:${p.color};"></span><div class="ec-name">${escHtml(p.name)}</div>${overdueCt>0?`<span class="pcc-od" title="${overdueCt} overdue task${overdueCt!==1?'s':''}">${overdueCt} overdue</span>`:''}<svg class="ec-chevron${actuallyExp?' open':''}" width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg></div>
+          <div class="pcc-r2">
+            ${projType(p)==='ongoing'?'':`<div class="ec-prog" style="flex:1;width:auto;"><div class="ec-prog-fill" style="width:${comp}%;background:${p.color};"></div></div><span class="pcc-pct">${comp}%</span>`}
+            ${isEvt(p)?'':`<span class="pcc-type">${PROJ_TYPES[projType(p)].label}</span>`}
+            ${isEvt(p)?'':(()=>{const nu=_nextUp(p,1)[0];return nu?`<span class="pcc-next">Next: ${escHtml(nu.name)}${nu.endDate?' · '+fmtD(nu.endDate):''}</span>`:'';})()}
           </div>
-          <div class="ec-meta">
-            <div class="ec-prog-wrap"${projType(p)==='ongoing'?' style="display:none;"':''}>
-              <div class="ec-prog"><div class="ec-prog-fill" style="width:${comp}%;background:${p.color};"></div></div>
-              <span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--muted);min-width:28px;">${comp}%</span>
-            </div>
-            <div class="ec-owners" style="display:flex;gap:2px;">${mems.map(m=>avHtml(m,18)).join('')}</div>
+          <div class="pcc-r3">
+            <span class="pcc-meta">${mf&&memberTaskCt!==null?`${memberTaskCt} open for ${getMember(mf)?.name?.split(' ')[0]||'them'}`:doneCt+'/'+totalCt}${p.endDate?' · to '+_pccDate(p.endDate):''}</span>
+            <span class="pcc-btns">
+              ${mems.map(m=>avHtml(m,18)).join('')}
             ${p.graphicsUrl?`<a href="${p.graphicsUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;align-items:center;" title="Graphics folder"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg></a>`:''}
             ${(p.eventUrl&&isEvt(p))?`<a href="${p.eventUrl}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;align-items:center;" title="Event page"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg></a>`:''}
-            <div class="ec-btns" style="display:flex;align-items:center;gap:6px;flex-shrink:0;">
-              <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openModal('project','${p.id}')" style="font-size:.65rem;">Edit</button>
-              <button class="btn btn-ghost btn-xs ec-bookmark" onclick="event.stopPropagation();toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Remove from sidebar':'Pin to sidebar'}" style="padding:0 6px;">
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="${isBookmarked(p.id)?'var(--acc)':'none'}" stroke="${isBookmarked(p.id)?'var(--acc)':'currentColor'}" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-              </button>
-              <button class="btn btn-acc btn-xs" onclick="event.stopPropagation();openDetail('${p.id}')" style="font-size:.65rem;">Full view</button>
-              <svg class="ec-chevron${actuallyExp?' open':''}" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round"><polyline points="6 9 12 15 18 9"/></svg>
-            </div>
+              <button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openModal('project','${p.id}')" title="Edit">Edit</button>
+              <button class="btn btn-ghost btn-xs ec-bookmark" onclick="event.stopPropagation();toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Remove from sidebar':'Pin to sidebar'}" style="padding:0 6px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="${isBookmarked(p.id)?'var(--acc)':'none'}" stroke="${isBookmarked(p.id)?'var(--acc)':'currentColor'}" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg></button>
+              <button class="btn btn-acc btn-xs" onclick="event.stopPropagation();openDetail('${p.id}')">Open</button>
+            </span>
           </div>
+          ${_latestUpdateLine(p)}
         </div>
 
         <!-- Expandable body -->
@@ -6148,19 +6171,20 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
             <span style="font-size:.68rem;color:var(--muted);">${items.length}</span>
             <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="event.stopPropagation();newProjOfType('${t}')">+ New</button>
           </div>
-          ${off?'':items.map(p=>_card(p,'')).join('')}
+          ${off?'':'<div class="dash-pgrid">'+items.map(p=>_card(p,'')).join('')+'</div>'}
         </div>`;}).join('');
       const _add=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:.7rem;color:var(--muted);" data-proj-add="1">Add:${Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>`<button class="btn btn-ghost btn-xs" onclick="newProjOfType('${t}')">+ ${PROJ_TYPES[t].label}</button>`).join('')}</div>`;
-      return _out+_sec+_add;
+      return '<div class="dash-pgrid">'+_out+'</div>'+_sec+_add;
 
     })()}
   </div>
 
-  <!-- RIGHT: Focus + Team -->
-  <div style="display:flex;flex-direction:column;gap:14px;min-width:0;">
+  <!-- ROW: My work, Due this week, Co-working (each folds) -->
+  <div class="dash-row3">
 
+    ${_dsOn('mywork')?_dashFold('mw',_myWorkCardHtml()):''}
     <!-- Focus: due this week -->
-    ${_dsOn('focus')?`<div class="card">
+    ${_dsOn('focus')?_dashFold('due',`<div class="card">
       <div class="card-hd"><span class="card-title">Due This Week</span>${mf?`<button class="btn btn-ghost btn-xs" onclick="S.activeMember=null;save();render()">✕ ${escHtml(getMember(mf)?.name||'')}</button>`:''}</div>
       <div class="card-bd">
         ${focusTasks.length===0?`<div style="color:var(--muted);font-size:.78rem;">Nothing due — all clear!</div>`:''}
@@ -6178,11 +6202,10 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
           </div>`;
         }).join('')}
       </div>
-    </div>`:''}
+    </div>`):''}
 
-    ${_dsOn('mywork')?_myWorkCardHtml():''}
 
-    ${_dsOn('cowork')?_coworkCardHtml(mf):''}
+    ${_dsOn('cowork')?_dashFold('cw',_coworkCardHtml(mf)):''}
 
 
     ${mf?(()=>{
