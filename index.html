@@ -1321,6 +1321,9 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .dash-row3{margin-top:32px;gap:16px;}
 .dash-quick{gap:24px;}
 #dash-notes-wrap{margin-bottom:4px;}
+
+.dash-quick.notes-open{gap:12px;}
+#dash-notes-wrap{margin-bottom:0!important;}
 </style>
 </head>
 <body>
@@ -5355,7 +5358,7 @@ function _dashQuickHtml(){
   const links=_dsOn('links'),notes=_dsOn('notes');
   if(!links&&!notes)return'';
   const n=(S.quickNotes||[]).filter(x=>!x.org).length,open=!!window._dashNotesOpen;
-  let h='<div class="dash-quick" id="dash-quick">';
+  let h='<div class="dash-quick'+(open?' notes-open':'')+'" id="dash-quick">';
   if(notes)h+='<div class="dq-notes"><button class="dtab dtab-sm" id="dash-notes-btn" aria-expanded="'+open+'" onclick="dashNotesToggle()">'+_dashChev(open)+'Notes'+(n?' <b>'+n+'</b>':'')+'</button></div>';
   if(notes&&open)h+='<div id="dash-notes-wrap">'+_quickNotesCardHtml()+'</div>';
   if(links)h+='<div class="dq-links"><div class="dq-lbl">Quick links</div><div class="ql-grid" style="margin:0;">'+(S.quickLinks||[]).map(_qlBtn).join('')+'<button class="ql-btn add-ql" onclick="openModal(\'quickLink\',null)">+ Add link</button></div></div>';
@@ -5807,13 +5810,13 @@ document.addEventListener('contextmenu',e=>{if(_mcDrag&&_mcDrag.touch&&e.target.
 function _projTimeline(p){
   const dated=S.tasks.some(t=>t.projectId===p.id&&(t.startDate||t.endDate));
   if(!p.startDate&&!p.endDate&&!dated)return '<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.8rem;">Add a start or end date to the project, or dates to its tasks, to see it on a timeline.</div></div>';
-  return renderGantt([p],false,{all:true,noCowork:true,id:'gantt-scroll-'+p.id,pid:p.id});
+  return renderGantt([p],false,{all:true,noCowork:true,range:true,id:'gantt-scroll-'+p.id,pid:p.id});
 }
 function renderProjectCalendar(p){
   const cur=(window._pvOpen&&window._pvOpen[p.id])||'';
   const tab=(k,l,at)=>'<button class="dtab" '+at+' aria-expanded="'+(cur===k)+'" onclick="pvSet(\''+p.id+'\',\''+k+'\')">'+_dashChev(cur===k)+l+'</button>';
   return '<div class="dtabs" style="margin-bottom:10px;">'+tab('tl','Timeline','data-ptl-hd="'+p.id+'"')+tab('cal','Calendar','data-pcal-hd="'+p.id+'"')
-    +(cur==='tl'?'<button class="btn btn-ghost btn-xs" style="margin-left:auto;font-size:.65rem;" onclick="scrollGanttToday(\'gantt-scroll-'+p.id+'\')">Today</button>':'')+'</div>'
+    +'</div>'
     +(cur==='tl'?'<div data-ptl="'+p.id+'">'+_projTimeline(p)+'</div>':'')
     +(cur==='cal'?'<div class="card"><div class="card-bd" data-mcal-host="'+p.id+'">'+renderMonthCal(p.id)+'</div></div>':'');
 }
@@ -8147,7 +8150,10 @@ function toggleKanbanDone(id){
 let draggedTaskId=null;
 
 /* ════ GANTT ════ */
+let _ganttCtx=null;   // set only while a single project's timeline is drawn zoomed to its own dates
+function _dpx(){return _ganttCtx?_ganttCtx.dpx:DPX;}
 function getGanttMonths(){
+  if(_ganttCtx)return _ganttCtx.months;
   // Rolling 12 months: from 1 month before today
   const now=new Date();
   const months=[];
@@ -8161,7 +8167,7 @@ function ganttDayOffset(dateStr){
   // offset in days from start of gantt window
   if(!dateStr)return null;
   const gm=getGanttMonths();
-  const startDate=new Date(gm[0].year,gm[0].month,1);
+  const startDate=_ganttCtx?_ganttCtx.start:new Date(gm[0].year,gm[0].month,1);
   const d=new Date(dateStr);
   const diff=Math.round((d-startDate)/86400000);
   return diff;
@@ -8183,19 +8189,42 @@ function _ganttOrder(projects){
     .sort((a,b)=>a.g-b.g||(a.g===2?(a.key<b.key?1:a.key>b.key?-1:0):(a.key<b.key?-1:a.key>b.key?1:0)))
     .map(x=>x.p);
 }
+function _ganttRangeFor(p){
+  const ds=[];const add=d=>{if(/^\d{4}-\d{2}-\d{2}/.test(d||''))ds.push(String(d).slice(0,10));};
+  add(p.startDate);add(p.endDate);
+  if(isEvt(p)&&p.startDate&&p.endDate){const defs=S.settings.phaseDefaults||{planning:2,prelaunch:6,postEvent:2},pw=p.phaseWeeks||{};
+    const pl=pw.planning!=null?pw.planning:defs.planning??2,pre=pw.prelaunch!=null?pw.prelaunch:defs.prelaunch??6,po=pw.postEvent!=null?pw.postEvent:defs.postEvent??2;
+    add(addDays(String(p.startDate).slice(0,10),-(pl+pre)*7));add(addDays(String(p.endDate).slice(0,10),po*7));}
+  S.tasks.forEach(t=>{if(t.projectId===p.id){add(t.startDate);add(t.endDate);}});
+  if(!ds.length)return null;
+  ds.sort();const lo=addDays(ds[0],-3),hi=addDays(ds[ds.length-1],3);
+  const lp=lo.split('-').map(Number),hp=hi.split('-').map(Number);
+  const start=new Date(lp[0],lp[1]-1,lp[2]),end=new Date(hp[0],hp[1]-1,hp[2]);
+  const total=Math.round((end-start)/86400000)+1;
+  const months=[];let cur=new Date(start),left=total;
+  while(left>0){const dim=new Date(cur.getFullYear(),cur.getMonth()+1,0).getDate();const days=Math.min(dim-cur.getDate()+1,left);months.push({month:cur.getMonth(),year:cur.getFullYear(),days});left-=days;cur=new Date(cur.getFullYear(),cur.getMonth()+1,1);}
+  return{start,months,dpx:Math.max(3,Math.min(24,1000/total))};
+}
 function renderGantt(projects,fullPage=false,opts){
+  if(opts&&opts.range&&projects.length===1){
+    const ctx=_ganttRangeFor(projects[0]);
+    if(ctx){_ganttCtx=ctx;try{return _renderGanttInner(projects,fullPage,opts);}finally{_ganttCtx=null;}}
+  }
+  return _renderGanttInner(projects,fullPage,opts);
+}
+function _renderGanttInner(projects,fullPage=false,opts){
   opts=opts||{};
   projects=_ganttOrder(projects);
   const gmonths=getGanttMonths();
   const totalDays=ganttTotalDays();
-  const totalW=totalDays*DPX;
+  const totalW=totalDays*_dpx();
   const now=new Date();
   const todayOffset=ganttDayOffset(now.toISOString().slice(0,10));
   let prevYear=null;
   const monthsHtml=gmonths.map(m=>{
     const yr=m.year!==prevYear?` '${String(m.year).slice(2)}`:'';
     prevYear=m.year;
-    return`<div class="gmo" style="width:${m.days*DPX}px;min-width:${m.days*DPX}px;">${MOS[m.month]}${yr}</div>`;
+    return`<div class="gmo" style="width:${m.days*_dpx()}px;min-width:${m.days*_dpx()}px;">${MOS[m.month]}${yr}</div>`;
   }).join('');
   let rows='';
   projects.forEach(p=>{
@@ -8248,7 +8277,7 @@ function renderGantt(projects,fullPage=false,opts){
       if(opts.all&&depth<3)_kids(t.id).filter(k=>_hasDated(k,0)).sort((x,y)=>String(x.endDate||x.startDate||'9').localeCompare(String(y.endDate||y.startDate||'9'))).forEach(k=>_trow(k,depth+1));};
     if(isExp)top.forEach(t=>_trow(t,0));
   });
-  const inner=`<div class="gantt-scroll" id="${opts.id||'gantt-scroll'}"${opts.pid?` data-pgantt="${opts.pid}"`:''}><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;"><div class="today-ln" style="left:${175+Math.max(0,todayOffset)*DPX}px;height:100%;"><span class="today-tag">TODAY</span></div>${opts.noCowork?'':renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
+  const inner=`<div class="gantt-scroll" id="${opts.id||'gantt-scroll'}"${opts.pid?` data-pgantt="${opts.pid}"`:''}><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;">${(opts.range&&(todayOffset===null||todayOffset<0||todayOffset>totalDays))?'':`<div class="today-ln" style="left:${175+Math.max(0,todayOffset)*_dpx()}px;height:100%;"><span class="today-tag">TODAY</span></div>`}${opts.noCowork?'':renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
   if(fullPage)return`<div class="fu"><div class="page-hd"><div class="page-title">Gantt <em>Timeline</em></div></div>${inner}</div>`;
   return inner;
 }
@@ -8257,8 +8286,8 @@ function barP(s,e){
   if(!s||!e)return null;
   const sd=ganttDayOffset(s),ed=ganttDayOffset(e);
   if(sd===null||ed===null)return null;
-  const w=Math.max((ed-sd)*DPX,8);
-  return{l:sd*DPX,w};
+  const w=Math.max((ed-sd)*_dpx(),8);
+  return{l:sd*_dpx(),w};
 }
 
 function getPhaseBars(p){
@@ -8299,8 +8328,8 @@ function getPhaseBars(p){
 }
 function toggleGExp(id){const i=S.expandedGantt.indexOf(id);i>=0?S.expandedGantt.splice(i,1):S.expandedGantt.push(id);save();render();}
 function scrollGanttToday(id){const g=el(id||'gantt-scroll');if(g)g.scrollLeft=Math.max(0,(doy(new Date())-20)*DPX);}
-/* project-page timelines open scrolled to the project itself (its start, or today when it is running) */
-function scrollProjGantts(){document.querySelectorAll('[data-pgantt]').forEach(g=>{const p=getProject(g.dataset.pgantt);if(!p)return;const t=_localToday();const d=(p.startDate&&p.endDate&&p.startDate<=t&&t<=p.endDate)?t:(p.startDate||p.endDate||t);const off=ganttDayOffset(d);g.scrollLeft=Math.max(0,(off===null?doy(new Date()):off)*DPX-20);});}
+/* project-page timelines are drawn zoomed to the project, so there is nothing to scroll to */
+function scrollProjGantts(){}
 
 function renderCoworkRow(totalW){
   if(!S.coworkDays)S.coworkDays=[];
