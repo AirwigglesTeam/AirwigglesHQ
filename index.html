@@ -2684,7 +2684,7 @@ function _pfApplyEdit(coll,id,next){
   const cur=list.find(x=>x.id===id);
   if(!cur){showToast('That item was deleted by someone else — your edit was not applied',4000);return false;}
   const snap=_pfOpenSnap[coll+':'+id];
-  if(!snap){const i=list.indexOf(cur);list[i]=next;return true;}     // no record of the opening state: replace as before
+  if(!snap){const i=list.indexOf(cur);list[i]=Object.assign({},cur,next);return true;}   // keep fields the form doesn't know about (lane, recurrence links)     // no record of the opening state: replace as before
   for(const k of Object.keys(next)){
     if(k==='id')continue;
     if(!_pfSame(next[k],snap[k])&&!_pfSame(next[k],cur[k]))cur[k]=PFSync.clone(next[k]);
@@ -3701,7 +3701,7 @@ function corpTax(p){
 }
 
 /* ── Date helper ── */
-function addDays(dateStr,n){if(!dateStr)return'';const d=new Date(dateStr+'T00:00:00');d.setDate(d.getDate()+n);return d.toISOString().slice(0,10);}
+function addDays(dateStr,n){const p=_isoParts(dateStr);if(!p)return'';return new Date(Date.UTC(p[0],p[1]-1,p[2]+n)).toISOString().slice(0,10);}   // pure UTC arithmetic: no daylight-saving drift
 
 
 function taskComp(t){const ch=kids(t.id);if(!ch.length)return t.done?100:0;const d=ch.filter(c=>c.done).length;return Math.round(d/ch.length*100);}
@@ -3718,6 +3718,31 @@ const LANES=[['now','Now','Actively working on'],['next','Next','Up next'],['lat
 const NOW_CAP=5;
 /* Tasks without a lane sit in Next, so converting an existing project to Ongoing needs no clean-up. */
 function taskLane(t){return t.lane==='now'||t.lane==='later'?t.lane:'next';}
+function _isoParts(s){const m=/^(\d{4})-(\d{2})-(\d{2})/.exec(s||'');return m?[+m[1],+m[2],+m[3]]:null;}
+/* Calendar-correct month arithmetic: keeps the day of the month, clamps to month end (31 Jan + 1 month = 28/29 Feb). */
+function addMonthsISO(s,n){
+  const p=_isoParts(s);if(!p)return'';
+  const t=p[1]-1+n;const y=p[0]+Math.floor(t/12);const m=((t%12)+12)%12;
+  const dim=new Date(Date.UTC(y,m+1,0)).getUTCDate();
+  return new Date(Date.UTC(y,m,Math.min(p[2],dim))).toISOString().slice(0,10);
+}
+function _localToday(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+/* Next occurrence of a recurring task. Anchored to the ORIGINAL date (15 March stays 15 March every year, even in
+   leap years) and never in the past: finishing a filing three months late schedules next year's, not an overdue one. */
+function nextRecurDate(due,rec,today){
+  const n=Math.max(1,parseInt(rec&&rec.interval)||1),ty=rec&&rec.type;
+  const step=k=>ty==='daily'?addDays(due,n*k):ty==='yearly'?addMonthsISO(due,12*n*k):ty==='monthly'?addMonthsISO(due,n*k):addDays(due,7*n*k);
+  let k=1,nxt=step(k);
+  while(nxt<=today&&k<2000){k++;nxt=step(k);}
+  return nxt;
+}
+function recLabel(rec){
+  const n=Math.max(1,parseInt(rec&&rec.interval)||1),ty=rec&&rec.type;
+  if(ty==='monthly'&&n===3)return'every quarter';
+  if(ty==='monthly'&&n===12)return'every year';
+  const u={daily:'day',weekly:'week',monthly:'month',yearly:'year'}[ty]||'week';
+  return n===1?'every '+u:'every '+n+' '+u+'s';
+}
 function _nextUp(p,n){
   const rank=t=>projType(p)==='ongoing'?{now:0,next:1,later:2}[taskLane(t)]:0;
   const dk=t=>t.endDate||'9999';
@@ -5620,6 +5645,7 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
               ${spons.length>0?`<span style="font-size:.62rem;color:var(--text2);">${spons.length} sponsor${spons.length!==1?'s':''}</span>`:''}
               <span style="font-size:.62rem;color:var(--muted);">${mf&&memberTaskCt!==null?`${memberTaskCt} open for ${getMember(mf)?.name?.split(' ')[0]||'them'}`:doneCt+'/'+totalCt+' tasks'}</span>
             </div>
+            ${_latestUpdateLine(p)}
           </div>
           <div class="ec-meta">
             <div class="ec-prog-wrap"${projType(p)==='ongoing'?' style="display:none;"':''}>
@@ -6414,12 +6440,18 @@ function _updateTaskRowInPlace(id){
 }
 
 function spawnRecurring(t){
-  const shifts={daily:1,weekly:7,monthly:30,yearly:365};
-  const shift=(shifts[t.recur.type]||7)*(t.recur.interval||1);
-  S.tasks.push({...t,id:uid(),done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},
-    startDate:t.startDate?addDays(t.startDate,shift):'',
-    endDate:t.endDate?addDays(t.endDate,shift):'',
-    parentId:null});
+  if(!t.recur||!t.recur.enabled)return;
+  if(t.recurNext&&getTask(t.recurNext))return;                       // already scheduled: un-ticking and re-ticking must not add copies
+  const today=_localToday();
+  let nextEnd='',nextStart='';
+  if(t.endDate){nextEnd=nextRecurDate(t.endDate,t.recur,today);const delta=Math.round((Date.parse(nextEnd)-Date.parse(t.endDate))/864e5);nextStart=t.startDate?addDays(t.startDate,delta):'';}
+  else if(t.startDate){nextStart=nextRecurDate(t.startDate,t.recur,today);}
+  const root=t.recurRoot||t.id;
+  /* Dated tasks get an id made from the series and the due date, so two people ticking it off at once produce ONE next task, not two. */
+  const id=(nextEnd||nextStart)?root+'_r'+(nextEnd||nextStart):uid();
+  if(getTask(id)){t.recurNext=id;return;}
+  S.tasks.push({...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:null,recurRoot:root,recurNext:''});
+  t.recurNext=id;
 }
 
 function quickAddSub(parentId){
@@ -7296,6 +7328,11 @@ ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style
   </div>`}
 </div>
 
+<!-- STATUS UPDATES -->
+<div class="detail-sec" style="grid-column:1 / -1;" data-status-log="${p.id}">
+  ${renderStatusLog(p)}
+</div>
+
 <!-- TASKS SECTION — split by phase -->
 <div class="detail-sec" style="grid-column:1 / -1;">
   ${renderDetailPhaseSections(p,top)}
@@ -7368,8 +7405,66 @@ function lnAdd(pid,lane){
   saveNow();render();
   setTimeout(()=>{const n=el('ln-in-'+pid+'-'+lane);if(n)n.focus();},60);
 }
+/* ── Dated status updates: a short running log per project, newest first ── */
+const _UPD_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function _updDate(iso){const q=_isoParts(iso);return q?q[2]+' '+_UPD_MON[q[1]-1]+' '+q[0]:'';}
+function _latestUpdateLine(p){
+  const u=(p.updates||[]).slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||(b.at||0)-(a.at||0))[0];
+  if(!u)return'';
+  const t=String(u.text||'');
+  return`<div class="ec-latest-upd" style="font-size:.65rem;color:var(--text2);margin-top:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="${escHtml(t)}"><span style="color:var(--muted);font-family:'DM Mono',monospace;">${escHtml(_updDate(u.d))}</span> ${escHtml(t)}</div>`;
+}
+function renderStatusLog(p){
+  const all=(p.updates||[]).slice().sort((a,b)=>(b.d||'').localeCompare(a.d||'')||(b.at||0)-(a.at||0));
+  const open=window._updAll&&window._updAll[p.id];
+  const shown=open?all:all.slice(0,5);
+  let h=`<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Status updates${all.length?`<span style="font-size:.68rem;color:var(--muted);font-weight:400;">${all.length}</span>`:''}</div>`;
+  h+=`<div style="display:flex;gap:6px;margin-bottom:8px;flex-wrap:wrap;"><input class="inp" id="upd-in-${p.id}" maxlength="1000" placeholder="Where are we at? e.g. Waiting on the accountant, filing due 31 Jan" style="flex:1;min-width:200px;" onkeydown="if(event.key==='Enter'){event.preventDefault();addStatusUpdate('${p.id}');}"><button class="btn btn-primary btn-sm" onclick="addStatusUpdate('${p.id}')">Add update</button></div>`;
+  if(!all.length)return h+'<div style="color:var(--muted);font-size:.73rem;padding:2px 4px;opacity:.7;">No updates yet. A line or two each time something moves keeps everyone in the loop.</div>';
+  h+='<div class="upd-list">'+shown.map(u=>`<div class="upd-row" data-upd="${escHtml(u.id)}" style="display:flex;gap:10px;align-items:baseline;padding:5px 2px;border-bottom:1px solid var(--border);"><span style="font-family:'DM Mono',monospace;font-size:.66rem;color:var(--muted);flex-shrink:0;min-width:84px;">${escHtml(_updDate(u.d))}</span><span style="flex:1;font-size:.78rem;word-break:break-word;white-space:pre-wrap;">${escHtml(u.text)}</span>${u.by?`<span style="font-size:.64rem;color:var(--muted);flex-shrink:0;">${escHtml(u.by)}</span>`:''}<button class="del-btn" title="Delete update" onclick="delStatusUpdate('${p.id}','${escHtml(u.id)}')">×</button></div>`).join('')+'</div>';
+  if(all.length>5)h+=`<button class="btn btn-ghost btn-xs" style="margin-top:6px;" onclick="window._updAll=window._updAll||{};window._updAll['${p.id}']=!window._updAll['${p.id}'];render();">${open?'Show fewer':'Show all '+all.length}</button>`;
+  return h;
+}
+function addStatusUpdate(pid){
+  const p=getProject(pid);const inp=el('upd-in-'+pid);const text=inp&&inp.value.trim().slice(0,1000);if(!p||!text)return;
+  const me=getMyMember();
+  saveWithUndo('Add status update');
+  if(!Array.isArray(p.updates))p.updates=[];
+  p.updates.push({id:uid(),d:_localToday(),at:Date.now(),by:me?(me.name||'').split(' ')[0]:'',text});
+  saveNow();render();
+}
+function delStatusUpdate(pid,uidv){
+  const p=getProject(pid);if(!p||!Array.isArray(p.updates))return;
+  saveWithUndo('Delete status update');
+  p.updates=p.updates.filter(u=>u.id!==uidv);
+  saveNow();render();
+}
+/* ── Admin: recurring obligations (filings, renewals, reviews) ── */
+function renderRecurPanel(p){
+  const series=S.tasks.filter(t=>t.projectId===p.id&&!t.done&&t.recur&&t.recur.enabled).sort((a,b)=>(a.endDate||'9999').localeCompare(b.endDate||'9999'));
+  let h=`<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Recurring tasks<span style="font-size:.68rem;color:var(--muted);font-weight:400;">tick one off and the next is scheduled automatically</span></div>`;
+  h+=series.length?'<div class="rec-list" style="margin-bottom:8px;">'+series.map(t=>`<div class="rec-row" data-rec="${t.id}" style="display:flex;gap:10px;align-items:center;padding:5px 2px;border-bottom:1px solid var(--border);flex-wrap:wrap;"><span style="flex:1;min-width:140px;font-size:.78rem;font-weight:600;cursor:pointer;" onclick="openModal('task','${t.id}')">${escHtml(t.name)}</span><span style="font-size:.68rem;color:var(--text2);">${recLabel(t.recur)}</span><span style="font-family:'DM Mono',monospace;font-size:.68rem;color:${t.endDate&&t.endDate<_localToday()?'var(--red)':'var(--muted)'};">${t.endDate?'due '+_updDate(t.endDate):'no date'}</span><button class="btn btn-ghost btn-xs" onclick="recStop('${t.id}')">Stop repeating</button></div>`).join('')+'</div>'
+    :'<div style="color:var(--muted);font-size:.73rem;padding:2px 4px 8px;opacity:.7;">Nothing recurring yet. Add things like annual accounts, insurance renewals or quarterly reviews.</div>';
+  h+=`<div class="rec-add" style="display:flex;gap:6px;flex-wrap:wrap;align-items:center;margin-bottom:12px;"><input class="inp" id="rec-name-${p.id}" placeholder="e.g. Companies House confirmation statement" style="flex:1;min-width:180px;"><input class="inp" type="date" id="rec-due-${p.id}" style="width:140px;" title="First due date"><span style="font-size:.72rem;color:var(--muted);">every</span><input class="inp" type="number" id="rec-n-${p.id}" value="1" min="1" style="width:56px;"><select class="sel" id="rec-t-${p.id}" style="width:96px;"><option value="daily">days</option><option value="weekly">weeks</option><option value="monthly">months</option><option value="yearly" selected>years</option></select><select class="sel" id="rec-who-${p.id}" style="width:130px;"><option value="">Unassigned</option>${(S.members||[]).map(m=>`<option value="${m.id}">${escHtml(m.name)}</option>`).join('')}</select><button class="btn btn-primary btn-sm" onclick="recAdd('${p.id}')">Add recurring</button></div>`;
+  return h;
+}
+function recAdd(pid){
+  const name=(el('rec-name-'+pid)?.value||'').trim();const due=el('rec-due-'+pid)?.value||'';
+  if(!name){if(el('rec-name-'+pid))el('rec-name-'+pid).style.borderColor='var(--red)';return;}
+  if(!due){if(el('rec-due-'+pid))el('rec-due-'+pid).style.borderColor='var(--red)';return;}
+  const n=Math.max(1,parseInt(el('rec-n-'+pid)?.value)||1),type=el('rec-t-'+pid)?.value||'yearly',who=el('rec-who-'+pid)?.value||'';
+  saveWithUndo('Add recurring task');
+  const id=uid();
+  S.tasks.unshift({id,name,description:'',projectId:pid,parentId:null,priority:'Medium',phase:'',assignees:who?[who]:[],labels:[],blockedBy:[],startDate:'',endDate:due,kStatus:'todo',done:false,recur:{enabled:true,type,interval:n},slackReminder:{},recurRoot:id,recurNext:''});
+  saveNow();render();
+}
+function recStop(id){
+  const t=getTask(id);if(!t||!t.recur)return;
+  saveWithUndo('Stop repeating');t.recur={...t.recur,enabled:false};saveNow();render();
+}
 function renderDetailFlatTasks(p,top){
-  let html='<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Tasks';
+  let html=projType(p)==='admin'?renderRecurPanel(p):'';
+  html+='<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">Tasks';
   if(top.length>0)html+=`<span style="font-size:.68rem;color:var(--muted);font-weight:400;">${top.length} total</span>`;
   html+='</div>';
   html+=quickAddBarHtml(p.id);
@@ -7649,8 +7744,10 @@ function renderGantt(projects,fullPage=false){
   let rows='';
   projects.forEach(p=>{
     const comp=projComp(p);const isExp=S.expandedGantt.includes(p.id);
-    const bp=barP(p.startDate,p.endDate);
-    const bHtml=bp?`<div class="gbar" style="left:${bp.l}px;width:${bp.w}px;background:${p.color}22;border:1px solid ${p.color}55;" onclick="openDetail('${p.id}')"><div class="gbar-fill" style="width:${comp}%;background:${p.color};"></div><div class="gbar-txt">${escHtml(p.name)} · ${comp}%</div></div>`:'';
+    const _bp0=barP(p.startDate,p.endDate);
+    const openEnded=projType(p)==='ongoing'&&!p.endDate&&!!p.startDate&&!!_bp0;   // ongoing work with no end date runs off the right edge
+    const bp=openEnded?{l:_bp0.l,w:Math.max(totalW-_bp0.l,8)}:_bp0;
+    const bHtml=bp?`<div class="gbar" style="left:${bp.l}px;width:${bp.w}px;background:${p.color}22;border:1px solid ${p.color}55;${openEnded?'border-right:2px dashed '+p.color+'99;':''}" onclick="openDetail('${p.id}')">${openEnded?'':`<div class="gbar-fill" style="width:${comp}%;background:${p.color};"></div>`}<div class="gbar-txt">${escHtml(p.name)}${openEnded?' · ongoing':' · '+comp+'%'}</div></div>`:'';
     // Phase segments rendered as a separate row below the project bar
     const phaseBars=getPhaseBars(p);
     const today=new Date();today.setHours(0,0,0,0);
@@ -7705,7 +7802,7 @@ function barP(s,e){
 
 function getPhaseBars(p){
   // Returns array of {phase, l, w, startDate, endDate} for rendering on the Gantt
-  if(!p.startDate||!p.endDate)return[];
+  if(!isEvt(p)||!p.startDate||!p.endDate)return[];   // Planning / Pre-launch / Live / Post-event only exist for events
   const defs=S.settings.phaseDefaults||{planning:2,prelaunch:6,postEvent:2};
   const pw=p.phaseWeeks||{};
   const planWks=pw.planning!=null?pw.planning:defs.planning??2;
@@ -10567,7 +10664,7 @@ function saveTask(eid,defParent,tmplId){
   // tmLbStillInherited: user opened an inheriting subtask and didn't touch labels → keep null.
   const labels=tmLbStillInherited?null:(rawTmLabels.length>0?rawTmLabels:(parentVal?null:[]));
   const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{},...(el('tm-cw')?{coworkDayId:el('tm-cw').value}:{})};
-  if(eid&&oldTask){task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
+  if(eid&&oldTask){['lane','recurRoot','recurNext'].forEach(k=>{if(oldTask[k]!==undefined)task[k]=oldTask[k];});task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   saveWithUndo(eid?'Edit task':'Add task');
   if(eid){_pfApplyEdit('tasks',eid,task);}else S.tasks.push(task);
   saveNow();
