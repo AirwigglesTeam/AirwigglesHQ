@@ -3708,8 +3708,8 @@ function taskComp(t){const ch=kids(t.id);if(!ch.length)return t.done?100:0;const
 const PROJ_TYPES={
   event:{label:'Event',plural:'Events',blurb:'Dated, with sponsors, prizes and phases.'},
   ongoing:{label:'Ongoing',plural:'Ongoing',blurb:'Multi-year work with no end date.'},
-  improvement:{label:'Improvement',plural:'Improvements',blurb:'A finite piece of work, e.g. a website change.'},
-  admin:{label:'Admin & compliance',plural:'Admin & compliance',blurb:'Company housekeeping, filings and renewals.'}
+  improvement:{label:'Project',plural:'Projects',blurb:'A finite piece of work, e.g. a website change.'},
+  admin:{label:'Admin',plural:'Admin',blurb:'Company housekeeping, filings and renewals.'}
 };
 /* Projects saved before types existed have no p.type: they are events, exactly as before. */
 function projType(p){return(p&&PROJ_TYPES[p.type])?p.type:'event';}
@@ -5189,7 +5189,7 @@ function _dashCompactRow(p){
   const ds=p.startDate&&p.endDate?fmtD(p.startDate)+' → '+fmtD(p.endDate):p.endDate?'Due '+fmtD(p.endDate):'No dates';
   const open=S.tasks.filter(t=>t.projectId===p.id&&!t.done).length;
   return '<div class="dash-crow" onclick="openDetail(\''+p.id+'\')"><span style="width:8px;height:8px;border-radius:50%;background:'+p.color+';flex-shrink:0;"></span>'
-   +'<span class="dash-crow-nm">'+escHtml(p.name)+'</span><span class="dash-crow-meta dash-crow-dt">'+ds+'</span><span class="dash-crow-meta dash-crow-dt">'+open+' open</span>'
+   +'<span class="dash-crow-nm">'+escHtml(p.name)+'</span>'+(p.status==='backlog'?'<span class="dash-crow-meta" style="font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;">Backlog</span>':'')+(isEvt(p)?'':'<span class="dash-crow-meta" style="font-size:.58rem;">'+PROJ_TYPES[projType(p)].label+'</span>')+'<span class="dash-crow-meta dash-crow-dt">'+ds+'</span><span class="dash-crow-meta dash-crow-dt">'+open+' open</span>'
    +'<span class="dash-crow-meta" style="min-width:30px;text-align:right;">'+comp+'%</span></div>';
 }
 
@@ -5565,16 +5565,16 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
   <div style="${(_dsOn('events')||_dsOn('notes'))?'':'display:none;'}container-type:inline-size;container-name:ec-two-left;min-width:0;">
     ${_dsOn('notes')?`<div style="margin-bottom:14px;">${_quickNotesCardHtml()}</div>`:''}
     <div style="${_dsOn('events')?'display:flex;':'display:none;'}align-items:center;gap:7px;margin-bottom:12px;flex-wrap:wrap;">
-      <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.filter(isEvt).length})</button>
-      <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>isEvt(p)&&p.status==='active').length})</button>
-      <button class="chip${(S.projFilter||'active')==='backlog'?' on':''}" onclick="S.projFilter='backlog';save();render()">Backlog (${S.projects.filter(p=>isEvt(p)&&p.status==='backlog').length})</button>
-      <button class="chip${(S.projFilter||'active')==='completed'?' on':''}" onclick="S.projFilter='completed';save();render()">Completed (${S.projects.filter(p=>isEvt(p)&&p.status==='completed').length})</button>
+      <button class="chip${(S.projFilter||'active')==='all'?' on':''}" onclick="S.projFilter='all';save();render()">All (${S.projects.filter(p=>p.status!=='completed').length})</button>
+      <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>p.status==='active').length})</button>
+      <button class="chip${(S.projFilter||'active')==='backlog'?' on':''}" onclick="S.projFilter='backlog';save();render()">Backlog (${S.projects.filter(p=>p.status==='backlog').length})</button>
+      <button class="chip${(S.projFilter||'active')==='completed'?' on':''}" onclick="S.projFilter='completed';save();render()">Archive (${S.projects.filter(p=>p.status==='completed').length})</button>
       <button class="btn btn-acc btn-sm" style="margin-left:auto;" onclick="newProjOfType('')">+ New Event</button>
     </div>
     ${(()=>{
       if(!_dsOn('events'))return'';
       const filter=S.projFilter||'active';
-      let filtered=filter==='all'?S.projects.filter(isEvt):S.projects.filter(p=>isEvt(p)&&p.status===filter);
+      let filtered=S.projects.filter(p=>isEvt(p)&&(filter==='all'?p.status!=='completed':p.status===filter));   // finished (completed) projects live in the Archive filter
       // Sort: active first, then everything else (greyed) when showing all
       if(filter==='all'){
         filtered.sort((a,b)=>{
@@ -5583,12 +5583,13 @@ ${_dsOn('links')?`<div style="margin-bottom:18px;">
           return aActive?-1:1;
         });
       }
-      const _other=Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>[t,S.projects.filter(p=>projType(p)===t&&(filter==='all'||p.status===filter)).sort((a,b)=>(a.status==='active'?0:1)-(b.status==='active'?0:1))]).filter(x=>x[1].length);
-      if(filtered.length===0&&!_other.length)return`<div class="empty"<div class="empty-ico">${ICO.folder}</div><div class="empty-txt">No projects here. <span style="color:var(--acc);cursor:pointer;" onclick="openModal('project',null)">Create one →</span></div></div>`;
+      const _other=Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>[t,S.projects.filter(p=>projType(p)===t&&(filter==='all'?p.status!=='completed':p.status===filter)).sort((a,b)=>(a.status==='active'?0:1)-(b.status==='active'?0:1))]).filter(x=>x[1].length);
+      if(filtered.length===0&&!_other.length)return`<div class="empty"><div class="empty-ico">${ICO.folder}</div><div class="empty-txt">No projects here. <span style="color:var(--acc);cursor:pointer;" onclick="newProjOfType('')">Create one →</span></div></div>`;
       const _gi=(filter==='active'||filter==='all')?_dashGroups(filtered.filter(p=>p.status==='active')):null;
       if(_gi)filtered=[..._gi.ordered,...filtered.filter(p=>p.status!=='active')];
       let _lastG='';
       const _card=(p,_pre)=>{
+      if(p.status==='backlog'||p.status==='completed')return _pre+_dashCompactRow(p);   // backlog and archived projects take one line, not a full card
       const isInactive=filter==='all'&&p.status!=='active';const comp=projComp(p);
       const mf=S.activeMember;
       const top=sortTasksDoneToBottom(S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(!mf||(t.assignees||[]).includes(mf))));
