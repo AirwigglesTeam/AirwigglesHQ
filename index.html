@@ -1319,6 +1319,8 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .dash-pgrid>.dash-grp-hd:first-child{margin-top:0;}
 [data-proj-sec]{margin:30px 0 8px!important;}
 .dash-row3{margin-top:32px;gap:16px;}
+.dash-quick{gap:24px;}
+#dash-notes-wrap{margin-bottom:4px;}
 </style>
 </head>
 <body>
@@ -5809,7 +5811,7 @@ function renderProjectCalendar(p){
 }
 function pcToggle(pid){window._pcOpen=window._pcOpen||{};window._pcOpen[pid]=!window._pcOpen[pid];const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectCalendar(p);else render();}
 /* ════ EXPANDED TEAM SECTION ════
-   A full-width view of the whole team on the dashboard: workload distribution, capacity, and one card per person.
+   A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
 function teamExpandToggle(){dashTopSet('team');}
 function _tmFmt(n){return (Math.round(n*10)/10).toString();}
@@ -5824,7 +5826,6 @@ function teamStats(m,today){
   const since=addDays(today,-27);
   const held=(S.coworkDays||[]).filter(c=>c.date&&c.date.startsWith(yr)&&c.date<=today);
   const okrs=(m.okrs||[]).map(o=>({id:o.id,objective:o.objective||'',done:(o.keyResults||[]).filter(k=>k.done).length,total:(o.keyResults||[]).length,krs:o.keyResults||[]}));
-  const target=m.hoursPerWeek>0?m.hoursPerWeek:0;
   const hours28=sum(log.filter(e=>e.date>=since&&e.date<=today));
   const st={
     open:mine.length,
@@ -5833,7 +5834,7 @@ function teamStats(m,today){
     done:S.tasks.filter(t=>t.done&&(t.assignees||[]).includes(m.id)).length,   // tasks don't record when they were finished, so this is all-time
     byProject:Object.entries(byProj).map(([id,n])=>({p:getProject(id),n})).filter(x=>x.p).sort((a,b)=>b.n-a.n),
     hoursYear:sum(log.filter(e=>String(e.date||'').startsWith(yr))),
-    hours28,avgWeek:hours28/4,target,
+    hours28,avgWeek:hours28/4,
     cwAttended:held.filter(c=>(c.members||[]).includes(m.id)).length,cwHeld:held.length,
     okrs,resp:memResponsibilities(m)
   };
@@ -5842,7 +5843,6 @@ function teamStats(m,today){
   if(!st.open)st.attention.push({t:'No open tasks'});
   if(!okrs.length)st.attention.push({t:'No objectives set'});
   if(!st.resp.length)st.attention.push({t:'No areas set'});
-  if(!target)st.attention.push({t:'No hours per week set'});
   return st;
 }
 function teamSummary(today){
@@ -5851,7 +5851,6 @@ function teamSummary(today){
   return{stats,
     unassigned:S.tasks.filter(t=>!t.done&&act.has(t.projectId)&&!(t.assignees||[]).length).length,
     totalOpen:stats.reduce((n,x)=>n+x.s.open,0),
-    capacity:stats.reduce((n,x)=>n+x.s.target,0),
     logged:stats.reduce((n,x)=>n+x.s.avgWeek,0)};
 }
 function _tmAv(m,sz){return m.photoUrl?'<img src="'+escHtml(m.photoUrl)+'" style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">':'<div class="av" style="width:'+sz+'px;height:'+sz+'px;background:'+escHtml(m.color)+';font-size:'+(sz*.38)+'px;flex-shrink:0;">'+escHtml(m.initials)+'</div>';}
@@ -5864,7 +5863,7 @@ function _tmCard(m,s,idx,n){
   let h='<div class="mcard" data-team-member="'+escHtml(m.id)+'">';
   h+='<div class="mcard-top" style="margin-bottom:8px;"><div style="cursor:pointer;" onclick="openMemberProfile(\''+m.id+'\')" title="Open profile">'+_tmAv(m,44)+'</div>'
    +'<div style="flex:1;min-width:0;"><div style="font-size:1rem;font-weight:700;">'+escHtml(m.name)+'</div>'
-   +'<div style="font-size:.7rem;color:var(--muted);margin-top:2px;">'+(m.isDirector?'Director · ':'')+(s.target?_tmFmt(s.target)+' h/week':'No hours per week set')+'</div></div>'
+   +'<div style="font-size:.7rem;color:var(--muted);margin-top:2px;">'+(m.isDirector?'Director':'Team member')+'</div></div>'
    +'<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-ghost btn-xs" onclick="openMemberProfile(\''+m.id+'\')">Info</button><button class="btn btn-ghost btn-xs" onclick="openModal(\'memberTime\',\''+m.id+'\')">+ Log hours</button><button class="btn btn-ghost btn-xs" onclick="filterMemberAndExpand(\''+m.id+'\')" title="Filter the dashboard to this person">Focus</button></div></div>';
   if(s.attention.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">'+s.attention.map(a=>'<span style="font-size:.62rem;font-weight:600;padding:1px 8px;border-radius:10px;background:'+(a.red?'color-mix(in srgb,var(--red) 18%,transparent)':'var(--surface2)')+';color:'+(a.red?'var(--red)':'var(--muted)')+';">'+escHtml(a.t)+'</span>').join('')+'</div>';
   h+=_tmLbl('Areas &amp; responsibilities')+(s.resp.length?'<div style="display:flex;gap:5px;flex-wrap:wrap;">'+s.resp.map(r=>'<span style="font-size:.7rem;padding:2px 9px;border-radius:10px;background:var(--teal-dim);color:var(--acc);">'+escHtml(r.text)+'</span>').join('')+'</div>':'<div style="font-size:.74rem;color:var(--muted);">None set yet.</div>');
@@ -5880,7 +5879,7 @@ function _tmCard(m,s,idx,n){
   h+=_tmLbl('Objectives &amp; key results');
   h+=s.okrs.length?s.okrs.map(o=>'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:.62rem;color:var(--acc);">◈</span><span style="flex:1;font-size:.78rem;font-weight:600;min-width:0;">'+escHtml(o.objective)+'</span>'+(o.total?'<span style="font-family:\'DM Mono\',monospace;font-size:.66rem;color:var(--muted);">'+o.done+'/'+o.total+'</span>':'')+'</div>'
      +(o.total?'<div style="display:flex;margin-top:5px;">'+_tmBar(o.done/o.total*100,'var(--acc)')+'</div>':'')
-     +o.krs.map(k=>'<div style="display:flex;gap:6px;font-size:.72rem;margin-top:4px;color:'+(k.done?'var(--muted)':'var(--text2)')+';"><span style="color:var(--acc);">'+(k.done?'✓':'→')+'</span><span style="'+(k.done?'text-decoration:line-through;':'')+'">'+escHtml(k.text)+'</span></div>').join('')+'</div>').join('')
+     +o.krs.map(k=>'<div class="tm-kr" role="checkbox" aria-checked="'+(k.done?'true':'false')+'" tabindex="0" title="Tick off this key result" onclick="toggleMemberKR(\''+m.id+'\',\''+o.id+'\',\''+k.id+'\')" onkeydown="if(event.key===\' \'||event.key===\'Enter\'){event.preventDefault();this.click();}" style="display:flex;gap:6px;font-size:.72rem;margin-top:4px;cursor:pointer;color:'+(k.done?'var(--muted)':'var(--text2)')+';"><span style="color:var(--acc);">'+(k.done?'✓':'☐')+'</span><span style="'+(k.done?'text-decoration:line-through;':'')+'">'+escHtml(k.text)+'</span></div>').join('')+'</div>').join('')
     :'<div style="font-size:.74rem;color:var(--muted);">No objectives set yet.</div>';
   if(lists.length){
     h+='<div style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;" onclick="tmMotivToggle(\''+m.id+'\')" role="button" aria-expanded="'+open+'"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg><span style="font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Motivations &amp; aspirations</span></div>';
@@ -5896,7 +5895,7 @@ function renderTeam(){
   if(_dsOn('team'))h+='<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;"><div class="sec-hd" style="margin-bottom:0;"><span class="sec-lbl">Members</span></div><button class="btn btn-acc btn-xs" onclick="openModal(\'member\',null)">+ Add member</button></div>';
   else return h+'</div>';
   if(!S.members.length)return h+'<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.8rem;">No team members yet.</div></div></div>';
-  // workload + capacity
+  // workload
   h+='<div class="card" style="margin-bottom:14px;"><div class="card-hd"><span class="card-title">Workload distribution</span><span style="font-size:.66rem;color:var(--muted);">open tasks in active projects</span></div><div class="card-bd" id="tm-dist">';
   sum.stats.forEach(x=>{
     const share=sum.totalOpen?Math.round(x.s.open/sum.totalOpen*100):0;
@@ -5905,14 +5904,6 @@ function renderTeam(){
       +'<span style="font-family:\'DM Mono\',monospace;font-size:.68rem;color:var(--text2);min-width:0;margin-left:auto;text-align:right;">'+x.s.open+' open'+(x.s.overdue?' · <span style="color:var(--red);">'+x.s.overdue+' overdue</span>':'')+' · '+share+'%</span></div>';
   });
   h+='<div style="font-size:.7rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:8px;">'+(sum.unassigned?'<span style="color:var(--yellow);">'+sum.unassigned+' open task'+(sum.unassigned===1?'':'s')+' with nobody assigned</span>':'Every open task has an owner')+' · '+sum.totalOpen+' assignments across the team</div></div></div>';
-  h+='<div class="card" style="margin-bottom:14px;"><div class="card-hd"><span class="card-title">Capacity</span><span style="font-size:.66rem;color:var(--muted);">hours logged per week (last 4 weeks) against hours per week</span></div><div class="card-bd" id="tm-cap">';
-  sum.stats.forEach(x=>{
-    const t=x.s.target,a=x.s.avgWeek;
-    h+='<div class="tm-row" data-tm-cap="'+escHtml(x.m.id)+'" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="display:flex;align-items:center;gap:8px;width:150px;min-width:110px;">'+_tmAv(x.m,22)+'<span style="font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(x.m.name)+'</span></span>'
-      +(t?_tmBar(a/t*100,a>t*1.1?'var(--yellow)':'var(--acc)'):'<div style="flex:1;min-width:60px;font-size:.68rem;color:var(--muted);">No hours per week set</div>')
-      +'<span style="font-family:\'DM Mono\',monospace;font-size:.68rem;color:var(--text2);min-width:0;margin-left:auto;text-align:right;">'+_tmFmt(a)+'h'+(t?' of '+_tmFmt(t)+'h':'')+'</span></div>';
-  });
-  h+='<div style="font-size:.7rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:8px;">Team: '+_tmFmt(sum.logged)+'h logged per week'+(sum.capacity?' of '+_tmFmt(sum.capacity)+'h expected':'')+'</div></div></div>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:14px;align-items:start;">'+sum.stats.map((x,i)=>_tmCard(x.m,x.s,i,sum.stats.length)).join('')+'</div></div>';
   return h;
 }
@@ -6221,25 +6212,6 @@ ${_dashQuickHtml()}
     ${_dsOn('cowork')?_dashFold('cw',_coworkCardHtml(mf)):''}
 
 
-    ${mf?(()=>{
-      const mfm=getMember(mf);
-      if(!mfm)return'';
-      const memOkrs=mfm.okrs||[];
-      const isMe=window._myMemberId===mf;
-      return`<div class="card" id="dash-member-okrs">
-      <div class="card-hd" style="cursor:pointer;" onclick="(function(){const b=el('dash-mem-okr-bd');if(b){const open=b.style.display!=='none';b.style.display=open?'none':'block';}})()"><span class="card-title" style="color:var(--acc);">✦ ${escHtml(mfm.name)}'s Objectives</span>${isMe?`<button class="btn btn-ghost btn-xs" onclick="event.stopPropagation();openMemberProfile('${mf}','okrs')">Edit</button>`:''}</div>
-      <div class="card-bd" id="dash-mem-okr-bd">
-        ${memOkrs.length===0?`<div style="font-size:.75rem;color:var(--muted);">${isMe?'You haven\'t set any objectives yet. <button class="btn btn-ghost btn-xs" onclick="openMemberProfile(\''+mf+'\',\'okrs\')">Set them up</button>':'No objectives set yet.'}</div>`:''}
-        ${memOkrs.map(okr=>`<div style="margin-bottom:12px;">
-          <div style="font-size:.8rem;font-weight:700;color:var(--text);margin-bottom:5px;">◈ ${okr.objective}</div>
-          ${(okr.keyResults||[]).map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:4px 8px;border-left:2px solid ${kr.done?'var(--green)':'var(--border)'};margin-bottom:3px;">
-            <div class="ti-check${kr.done?' done':''}" style="width:12px;height:12px;flex-shrink:0;margin-top:2px;cursor:${isMe?'pointer':'default'};" ${isMe?`onclick="toggleMemberKR('${mf}','${okr.id}','${kr.id}')"`:''}></div>
-            <span style="font-size:.74rem;color:${kr.done?'var(--muted)':'var(--text2)'};${kr.done?'text-decoration:line-through;':''}">${escHtml(kr.text)}</span>
-          </div>`).join('')}
-        </div>`).join('')}
-      </div>
-    </div>`;
-    })():''}
 
 
   </div>
@@ -6522,9 +6494,22 @@ function addMpOkr(){
 function addMpKr(oi){
   const krs=el('mp-okr-krs-'+oi);if(!krs)return;
   const ki=krs.querySelectorAll('input').length;
-  const d=document.createElement('div');d.style.cssText='display:flex;gap:5px;margin-bottom:4px;';
-  d.innerHTML='<span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="mp-okr-kr-'+oi+'-'+ki+'"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>';
+  const d=document.createElement('div');d.style.cssText='display:flex;gap:6px;margin-bottom:4px;align-items:center;';d.dataset.krDone='0';
+  d.innerHTML='<div class="ti-check" role="checkbox" aria-checked="false" tabindex="0" title="Tick off this key result" onclick="mpToggleKr(this)" onkeydown="if(event.key===\' \'||event.key===\'Enter\'){event.preventDefault();this.click();}" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;"></div><input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="mp-okr-kr-'+oi+'-'+ki+'"><button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>';
   krs.appendChild(d);d.querySelector('input').focus();
+}
+/* Tick a key result inside the profile. Saved key results are written straight away (same as ticking elsewhere); new ones are saved with the profile. */
+function mpToggleKr(box,memberId,okrId){
+  const row=box.closest('[data-kr-done]');if(!row)return;
+  const done=row.dataset.krDone!=='1';
+  row.dataset.krDone=done?'1':'0';
+  box.classList.toggle('done',done);box.setAttribute('aria-checked',done?'true':'false');
+  const inp=row.querySelector('input');if(inp){inp.style.textDecoration=done?'line-through':'';inp.style.color=done?'var(--muted)':'';}
+  const krId=row.dataset.krId;
+  if(memberId&&okrId&&krId){
+    const m=getMember(memberId),o=m&&(m.okrs||[]).find(x=>x.id===okrId),k=o&&(o.keyResults||[]).find(x=>x.id===krId);
+    if(k&&k.done!==done){k.done=done;save();}
+  }
 }
 function removeMpOkr(oi){
   const item=el('mp-okr-list')?.querySelectorAll('.mp-okr-item')[oi];
@@ -12215,14 +12200,10 @@ function memberProfileModalHtml(id,tab){
 
   <!-- Role & capacity -->
   <div style="border-top:1px solid var(--border);padding-top:16px;margin-bottom:16px;">
-    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Role &amp; capacity</div>
+    <div style="font-size:.68rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin-bottom:12px;">Role</div>
     <div style="margin-bottom:12px;">
       <label style="font-size:.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;">Areas &amp; responsibilities</label>
       ${_mpListHtml('responsibilities',memResponsibilities(m),'e.g. Community, Partnerships, Finance…')}
-    </div>
-    <div>
-      <label style="font-size:.75rem;font-weight:600;color:var(--text2);display:block;margin-bottom:5px;" for="mp-hpw">Hours per week</label>
-      <input class="inp" type="number" id="mp-hpw" min="0" max="168" step="0.5" value="${m.hoursPerWeek>0?m.hoursPerWeek:''}" placeholder="Contracted or expected hours" style="width:200px;font-size:.78rem;">
     </div>
   </div>
 
@@ -12239,9 +12220,9 @@ function memberProfileModalHtml(id,tab){
         <input class="inp" style="margin-bottom:7px;font-size:.8rem;" placeholder="e.g. Become a confident presenter" value="${escHtml(okr.objective||'')}" id="mp-okr-obj-${oi}">
         <div id="mp-okr-krs-${oi}">
           ${(okr.keyResults||[]).map((kr,ki)=>`
-          <div style="display:flex;gap:5px;margin-bottom:4px;" data-kr-id="${kr.id||''}" data-kr-done="${kr.done?'1':'0'}">
-            <span style="color:var(--muted);font-size:.75rem;padding-top:7px;">→</span>
-            <input class="inp" style="flex:1;font-size:.75rem;" placeholder="Key result…" id="mp-okr-kr-${oi}-${ki}" value="${escHtml(kr.text||'')}">
+          <div style="display:flex;gap:6px;margin-bottom:4px;align-items:center;" data-kr-id="${kr.id||''}" data-kr-done="${kr.done?'1':'0'}">
+            <div class="ti-check${kr.done?' done':''}" role="checkbox" aria-checked="${kr.done?'true':'false'}" tabindex="0" title="Tick off this key result" onclick="mpToggleKr(this,'${id}','${okr.id||''}')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();this.click();}" style="width:15px;height:15px;flex-shrink:0;cursor:pointer;"></div>
+            <input class="inp" style="flex:1;font-size:.75rem;${kr.done?'text-decoration:line-through;color:var(--muted);':''}" placeholder="Key result…" id="mp-okr-kr-${oi}-${ki}" value="${escHtml(kr.text||'')}">
             <button onclick="this.parentNode.remove()" style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;">×</button>
           </div>`).join('')}
         </div>
@@ -12287,11 +12268,6 @@ function saveMemberProfile(id){
     const now=_mpReadList('responsibilities');
     if(!_mpSame(now,memResponsibilities(m)))m.responsibilities=now;
   }
-  if(el('mp-hpw')){
-    const h=parseFloat(el('mp-hpw').value);
-    const nh=(isFinite(h)&&h>0&&h<=168)?Math.round(h*2)/2:null;
-    if((m.hoursPerWeek||null)!==nh)m.hoursPerWeek=nh;
-  }
   // Save OKRs
   const okrItems=document.querySelectorAll('#mp-okr-list .mp-okr-item');
   const okrs=[];
@@ -12311,7 +12287,7 @@ function saveMemberProfile(id){
     const newKrInputs=[...item.querySelectorAll('input[id^="mp-okr-kr-"]')].filter(inp=>{
       const row=inp.closest('[data-kr-id]');return!row;
     });
-    newKrInputs.forEach(inp=>{const txt=inp.value.trim();if(txt)keyResults.push({id:uid(),text:txt,done:false});});
+    newKrInputs.forEach(inp=>{const txt=inp.value.trim();const rw=inp.parentNode;if(txt)keyResults.push({id:uid(),text:txt,done:!!(rw&&rw.dataset&&rw.dataset.krDone==='1')});});
     okrs.push({id:existingOkrId,objective:objText,keyResults});
   });
   m.okrs=okrs;
