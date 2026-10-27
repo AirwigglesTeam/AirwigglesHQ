@@ -5219,7 +5219,13 @@ function _dashCompactRow(p){
 }
 
 /* ════ QUICK NOTES (shared, rich text) ════ */
-function _qn(){if(!S.quickNotes)S.quickNotes=[];return S.quickNotes;}
+/* Notes lists: scope '' is the dashboard's shared Quick Notes (S.quickNotes); a project id scopes to that project's own notes (p.notes).
+   Same note shape, same sanitiser, same per-note sync merge. */
+function _qn(sc){
+  if(sc){const p=getProject(sc);if(!p)return[];if(!Array.isArray(p.notes))p.notes=[];return p.notes;}
+  if(!S.quickNotes)S.quickNotes=[];return S.quickNotes;
+}
+function _qnSx(sc){return sc?'-'+sc:'';}
 function _qnClean(html){
   const root=new DOMParser().parseFromString('<div>'+String(html||'')+'</div>','text/html').body.firstChild;
   const ok={B:1,STRONG:1,I:1,EM:1,U:1,S:1,UL:1,OL:1,LI:1,BR:1,DIV:1,P:1,A:1};
@@ -5235,41 +5241,67 @@ function _qnClean(html){
 }
 function _qnText(html){const d=document.createElement('div');d.innerHTML=html||'';return (d.textContent||'').trim();}
 function _qnAgo(ts){const m=Math.round((Date.now()-ts)/60000);if(m<1)return'just now';if(m<60)return m+'m ago';const h=Math.round(m/60);if(h<24)return h+'h ago';const d=Math.round(h/24);return d+'d ago';}
-function _qnNoteHtml(n){
-  return '<div class="qn-note" data-id="'+n.id+'"><div class="qn-ed qn-nb" contenteditable="true" onblur="qnSave(\''+n.id+'\',this)">'+_qnClean(n.html)+'</div>'
+function _qnNoteHtml(n,sc){
+  const q="'"+(sc||'')+"'";
+  return '<div class="qn-note" data-id="'+escHtml(n.id)+'"><div class="qn-ed qn-nb" contenteditable="true" onblur="qnSave(\''+escHtml(n.id)+'\',this,'+q+')">'+_qnClean(n.html)+'</div>'
    +'<div class="qn-meta"><span>'+escHtml(n.byName||'Someone')+' · '+_qnAgo(n.ts||0)+'</span><span style="margin-left:auto;display:flex;gap:4px;">'
-   +(n.org?'<button class="btn btn-ghost btn-xs" onclick="qnOrganise(\''+n.id+'\',false)">Restore</button>':'<button class="btn btn-ghost btn-xs" onclick="qnOrganise(\''+n.id+'\',true)" title="Sorted into the right place: tuck it away">Organised ✓</button>')
-   +'<button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="qnDelete(\''+n.id+'\')" title="Delete note">×</button></span></div></div>';
+   +(n.org?'<button class="btn btn-ghost btn-xs" onclick="qnOrganise(\''+escHtml(n.id)+'\',false,'+q+')">Restore</button>':'<button class="btn btn-ghost btn-xs" onclick="qnOrganise(\''+escHtml(n.id)+'\',true,'+q+')" title="Sorted into the right place: tuck it away">Organised ✓</button>')
+   +'<button class="btn btn-ghost btn-xs" style="color:var(--red);" onclick="qnDelete(\''+escHtml(n.id)+'\','+q+')" title="Delete note">×</button></span></div></div>';
 }
-function _qnListHtml(){
-  const all=[..._qn()].sort((a,b)=>(b.ts||0)-(a.ts||0));
+function _qnListHtml(sc){
+  sc=sc||'';const q="'"+sc+"'";
+  const all=[..._qn(sc)].sort((a,b)=>(b.ts||0)-(a.ts||0));
   const live=all.filter(n=>!n.org),org=all.filter(n=>n.org);
-  return (live.length?live.map(_qnNoteHtml).join(''):'<div style="font-size:.75rem;color:var(--muted);padding:6px 2px;">Nothing waiting. Jot something above.</div>')
-   +(org.length?'<div class="dash-grp-hd" style="margin-top:8px;" onclick="window._qnOrg=!window._qnOrg;_qnRefresh()"><span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(window._qnOrg?'':'transform:rotate(-90deg);')+'">&#9662;</span><span>Organised</span><span class="dash-grp-n">'+org.length+'</span></div>'+(window._qnOrg?org.map(_qnNoteHtml).join(''):''):'');
+  const orgOpen=sc?(window._pnOrg&&window._pnOrg[sc]):window._qnOrg;
+  return (live.length?live.map(n=>_qnNoteHtml(n,sc)).join(''):'<div style="font-size:.75rem;color:var(--muted);padding:6px 2px;">'+(sc?'No notes yet. Jot something above.':'Nothing waiting. Jot something above.')+'</div>')
+   +(org.length?'<div class="dash-grp-hd" style="margin-top:8px;" onclick="qnToggleOrg('+q+')"><span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(orgOpen?'':'transform:rotate(-90deg);')+'">&#9662;</span><span>Organised</span><span class="dash-grp-n">'+org.length+'</span></div>'+(orgOpen?org.map(n=>_qnNoteHtml(n,sc)).join(''):''):'');
 }
-function _qnRefresh(){const l=el('qn-list');if(l)l.innerHTML=_qnListHtml();}
-function _quickNotesCardHtml(){
+function qnToggleOrg(sc){if(sc){window._pnOrg=window._pnOrg||{};window._pnOrg[sc]=!window._pnOrg[sc];}else window._qnOrg=!window._qnOrg;_qnRefresh(sc);}
+function _qnRefresh(sc){const l=el('qn-list'+_qnSx(sc));if(l)l.innerHTML=_qnListHtml(sc);}
+function _qnBody(sc){
+  sc=sc||'';const sx=_qnSx(sc),q="'"+sc+"'";
   const btn=(cmd,label,tip)=>'<button type="button" class="btn btn-ghost btn-xs" title="'+tip+'" onmousedown="event.preventDefault()" onclick="document.execCommand(\''+cmd+'\')" style="min-width:26px;">'+label+'</button>';
-  return '<div class="card" id="dash-quick-notes"><div class="card-hd"><span class="card-title">Quick Notes</span><span style="font-size:.62rem;color:var(--muted);">Shared with the team</span></div><div class="card-bd">'
-   +'<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">'+btn('bold','<b>B</b>','Bold')+btn('italic','<i>I</i>','Italic')+btn('underline','<u>U</u>','Underline')+btn('insertUnorderedList','• List','Bullet list')+btn('insertOrderedList','1. List','Numbered list')+'</div>'
-   +'<div id="qn-new" class="qn-ed" contenteditable="true" data-ph="Jot down a task, idea or reminder…" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();qnAdd();}"></div>'
-   +'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;"><button class="btn btn-acc btn-xs" onclick="qnAdd()">Add note</button><span style="font-size:.62rem;color:var(--muted);">Ctrl/Cmd + Enter</span></div>'
-   +'<div id="qn-list" style="max-height:380px;overflow:auto;">'+_qnListHtml()+'</div></div></div>';
+  return '<div style="display:flex;gap:4px;margin-bottom:6px;flex-wrap:wrap;">'+btn('bold','<b>B</b>','Bold')+btn('italic','<i>I</i>','Italic')+btn('underline','<u>U</u>','Underline')+btn('insertUnorderedList','• List','Bullet list')+btn('insertOrderedList','1. List','Numbered list')+'</div>'
+   +'<div id="qn-new'+sx+'" class="qn-ed" contenteditable="true" data-ph="'+(sc?'Add a note for this project…':'Jot down a task, idea or reminder…')+'" onkeydown="if((event.ctrlKey||event.metaKey)&&event.key===\'Enter\'){event.preventDefault();qnAdd('+q+');}"></div>'
+   +'<div style="display:flex;align-items:center;gap:8px;margin:6px 0 10px;"><button class="btn btn-acc btn-xs" onclick="qnAdd('+q+')">Add note</button><span style="font-size:.62rem;color:var(--muted);">Ctrl/Cmd + Enter</span></div>'
+   +'<div id="qn-list'+sx+'" style="max-height:380px;overflow:auto;">'+_qnListHtml(sc)+'</div>';
 }
-function qnAdd(){
-  const ed=el('qn-new');if(!ed)return;
+function _quickNotesCardHtml(){
+  return '<div class="card" id="dash-quick-notes"><div class="card-hd"><span class="card-title">Quick Notes</span><span style="font-size:.62rem;color:var(--muted);">Shared with the team</span></div><div class="card-bd">'+_qnBody('')+'</div></div>';
+}
+/* Project notes: collapsed by default, open state is remembered for the session only */
+function renderProjectNotes(p){
+  const open=!!(window._pnOpen&&window._pnOpen[p.id]);
+  const n=(p.notes||[]).filter(x=>!x.org).length;
+  return '<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;" data-pnotes-hd="'+p.id+'" onclick="pnToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
+    +'<span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(open?'':'transform:rotate(-90deg);')+'">&#9662;</span>Notes'
+    +(n?'<span style="font-size:.68rem;color:var(--muted);font-weight:400;">'+n+'</span>':'')
+    +'<span style="font-size:.62rem;color:var(--muted);font-weight:400;">Shared with the team</span></div>'
+    +(open?'<div data-pnotes-body="'+p.id+'">'+_qnBody(p.id)+'</div>':'');
+}
+function pnToggle(pid){window._pnOpen=window._pnOpen||{};window._pnOpen[pid]=!window._pnOpen[pid];const h=document.querySelector('[data-pnotes="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectNotes(p);else render();}
+function qnAdd(sc){
+  sc=sc||'';
+  const ed=el('qn-new'+_qnSx(sc));if(!ed)return;
   const html=_qnClean(ed.innerHTML);if(!_qnText(html))return;
-  _qn().push({id:uid(),html,by:(typeof PF!=='undefined'&&_pbUser?(_pbUser.id||_pbUser.email):null)||'',byName:(_pbUser&&(_pbUser.name||_pbUser.email))||'',ts:Date.now(),org:false});
-  ed.innerHTML='';save();_qnRefresh();ed.focus();
+  const list=_qn(sc);if(sc&&!getProject(sc))return;
+  list.push({id:uid(),html,by:(typeof PF!=='undefined'&&_pbUser?(_pbUser.id||_pbUser.email):null)||'',byName:(_pbUser&&(_pbUser.name||_pbUser.email))||'',ts:Date.now(),org:false});
+  ed.innerHTML='';save();_qnRefresh(sc);ed.focus();
 }
-function qnSave(id,node){
-  const n=_qn().find(x=>x.id===id);if(!n)return;
+function qnSave(id,node,sc){
+  sc=sc||'';
+  const n=_qn(sc).find(x=>x.id===id);if(!n)return;
   const html=_qnClean(node.innerHTML);
-  if(!_qnText(html)){qnDelete(id);return;}
+  if(!_qnText(html)){qnDelete(id,sc);return;}
   if(html!==_qnClean(n.html)){n.html=html;save();}
 }
-function qnOrganise(id,v){const n=_qn().find(x=>x.id===id);if(!n)return;n.org=!!v;save();_qnRefresh();}
-function qnDelete(id){saveWithUndo('Delete note');S.quickNotes=_qn().filter(x=>x.id!==id);save();_qnRefresh();}
+function qnOrganise(id,v,sc){sc=sc||'';const n=_qn(sc).find(x=>x.id===id);if(!n)return;n.org=!!v;save();_qnRefresh(sc);}
+function qnDelete(id,sc){
+  sc=sc||'';saveWithUndo('Delete note');
+  if(sc){const p=getProject(sc);if(p)p.notes=(p.notes||[]).filter(x=>x.id!==id);}
+  else S.quickNotes=_qn().filter(x=>x.id!==id);
+  save();_qnRefresh(sc);
+}
 
 /* ════ NEXT CO-WORKING DAY ════ */
 /* ════ NOTIFICATIONS: bell (new assignments, overdue, due today, blocked) + Slack weekly digest ════ */
@@ -7331,6 +7363,11 @@ ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style
 <!-- STATUS UPDATES -->
 <div class="detail-sec" style="grid-column:1 / -1;" data-status-log="${p.id}">
   ${renderStatusLog(p)}
+</div>
+
+<!-- NOTES (collapsed by default) -->
+<div class="detail-sec" style="grid-column:1 / -1;" data-pnotes="${p.id}">
+  ${renderProjectNotes(p)}
 </div>
 
 <!-- TASKS SECTION — split by phase -->
