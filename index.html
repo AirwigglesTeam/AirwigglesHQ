@@ -1304,6 +1304,21 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .dash-pgrid>.dash-grp-hd{color:var(--acc);font-size:.72rem;}
 .dash-pgrid>.dash-grp-hd span{color:var(--acc)!important;}
 .pcc-btns .ec-bookmark{display:inline-flex!important;}
+
+/* spacing + clearer tabs */
+.dash-top{margin-bottom:26px;}
+.dtabs{margin-bottom:14px;}
+.dtab{border-color:var(--border2,var(--border));background:var(--surface2);color:var(--text2);box-shadow:0 1px 0 rgba(0,0,0,.25);}
+.dtab:hover{background:var(--surface3);}
+.dtab[aria-expanded="true"]{background:var(--teal-dim);}
+.dash-quick{display:flex;flex-direction:column;align-items:flex-start;gap:12px;margin-bottom:28px;}
+.dq-links{display:flex;flex-direction:column;gap:8px;min-width:0;max-width:100%;}
+#dash-notes-wrap{align-self:stretch;margin:0;}
+.dash-main .dash-pgrid{gap:14px;}
+.dash-pgrid>.dash-grp-hd{margin:18px 0 0;}
+.dash-pgrid>.dash-grp-hd:first-child{margin-top:0;}
+[data-proj-sec]{margin:30px 0 8px!important;}
+.dash-row3{margin-top:32px;gap:16px;}
 </style>
 </head>
 <body>
@@ -5323,7 +5338,7 @@ function _dashOkrsHtml(){
     <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="dashOkrToggle()" role="button" aria-expanded="${window._dashOkrOpen!==false}"><span class="sec-lbl">Team Objectives</span><svg id="dash-okr-chev" class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${window._dashOkrOpen!==false?'':'transform:rotate(-90deg);'}"><polyline points="6 9 12 15 18 9"/></svg></div>
     <div style="display:flex;gap:5px;">
       <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'ns\')">+ North Star</button>
-      <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'yr\')">+ Yearly Goal</button>
+      <button class="btn btn-ghost btn-xs" onclick="showTeamInput(\'yr\')">+ Long-term Goal</button>
     </div>
   </div>
   <div id="dash-team-okr-body" style="display:${window._dashOkrOpen!==false?'block':'none'};">${renderTeamOkrs()}</div>
@@ -5339,12 +5354,10 @@ function _dashQuickHtml(){
   if(!links&&!notes)return'';
   const n=(S.quickNotes||[]).filter(x=>!x.org).length,open=!!window._dashNotesOpen;
   let h='<div class="dash-quick" id="dash-quick">';
-  if(links)h+='<span class="dq-lbl">Quick links</span><div class="ql-grid" style="margin:0;">'+(S.quickLinks||[]).map(_qlBtn).join('')+'<button class="ql-btn add-ql" onclick="openModal(\'quickLink\',null)">+ Add link</button></div>';
-  h+='<span class="dq-sp"></span>';
-  if(notes)h+='<button class="dtab dtab-sm" id="dash-notes-btn" aria-expanded="'+open+'" onclick="dashNotesToggle()">'+_dashChev(open)+'Notes'+(n?' <b>'+n+'</b>':'')+'</button>';
-  h+='</div>';
-  if(notes&&open)h+='<div style="margin:-6px 0 18px;" id="dash-notes-wrap">'+_quickNotesCardHtml()+'</div>';
-  return h;
+  if(notes)h+='<div class="dq-notes"><button class="dtab dtab-sm" id="dash-notes-btn" aria-expanded="'+open+'" onclick="dashNotesToggle()">'+_dashChev(open)+'Notes'+(n?' <b>'+n+'</b>':'')+'</button></div>';
+  if(notes&&open)h+='<div id="dash-notes-wrap">'+_quickNotesCardHtml()+'</div>';
+  if(links)h+='<div class="dq-links"><div class="dq-lbl">Quick links</div><div class="ql-grid" style="margin:0;">'+(S.quickLinks||[]).map(_qlBtn).join('')+'<button class="ql-btn add-ql" onclick="openModal(\'quickLink\',null)">+ Add link</button></div></div>';
+  return h+'</div>';
 }
 /* Rows of cards that fold from their header: My work, Due this week, Co-working */
 function dashFoldToggle(k){window._dashFoldOff=window._dashFoldOff||{};window._dashFoldOff[k]=!window._dashFoldOff[k];render();}
@@ -6182,7 +6195,6 @@ ${_dashQuickHtml()}
   <!-- ROW: My work, Due this week, Co-working (each folds) -->
   <div class="dash-row3">
 
-    ${_dsOn('mywork')?_dashFold('mw',_myWorkCardHtml()):''}
     <!-- Focus: due this week -->
     ${_dsOn('focus')?_dashFold('due',`<div class="card">
       <div class="card-hd"><span class="card-title">Due This Week</span>${mf?`<button class="btn btn-ghost btn-xs" onclick="S.activeMember=null;save();render()">✕ ${escHtml(getMember(mf)?.name||'')}</button>`:''}</div>
@@ -6205,6 +6217,7 @@ ${_dashQuickHtml()}
     </div>`):''}
 
 
+    ${_dsOn('mywork')?_dashFold('mw',_myWorkCardHtml()):''}
     ${_dsOn('cowork')?_dashFold('cw',_coworkCardHtml(mf)):''}
 
 
@@ -6295,7 +6308,7 @@ function renderTeamOkrs(){
 
   // Yearly Goals section
   html+='<div>';
-  html+='<div style="font-size:.64rem;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px;">◎ Yearly Goals</div>';
+  html+='<div style="font-size:.64rem;font-weight:700;color:var(--yellow);text-transform:uppercase;letter-spacing:.09em;margin-bottom:6px;">◎ Long-term Goals</div>';
   if(yr.length>0){
     html+=yr.map(y=>{
       return '<div style="display:flex;align-items:center;gap:8px;padding:6px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;margin-bottom:4px;">'
