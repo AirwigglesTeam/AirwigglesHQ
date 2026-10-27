@@ -1239,6 +1239,13 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
   .mcal-dots{display:flex;}
   .mcal-dow{padding:4px 0;font-size:.56rem;}
 }
+.mcal-chip[data-mcdrag],.mcal-trow[data-mcdrag]{cursor:grab;-webkit-user-select:none;user-select:none;-webkit-touch-callout:none;}
+.mcal-cell.drop{background:color-mix(in srgb,var(--acc) 22%,var(--surface));outline:2px dashed var(--acc);outline-offset:-2px;}
+.mcal-ghost{position:fixed;left:0;top:0;z-index:9999;pointer-events:none;background:var(--surface3);border:1px solid var(--acc);border-radius:6px;padding:3px 8px;font-size:.72rem;max-width:220px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;box-shadow:0 8px 24px rgba(0,0,0,.4);}
+body.mcal-dragging{cursor:grabbing;}
+body.mcal-dragging *{cursor:grabbing !important;}
+.mcal-mvw{position:relative;display:inline-flex;}
+.mcal-mv{position:absolute;left:0;top:0;width:1px;height:1px;opacity:0;pointer-events:none;}
 </style>
 </head>
 <body>
@@ -5526,7 +5533,7 @@ function mcCollect(sc,days){
 }
 function _mcChip(t,today){
   const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
-  return '<div class="mcal-chip'+(t.done?' done':'')+(over?' over':'')+'" data-task="'+t.id+'" title="'+escHtml(t.name)+'" onclick="event.stopPropagation();openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span>'+escHtml(t.name)+'</span></div>';
+  return '<div class="mcal-chip'+(t.done?' done':'')+(over?' over':'')+'" data-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' title="'+escHtml(t.name)+'" onclick="event.stopPropagation();openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span>'+escHtml(t.name)+'</span></div>';
 }
 function _mcDayDetail(iso,data,today,sc){
   const d=data[iso]||{tasks:[],cw:[],marks:[]};
@@ -5537,7 +5544,7 @@ function _mcDayDetail(iso,data,today,sc){
   d.marks.forEach(m=>{h+='<div class="mcal-row"><i style="background:'+(m.p.color||'var(--acc)')+'"></i> '+escHtml(m.p.name)+' '+(m.kind==='start'?'starts':'ends')+'</div>';});
   d.tasks.slice().sort((a,b)=>(a.done-b.done)||a.name.localeCompare(b.name)).forEach(t=>{
     const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
-    h+='<div class="mcal-row mcal-trow'+(t.done?' done':'')+'" data-task="'+t.id+'" onclick="openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span class="mcal-tn">'+escHtml(t.name)+'</span>'+(sc?'':'<span class="mcal-muted">'+escHtml(p?p.name:'')+'</span>')+(over?'<span class="mcal-late">overdue</span>':'')+((t.assignees||[]).length?'<span class="mcal-avs">'+(t.assignees||[]).slice(0,3).map(id=>avHtml(id,16)).join('')+'</span>':'')+'</div>';
+    h+='<div class="mcal-row mcal-trow'+(t.done?' done':'')+'" data-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' onclick="openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span class="mcal-tn">'+escHtml(t.name)+'</span>'+(sc?'':'<span class="mcal-muted">'+escHtml(p?p.name:'')+'</span>')+(over?'<span class="mcal-late">overdue</span>':'')+((t.assignees||[]).length?'<span class="mcal-avs">'+(t.assignees||[]).slice(0,3).map(id=>avHtml(id,16)).join('')+'</span>':'')+(t.done?'':'<span class="mcal-mvw" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-xs" onclick="mcPick(this)" title="Move to another date">Move</button><input type="date" class="mcal-mv" value="'+(t.endDate||t.startDate||'')+'" onchange="mcMove(\''+t.id+'\',this.value)" tabindex="-1" aria-label="New date"></span>')+'</div>';
   });
   return h+'</div>';
 }
@@ -5566,6 +5573,83 @@ function mcRefresh(sc){const e=document.querySelector('[data-mcal-host="'+(sc||'
 function mcNav(sc,dir){const s=_mcState(sc);let m=s.m+dir,y=s.y;if(m>11){m=0;y++;}if(m<0){m=11;y--;}s.m=m;s.y=y;mcRefresh(sc);}
 function mcToday(sc){const s=_mcState(sc);const t=_localToday();s.y=+t.slice(0,4);s.m=+t.slice(5,7)-1;s.sel=t;mcRefresh(sc);}
 function mcSel(sc,iso){_mcState(sc).sel=iso;mcRefresh(sc);}
+
+/* ── Rescheduling ──────────────────────────────────────────────
+   Dropping a task on a day (or choosing a date with the Move button) changes its date.
+   A task with a start AND an end date keeps its length: both dates shift by the same number of days. */
+function mcPick(btn){const i=btn.parentNode.querySelector('input');if(!i)return;try{if(i.showPicker)i.showPicker();else i.click();}catch(e){i.focus();i.click();}}
+function mcMove(id,iso){
+  const t=getTask(id);
+  if(!t||t.done||!/^\d{4}-\d{2}-\d{2}$/.test(iso||'')){return false;}
+  const q=_isoParts(iso);if(q[0]<2000||q[0]>2100||q[1]<1||q[1]>12||q[2]<1||q[2]>31||addMonthsISO(iso,0)!==iso)return false;   // rejects half-typed or impossible dates
+  const cur=t.endDate||t.startDate;if(!cur||cur===iso)return false;
+  const delta=Math.round((Date.parse(iso)-Date.parse(cur))/864e5);
+  saveWithUndo('Move task');
+  if(t.endDate){t.endDate=iso;if(t.startDate)t.startDate=addDays(t.startDate,delta);}
+  else t.startDate=iso;
+  save();
+  const lab=_updDate(iso);
+  showToast('Moved "'+(t.name.length>40?t.name.slice(0,40)+'…':t.name)+'" to '+lab+(t.recur&&t.recur.enabled?'. Future repeats follow the new date.':''),3200);
+  render();
+  return true;
+}
+let _mcDrag=null,_mcNoClick=0;
+function _mcDragEnd(){
+  if(!_mcDrag)return;
+  clearTimeout(_mcDrag.timer);
+  if(_mcDrag.ghost)_mcDrag.ghost.remove();
+  document.querySelectorAll('.mcal-cell.drop').forEach(c=>c.classList.remove('drop'));
+  document.body.classList.remove('mcal-dragging');
+  _mcDrag=null;
+}
+function _mcDragStart(){
+  const d=_mcDrag;if(!d||d.active)return;
+  const t=getTask(d.id);if(!t||t.done){_mcDragEnd();return;}
+  d.active=true;
+  const g=document.createElement('div');g.className='mcal-ghost';g.textContent=t.name;document.body.appendChild(g);d.ghost=g;
+  document.body.classList.add('mcal-dragging');
+  if(navigator.vibrate&&d.touch)try{navigator.vibrate(15);}catch(e){}
+  _mcDragMove(d.lx,d.ly);
+}
+function _mcCellAt(x,y){const n=document.elementFromPoint(x,y);return n&&n.closest?n.closest('.mcal-cell'):null;}
+function _mcDragMove(x,y){
+  const d=_mcDrag;if(!d||!d.active)return;
+  d.ghost.style.transform='translate('+(x+12)+'px,'+(y+12)+'px)';
+  const c=_mcCellAt(x,y);
+  document.querySelectorAll('.mcal-cell.drop').forEach(n=>{if(n!==c)n.classList.remove('drop');});
+  if(c)c.classList.add('drop');
+}
+document.addEventListener('pointerdown',e=>{
+  if(e.button>0||_mcDrag)return;
+  const n=e.target.closest&&e.target.closest('[data-mcdrag]');if(!n)return;
+  if(e.target.closest('input,button,select,textarea,a'))return;
+  _mcDrag={id:n.dataset.mcdrag,x:e.clientX,y:e.clientY,lx:e.clientX,ly:e.clientY,active:false,touch:e.pointerType==='touch',pid:e.pointerId,ghost:null,timer:0};
+  if(_mcDrag.touch)_mcDrag.timer=setTimeout(_mcDragStart,380);   // touch: press and hold to pick up, so normal scrolling still works
+},true);
+document.addEventListener('pointermove',e=>{
+  const d=_mcDrag;if(!d||e.pointerId!==d.pid)return;
+  d.lx=e.clientX;d.ly=e.clientY;
+  if(!d.active){
+    const moved=Math.hypot(e.clientX-d.x,e.clientY-d.y);
+    if(d.touch){if(moved>10)_mcDragEnd();}      // finger moved before the hold finished: it is a scroll, not a drag
+    else if(moved>5)_mcDragStart();
+    return;
+  }
+  e.preventDefault();_mcDragMove(e.clientX,e.clientY);
+},{passive:false});
+document.addEventListener('pointerup',e=>{
+  const d=_mcDrag;if(!d||e.pointerId!==d.pid)return;
+  if(d.active){
+    const c=_mcCellAt(e.clientX,e.clientY);const id=d.id;
+    _mcNoClick=Date.now();_mcDragEnd();
+    if(c&&c.dataset.iso)mcMove(id,c.dataset.iso);
+  }else _mcDragEnd();
+},true);
+document.addEventListener('pointercancel',e=>{if(_mcDrag&&e.pointerId===_mcDrag.pid)_mcDragEnd();},true);
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&_mcDrag){_mcNoClick=Date.now();_mcDragEnd();}});
+document.addEventListener('touchmove',e=>{if(_mcDrag&&_mcDrag.active&&e.cancelable)e.preventDefault();},{passive:false});   // once picked up, the finger moves the task, not the page
+document.addEventListener('click',e=>{if(Date.now()-_mcNoClick<80){e.stopPropagation();e.preventDefault();}},true);   // a drop must not also open the task
+document.addEventListener('contextmenu',e=>{if(_mcDrag&&_mcDrag.touch&&e.target.closest&&e.target.closest('[data-mcdrag]'))e.preventDefault();});
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
@@ -10401,7 +10485,7 @@ function projectModalHtml(id){
     <div id="pm-type-blurb" style="font-size:.7rem;color:var(--muted);margin-top:5px;">${PROJ_TYPES[defType].blurb}</div>
   </div>
   <div class="field"><label class="flbl">Name *</label><input class="inp" id="pm-name" value="${escHtml(defName)}" placeholder="Project name"></div>
-  <div class="field"><label class="flbl">Description</label><textarea class="txta" id="pm-desc">${defDesc}</textarea></div>
+  <div class="field"><label class="flbl">Description</label><textarea class="txta" id="pm-desc">${escHtml(defDesc)}</textarea></div>
   <div class="inp-row">
     <div class="field"><label class="flbl">Priority</label><select class="sel" id="pm-prio"><option value="" ${!defPrio?'selected':''}>— No Priority —</option>${PRIOS.map(pr=>`<option ${defPrio===pr?'selected':''}>${pr}</option>`).join('')}</select></div>
   </div>
@@ -11936,7 +12020,7 @@ function memberProfileModalHtml(id,tab){
         <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round">${f.icon}</svg>
         <label style="font-size:.75rem;font-weight:600;color:var(--text2);">${escHtml(f.label)}</label>
       </div>
-      <textarea class="txta" id="mp-${f.key}" style="min-height:56px;font-size:.78rem;resize:vertical;" placeholder="${f.placeholder}">${m[f.key]||''}</textarea>
+      <textarea class="txta" id="mp-${f.key}" style="min-height:56px;font-size:.78rem;resize:vertical;" placeholder="${f.placeholder}">${escHtml(m[f.key]||'')}</textarea>
     </div>`).join('')}
   </div>
 
@@ -12309,7 +12393,7 @@ function prizeDeliveryModalHtml(data){
       <!-- Activation instructions -->
       ${(prod.fulfillType||'code')==='code'?`<div>
         <div style="font-size:.7rem;font-weight:600;color:var(--muted);text-transform:uppercase;letter-spacing:.05em;margin-bottom:5px;">Activation instructions</div>
-        <textarea class="txta" style="min-height:44px;font-size:.75rem;" placeholder="e.g. Log in at boomlibrary.com/product-registration/ and enter your code" onchange="pdUpdateInstr('${p.id}','${s.id}',${pi},this.value)">${prod.activationInstructions||profileProd.activationInstructions||''}</textarea>
+        <textarea class="txta" style="min-height:44px;font-size:.75rem;" placeholder="e.g. Log in at boomlibrary.com/product-registration/ and enter your code" onchange="pdUpdateInstr('${p.id}','${s.id}',${pi},this.value)">${escHtml(prod.activationInstructions||profileProd.activationInstructions||'')}</textarea>
       </div>`:''}
     </div>`;
   }).join('')}
