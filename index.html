@@ -5511,7 +5511,7 @@ function mcGridDays(y,m){
 function mcCollect(sc,days){
   const lo=days[0],hi=days[days.length-1];
   const by={};const at=d=>by[d]||(by[d]={tasks:[],cw:[],marks:[]});
-  const mf=S.activeMember;
+  const mf=sc?null:S.activeMember;   // the 'my view' member filter belongs to the dashboard; a project page shows the whole project
   const projs=sc?[getProject(sc)].filter(Boolean):S.projects.filter(p=>p.status==='active');
   const pids=new Set(projs.map(p=>p.id));
   S.tasks.forEach(t=>{
@@ -5650,6 +5650,16 @@ document.addEventListener('keydown',e=>{if(e.key==='Escape'&&_mcDrag){_mcNoClick
 document.addEventListener('touchmove',e=>{if(_mcDrag&&_mcDrag.active&&e.cancelable)e.preventDefault();},{passive:false});   // once picked up, the finger moves the task, not the page
 document.addEventListener('click',e=>{if(Date.now()-_mcNoClick<80){e.stopPropagation();e.preventDefault();}},true);   // a drop must not also open the task
 document.addEventListener('contextmenu',e=>{if(_mcDrag&&_mcDrag.touch&&e.target.closest&&e.target.closest('[data-mcdrag]'))e.preventDefault();});
+
+/* ── Inside event / project / admin pages: collapsed by default, scoped to that project ── */
+function renderProjectCalendar(p){
+  const open=!!(window._pcOpen&&window._pcOpen[p.id]);
+  return '<div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;cursor:pointer;user-select:none;" data-pcal-hd="'+p.id+'" onclick="pcToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
+    +'<span style="font-size:.6rem;color:var(--muted);display:inline-block;'+(open?'':'transform:rotate(-90deg);')+'">&#9662;</span>Calendar'
+    +'<span style="font-size:.62rem;color:var(--muted);font-weight:400;">tasks and co-working days by month</span></div>'
+    +(open?'<div class="card"><div class="card-bd" data-mcal-host="'+p.id+'">'+renderMonthCal(p.id)+'</div></div>':'');
+}
+function pcToggle(pid){window._pcOpen=window._pcOpen||{};window._pcOpen[pid]=!window._pcOpen[pid];const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectCalendar(p);else render();}
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
@@ -7592,6 +7602,11 @@ ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style
 <!-- NOTES (collapsed by default) -->
 <div class="detail-sec" style="grid-column:1 / -1;" data-pnotes="${p.id}">
   ${renderProjectNotes(p)}
+</div>
+
+<!-- CALENDAR (collapsed by default) -->
+<div class="detail-sec" style="grid-column:1 / -1;" data-pcal="${p.id}">
+  ${renderProjectCalendar(p)}
 </div>
 
 <!-- TASKS SECTION — split by phase -->
