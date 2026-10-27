@@ -1336,6 +1336,20 @@ body.mcal-dragging *{cursor:grabbing !important;}
 @media(max-width:860px){.dash-pgrid{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:560px){.dash-pgrid{grid-template-columns:minmax(0,1fr);}}
 .dash-main .dash-pgrid{gap:12px;}
+
+/* v66: category columns (Events | Ongoing | Projects | Admin), cards stacked inside each column */
+.dash-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:16px;align-items:start;}
+.dash-col{min-width:0;margin:0!important;}
+.dash-col-hd{display:flex;align-items:center;gap:8px;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border);cursor:pointer;user-select:none;}
+.dash-col[data-proj-col] .dash-col-hd{cursor:default;}
+.dash-col-lbl{font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);}
+.dash-col-n{font-size:.68rem;color:var(--muted);}
+.dash-col .dash-pgrid,.dash-main .dash-col .dash-pgrid{grid-template-columns:minmax(0,1fr);gap:10px;}
+.dash-col .dash-crow{flex-wrap:wrap;row-gap:2px;padding:7px 10px;}
+.dash-col .dash-crow-dt{display:none;}
+.dash-col .pcc-r3{row-gap:6px;}
+@media(max-width:1100px){.dash-cols{grid-template-columns:repeat(2,minmax(0,1fr));}}
+@media(max-width:600px){.dash-cols{grid-template-columns:minmax(0,1fr);}}
 </style>
 </head>
 <body>
@@ -6191,19 +6205,20 @@ ${_dashQuickHtml()}
       }
       return _card(p,_pre);
       }).join('');
-      const _sec=_other.map(([t,items])=>{
+      /* Category columns: Events | Ongoing | Projects | Admin side by side, cards stacked inside each column */
+      const _colHd=(t,label,n,off)=>`<div class="dash-col-hd" ${t==='event'?'':`onclick="projSecToggle('${t}')" `}>
+          ${t==='event'?'':`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .15s;transform:rotate(${off?-90:0}deg);"><polyline points="6 9 12 15 18 9"/></svg>`}
+          <span class="dash-col-lbl">${label}</span><span class="dash-col-n">${n}</span>
+          <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="event.stopPropagation();newProjOfType('${t}')">+ New</button>
+        </div>`;
+      const _cols=[];
+      if(filtered.length)_cols.push(`<div class="dash-col" data-proj-col="event">${_colHd('event','Events',filtered.length,false)}<div class="dash-pgrid">${_out}</div></div>`);
+      _other.forEach(([t,items])=>{
         const off=!!(window._projSecOff||{})[t];
-        return`<div style="margin:18px 0 6px;" data-proj-sec="${t}">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;cursor:pointer;" onclick="projSecToggle('${t}')">
-            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .15s;transform:rotate(${off?-90:0}deg);"><polyline points="6 9 12 15 18 9"/></svg>
-            <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">${PROJ_TYPES[t].plural}</span>
-            <span style="font-size:.68rem;color:var(--muted);">${items.length}</span>
-            <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="event.stopPropagation();newProjOfType('${t}')">+ New</button>
-          </div>
-          ${off?'':'<div class="dash-pgrid">'+items.map(p=>_card(p,'')).join('')+'</div>'}
-        </div>`;}).join('');
+        _cols.push(`<div class="dash-col" data-proj-sec="${t}">${_colHd(t,PROJ_TYPES[t].plural,items.length,off)}${off?'':'<div class="dash-pgrid">'+items.map(p=>_card(p,'')).join('')+'</div>'}</div>`);
+      });
       const _add=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:.7rem;color:var(--muted);" data-proj-add="1">Add:${Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>`<button class="btn btn-ghost btn-xs" onclick="newProjOfType('${t}')">+ ${PROJ_TYPES[t].label}</button>`).join('')}</div>`;
-      return '<div class="dash-pgrid">'+_out+'</div>'+_sec+_add;
+      return '<div class="dash-cols" style="--n:'+Math.min(4,_cols.length||1)+'">'+_cols.join('')+'</div>'+_add;
 
     })()}
   </div>
