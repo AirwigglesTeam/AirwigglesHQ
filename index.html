@@ -5675,6 +5675,112 @@ function renderProjectCalendar(p){
     +(open?'<div class="card"><div class="card-bd" data-mcal-host="'+p.id+'">'+renderMonthCal(p.id)+'</div></div>':'');
 }
 function pcToggle(pid){window._pcOpen=window._pcOpen||{};window._pcOpen[pid]=!window._pcOpen[pid];const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectCalendar(p);else render();}
+/* ════ EXPANDED TEAM SECTION ════
+   A full-width view of the whole team on the dashboard: workload distribution, capacity, and one card per person.
+   Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
+function teamExpandToggle(){window._teamExp=!window._teamExp;render();}
+function _tmFmt(n){return (Math.round(n*10)/10).toString();}
+/* Numbers for one person. Counts open work in active projects, the same rule the dashboard Team card uses. */
+function teamStats(m,today){
+  const act=new Set(S.projects.filter(p=>p.status==='active').map(p=>p.id));
+  const mine=S.tasks.filter(t=>!t.done&&act.has(t.projectId)&&(t.assignees||[]).includes(m.id));
+  const wk=addDays(today,7);
+  const byProj={};mine.forEach(t=>{byProj[t.projectId]=(byProj[t.projectId]||0)+1;});
+  const log=m.timeLog||[];const yr=today.slice(0,4);
+  const sum=a=>a.reduce((n,e)=>n+(parseFloat(e.hours)||0),0);
+  const since=addDays(today,-27);
+  const held=(S.coworkDays||[]).filter(c=>c.date&&c.date.startsWith(yr)&&c.date<=today);
+  const okrs=(m.okrs||[]).map(o=>({id:o.id,objective:o.objective||'',done:(o.keyResults||[]).filter(k=>k.done).length,total:(o.keyResults||[]).length,krs:o.keyResults||[]}));
+  const target=m.hoursPerWeek>0?m.hoursPerWeek:0;
+  const hours28=sum(log.filter(e=>e.date>=since&&e.date<=today));
+  const st={
+    open:mine.length,
+    overdue:mine.filter(t=>t.endDate&&t.endDate<today).length,
+    dueWeek:mine.filter(t=>t.endDate&&t.endDate>=today&&t.endDate<=wk).length,
+    done:S.tasks.filter(t=>t.done&&(t.assignees||[]).includes(m.id)).length,   // tasks don't record when they were finished, so this is all-time
+    byProject:Object.entries(byProj).map(([id,n])=>({p:getProject(id),n})).filter(x=>x.p).sort((a,b)=>b.n-a.n),
+    hoursYear:sum(log.filter(e=>String(e.date||'').startsWith(yr))),
+    hours28,avgWeek:hours28/4,target,
+    cwAttended:held.filter(c=>(c.members||[]).includes(m.id)).length,cwHeld:held.length,
+    okrs,resp:memResponsibilities(m)
+  };
+  st.attention=[];
+  if(st.overdue)st.attention.push({t:st.overdue+' overdue',red:true});
+  if(!st.open)st.attention.push({t:'No open tasks'});
+  if(!okrs.length)st.attention.push({t:'No objectives set'});
+  if(!st.resp.length)st.attention.push({t:'No areas set'});
+  if(!target)st.attention.push({t:'No hours per week set'});
+  return st;
+}
+function teamSummary(today){
+  const act=new Set(S.projects.filter(p=>p.status==='active').map(p=>p.id));
+  const stats=S.members.map(m=>({m,s:teamStats(m,today)}));
+  return{stats,
+    unassigned:S.tasks.filter(t=>!t.done&&act.has(t.projectId)&&!(t.assignees||[]).length).length,
+    totalOpen:stats.reduce((n,x)=>n+x.s.open,0),
+    capacity:stats.reduce((n,x)=>n+x.s.target,0),
+    logged:stats.reduce((n,x)=>n+x.s.avgWeek,0)};
+}
+function _tmAv(m,sz){return m.photoUrl?'<img src="'+escHtml(m.photoUrl)+'" style="width:'+sz+'px;height:'+sz+'px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="">':'<div class="av" style="width:'+sz+'px;height:'+sz+'px;background:'+escHtml(m.color)+';font-size:'+(sz*.38)+'px;flex-shrink:0;">'+escHtml(m.initials)+'</div>';}
+function _tmLbl(t){return '<div style="font-size:.64rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;margin:12px 0 6px;">'+t+'</div>';}
+function _tmBar(pct,color,over){return '<div class="ec-prog" style="flex:1;min-width:60px;position:relative;"><div class="ec-prog-fill" style="width:'+Math.max(0,Math.min(100,pct))+'%;background:'+color+';"></div>'+(over?'<div class="ec-prog-fill" style="position:absolute;left:0;top:0;height:100%;width:'+Math.max(0,Math.min(100,over))+'%;background:var(--red);"></div>':'')+'</div>';}
+function tmMotivToggle(id){window._tmOpen=window._tmOpen||{};window._tmOpen[id]=!window._tmOpen[id];render();}
+function _tmCard(m,s,idx,n){
+  const open=!!(window._tmOpen&&window._tmOpen[m.id]);
+  const lists=MEM_FIELDS.map(f=>[f,memListItems(m,f.key)]).filter(x=>x[1].length);
+  let h='<div class="mcard" data-team-member="'+escHtml(m.id)+'">';
+  h+='<div class="mcard-top" style="margin-bottom:8px;"><div style="cursor:pointer;" onclick="openMemberProfile(\''+m.id+'\')" title="Open profile">'+_tmAv(m,44)+'</div>'
+   +'<div style="flex:1;min-width:0;"><div style="font-size:1rem;font-weight:700;">'+escHtml(m.name)+'</div>'
+   +'<div style="font-size:.7rem;color:var(--muted);margin-top:2px;">'+(m.isDirector?'Director · ':'')+(s.target?_tmFmt(s.target)+' h/week':'No hours per week set')+'</div></div>'
+   +'<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-ghost btn-xs" onclick="openMemberProfile(\''+m.id+'\')">Info</button><button class="btn btn-ghost btn-xs" onclick="openModal(\'memberTime\',\''+m.id+'\')">+ Log hours</button><button class="btn btn-ghost btn-xs" onclick="filterMemberAndExpand(\''+m.id+'\')" title="Filter the dashboard to this person">Focus</button></div></div>';
+  if(s.attention.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">'+s.attention.map(a=>'<span style="font-size:.62rem;font-weight:600;padding:1px 8px;border-radius:10px;background:'+(a.red?'color-mix(in srgb,var(--red) 18%,transparent)':'var(--surface2)')+';color:'+(a.red?'var(--red)':'var(--muted)')+';">'+escHtml(a.t)+'</span>').join('')+'</div>';
+  h+=_tmLbl('Areas &amp; responsibilities')+(s.resp.length?'<div style="display:flex;gap:5px;flex-wrap:wrap;">'+s.resp.map(r=>'<span style="font-size:.7rem;padding:2px 9px;border-radius:10px;background:var(--teal-dim);color:var(--acc);">'+escHtml(r.text)+'</span>').join('')+'</div>':'<div style="font-size:.74rem;color:var(--muted);">None set yet.</div>');
+  h+=_tmLbl('Workload')+'<div class="mcard-stats">'
+   +'<div class="mstat"><div class="mstat-val">'+s.open+'</div><div class="mstat-lbl">Open</div></div>'
+   +'<div class="mstat"><div class="mstat-val" style="'+(s.overdue?'color:var(--red);':'')+'">'+s.overdue+'</div><div class="mstat-lbl">Overdue</div></div>'
+   +'<div class="mstat"><div class="mstat-val">'+s.dueWeek+'</div><div class="mstat-lbl">Due this week</div></div></div>';
+  if(s.byProject.length)h+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">'+s.byProject.slice(0,5).map(x=>'<div style="display:flex;align-items:center;gap:7px;font-size:.72rem;cursor:pointer;" onclick="openDetail(\''+x.p.id+'\')"><span style="width:8px;height:8px;border-radius:50%;background:'+escHtml(x.p.color||'var(--acc)')+';flex-shrink:0;"></span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(x.p.name)+'</span><span style="font-family:\'DM Mono\',monospace;color:var(--muted);">'+x.n+'</span></div>').join('')+(s.byProject.length>5?'<div style="font-size:.64rem;color:var(--muted);">+'+(s.byProject.length-5)+' more projects</div>':'')+'</div>';
+  h+=_tmLbl('Hours &amp; co-working')+'<div class="mcard-stats">'
+   +'<div class="mstat"><div class="mstat-val" style="color:var(--yellow);">'+_tmFmt(s.hoursYear)+'h</div><div class="mstat-lbl">Logged this year</div></div>'
+   +'<div class="mstat"><div class="mstat-val">'+_tmFmt(s.avgWeek)+'h</div><div class="mstat-lbl">Per week (4 wks)</div></div>'
+   +'<div class="mstat"><div class="mstat-val" style="color:var(--purple);">'+s.cwAttended+'<span style="font-size:.7rem;color:var(--muted);font-weight:500;"> / '+s.cwHeld+'</span></div><div class="mstat-lbl">Co-working days</div></div></div>';
+  h+=_tmLbl('Objectives &amp; key results');
+  h+=s.okrs.length?s.okrs.map(o=>'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:.62rem;color:var(--acc);">◈</span><span style="flex:1;font-size:.78rem;font-weight:600;min-width:0;">'+escHtml(o.objective)+'</span>'+(o.total?'<span style="font-family:\'DM Mono\',monospace;font-size:.66rem;color:var(--muted);">'+o.done+'/'+o.total+'</span>':'')+'</div>'
+     +(o.total?'<div style="display:flex;margin-top:5px;">'+_tmBar(o.done/o.total*100,'var(--acc)')+'</div>':'')
+     +o.krs.map(k=>'<div style="display:flex;gap:6px;font-size:.72rem;margin-top:4px;color:'+(k.done?'var(--muted)':'var(--text2)')+';"><span style="color:var(--acc);">'+(k.done?'✓':'→')+'</span><span style="'+(k.done?'text-decoration:line-through;':'')+'">'+escHtml(k.text)+'</span></div>').join('')+'</div>').join('')
+    :'<div style="font-size:.74rem;color:var(--muted);">No objectives set yet.</div>';
+  if(lists.length){
+    h+='<div style="display:flex;align-items:center;gap:10px;margin-top:12px;cursor:pointer;" onclick="tmMotivToggle(\''+m.id+'\')" role="button" aria-expanded="'+open+'"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg><span style="font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Motivations &amp; aspirations</span></div>';
+    if(open)h+='<div data-tm-motiv="'+escHtml(m.id)+'" style="margin-top:8px;">'+lists.map(x=>'<div style="margin-bottom:8px;"><div style="display:flex;align-items:center;gap:6px;margin-bottom:3px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linecap="round">'+x[0].icon+'</svg><span style="font-size:.72rem;font-weight:600;color:var(--text2);">'+escHtml(x[0].label)+'</span></div>'+x[1].map(it=>'<div style="font-size:.74rem;padding-left:18px;margin-bottom:2px;">• '+escHtml(it.text)+'</div>').join('')+'</div>').join('')+'</div>';
+  }
+  h+='<div style="display:flex;justify-content:flex-end;gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border2);"><button class="reorder-arrow" onclick="reorderMember(\''+m.id+'\',-1)" title="Move earlier" '+(idx===0?'disabled':'')+'>◀</button><button class="reorder-arrow" onclick="reorderMember(\''+m.id+'\',1)" title="Move later" '+(idx===n-1?'disabled':'')+'>▶</button></div>';
+  return h+'</div>';
+}
+function renderTeam(){
+  const today=_localToday();const sum=teamSummary(today);
+  const maxOpen=Math.max(1,...sum.stats.map(x=>x.s.open));
+  let h='<div style="margin-bottom:18px;" id="dash-team-expanded"><div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;gap:8px;flex-wrap:wrap;"><div class="sec-hd" style="margin-bottom:0;"><span class="sec-lbl">Team</span></div><span style="display:flex;gap:6px;"><button class="btn btn-ghost btn-xs" onclick="teamExpandToggle()">Collapse</button><button class="btn btn-acc btn-xs" onclick="openModal(\'member\',null)">+ Add member</button></span></div>';
+  if(!S.members.length)return h+'<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.8rem;">No team members yet.</div></div></div>';
+  // workload + capacity
+  h+='<div class="card" style="margin-bottom:14px;"><div class="card-hd"><span class="card-title">Workload distribution</span><span style="font-size:.66rem;color:var(--muted);">open tasks in active projects</span></div><div class="card-bd" id="tm-dist">';
+  sum.stats.forEach(x=>{
+    const share=sum.totalOpen?Math.round(x.s.open/sum.totalOpen*100):0;
+    h+='<div class="tm-row" data-tm-row="'+escHtml(x.m.id)+'" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="display:flex;align-items:center;gap:8px;width:150px;min-width:110px;">'+_tmAv(x.m,22)+'<span style="font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(x.m.name)+'</span></span>'
+      +_tmBar(x.s.open/maxOpen*100,'var(--acc)',x.s.overdue/maxOpen*100)
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:.68rem;color:var(--text2);min-width:0;margin-left:auto;text-align:right;">'+x.s.open+' open'+(x.s.overdue?' · <span style="color:var(--red);">'+x.s.overdue+' overdue</span>':'')+' · '+share+'%</span></div>';
+  });
+  h+='<div style="font-size:.7rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:8px;">'+(sum.unassigned?'<span style="color:var(--yellow);">'+sum.unassigned+' open task'+(sum.unassigned===1?'':'s')+' with nobody assigned</span>':'Every open task has an owner')+' · '+sum.totalOpen+' assignments across the team</div></div></div>';
+  h+='<div class="card" style="margin-bottom:14px;"><div class="card-hd"><span class="card-title">Capacity</span><span style="font-size:.66rem;color:var(--muted);">hours logged per week (last 4 weeks) against hours per week</span></div><div class="card-bd" id="tm-cap">';
+  sum.stats.forEach(x=>{
+    const t=x.s.target,a=x.s.avgWeek;
+    h+='<div class="tm-row" data-tm-cap="'+escHtml(x.m.id)+'" style="display:flex;align-items:center;gap:10px;margin-bottom:8px;flex-wrap:wrap;"><span style="display:flex;align-items:center;gap:8px;width:150px;min-width:110px;">'+_tmAv(x.m,22)+'<span style="font-size:.78rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(x.m.name)+'</span></span>'
+      +(t?_tmBar(a/t*100,a>t*1.1?'var(--yellow)':'var(--acc)'):'<div style="flex:1;min-width:60px;font-size:.68rem;color:var(--muted);">No hours per week set</div>')
+      +'<span style="font-family:\'DM Mono\',monospace;font-size:.68rem;color:var(--text2);min-width:0;margin-left:auto;text-align:right;">'+_tmFmt(a)+'h'+(t?' of '+_tmFmt(t)+'h':'')+'</span></div>';
+  });
+  h+='<div style="font-size:.7rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:8px;">Team: '+_tmFmt(sum.logged)+'h logged per week'+(sum.capacity?' of '+_tmFmt(sum.capacity)+'h expected':'')+'</div></div></div>';
+  h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:14px;align-items:start;">'+sum.stats.map((x,i)=>_tmCard(x.m,x.s,i,sum.stats.length)).join('')+'</div></div>';
+  return h;
+}
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
@@ -5813,7 +5919,8 @@ ${(active.length>0&&_dsOn('timeline'))?`<div style="margin-bottom:18px;">
 </div>`:''}
 
 <!-- TEAM OBJECTIVES + TEAM (two columns on wide screens, stacked on narrow ones) -->
-${(_dsOn('okrs')||_dsOn('team'))?`<div class="dash-okr-team${_dsOn('okrs')&&_dsOn('team')?' two':''}">
+${(_dsOn('team')&&window._teamExp)?renderTeam():''}
+${(!(_dsOn('team')&&window._teamExp)&&(_dsOn('okrs')||_dsOn('team')))?`<div class="dash-okr-team${_dsOn('okrs')&&_dsOn('team')?' two':''}">
   ${_dsOn('okrs')?`<div style="margin-bottom:18px;" id="dash-team-okrs">
   <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
     <div class="sec-hd" style="cursor:pointer;margin-bottom:0;" onclick="dashOkrToggle()" role="button" aria-expanded="${window._dashOkrOpen!==false}"><span class="sec-lbl">Team Objectives</span><svg id="dash-okr-chev" class="sec-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;${window._dashOkrOpen!==false?'':'transform:rotate(-90deg);'}"><polyline points="6 9 12 15 18 9"/></svg></div>
@@ -5827,7 +5934,7 @@ ${(_dsOn('okrs')||_dsOn('team'))?`<div class="dash-okr-team${_dsOn('okrs')&&_dsO
   ${_dsOn('team')?`<div id="dash-team-col" style="min-width:0;"><div class="card">
       <div class="card-hd">
         <span class="card-title">Team</span>
-        <button class="btn btn-acc btn-xs" onclick="openModal('member',null)" style="font-size:.68rem;">+ Add member</button>
+        <span style="display:flex;gap:6px;"><button class="btn btn-ghost btn-xs" onclick="teamExpandToggle()" title="Workload, hours, co-working and objectives for everyone" style="font-size:.68rem;">Expand</button><button class="btn btn-acc btn-xs" onclick="openModal('member',null)" style="font-size:.68rem;">+ Add member</button></span>
       </div>
       <div class="card-bd">
         ${S.members.length===0?`<div style="color:var(--muted);font-size:.78rem;padding:4px 0;">No members yet.</div>`:''}
@@ -8184,50 +8291,6 @@ function renderCoworkRow(totalW){
 }
 
 /* ════ TEAM ════ */
-function renderTeam(){
-  return`<div class="fu"><div class="page-hd"><div class="page-title">Team</div><button class="btn btn-acc btn-sm" onclick="openModal('member',null)">+ Add Member</button></div>
-${S.members.length===0?`<div class="empty"><div class="empty-ico">${ICO.users}</div><div class="empty-txt">No team members yet.</div></div>`:
-`<div class="member-grid">${S.members.map(m=>{
-  const hours=memberHoursTotal(m);
-  const activeProjs=S.projects.filter(p=>p.status==='active'&&S.tasks.some(t=>t.projectId===p.id&&(t.assignees||[]).includes(m.id)));
-  const completedProjs=S.projects.filter(p=>p.status==='completed'&&S.tasks.some(t=>t.projectId===p.id&&(t.assignees||[]).includes(m.id)));
-  const ownedProjs=S.projects.filter(p=>p.ownerId===m.id);
-  const activeTasks=S.tasks.filter(t=>(t.assignees||[]).includes(m.id)&&!t.done&&!t.parentId);
-  const doneTasks=S.tasks.filter(t=>(t.assignees||[]).includes(m.id)&&t.done);
-  const mi=S.members.findIndex(x=>x.id===m.id);
-  const _mi=S.members.indexOf(m);
-  return`<div class="mcard mcard-dnd" data-member-id="${m.id}" style="position:relative;">
-<div class="mcard-top">
-  <div onclick="filterByMember('${m.id}');nav('dashboard');" style="cursor:pointer;" title="View on dashboard">
-  ${m.photoUrl?`<img src="${escHtml(m.photoUrl)}" style="width:44px;height:44px;border-radius:50%;object-fit:cover;flex-shrink:0;" alt="${escHtml(m.name)}">`:`<div class="av" style="width:44px;height:44px;background:${m.color};font-size:.9rem;flex-shrink:0;">${escHtml(m.initials)}</div>`}
-  </div>
-  <div style="flex:1;min-width:0;">
-    <div style="font-size:1rem;font-weight:700;">${escHtml(m.name)}</div>
-    <div style="font-size:.7rem;color:var(--muted);margin-top:2px;">${hours.toFixed(1)} hours logged</div>
-    <button class="btn btn-ghost btn-xs" style="margin-top:6px;" onclick="openModal('memberTime','${m.id}')">+ Log hours</button>
-  </div>
-  <div style="display:flex;gap:5px;">
-    <button class="btn btn-ghost btn-xs" onclick="openModal('member','${m.id}')">Edit</button>
-    <button class="btn btn-danger btn-xs" onclick="deleteMember('${m.id}')">×</button>
-  </div>
-</div>
-<div class="mcard-stats">
-  <div class="mstat" style="cursor:pointer;" onclick="filterByMember('${m.id}');nav('dashboard');" title="View projects on dashboard"><div class="mstat-val">${activeProjs.length}</div><div class="mstat-lbl">Projects ↗</div></div>
-  <div class="mstat"><div class="mstat-val">${completedProjs.length}</div><div class="mstat-lbl">Completed</div></div>
-  <div class="mstat"><div class="mstat-val">${ownedProjs.length}</div><div class="mstat-lbl">Owned</div></div>
-  <div class="mstat" style="cursor:pointer;" onclick="filterByMember('${m.id}');nav('dashboard');" title="View tasks on dashboard"><div class="mstat-val">${activeTasks.length}</div><div class="mstat-lbl">Tasks ↗</div></div>
-  <div class="mstat"><div class="mstat-val">${doneTasks.length}</div><div class="mstat-lbl">Done</div></div>
-  <div class="mstat" style="cursor:pointer;" onclick="openMemberHoursBreakdown('${m.id}')" title="View time breakdown"><div class="mstat-val" style="font-size:.9rem;color:var(--yellow);">${hours.toFixed(1)}h</div><div class="mstat-lbl">Hours ↗</div></div>
-</div>
-${m.timeLog&&m.timeLog.length>0?`<div class="mcard-foot"><div style="font-size:.65rem;color:var(--muted);width:100%;">Recent: ${m.timeLog.slice(-3).map(e=>`${e.hours}h ${e.projectId?getProject(e.projectId)?.name||'':''} (${fmtD(e.date)})`).join(' · ')}</div></div>`:''}
-<div style="display:flex;justify-content:flex-end;gap:4px;margin-top:10px;padding-top:8px;border-top:1px solid var(--border2);">
-  <button class="reorder-arrow" onclick="reorderMember('${m.id}',-1)" title="Move left" ${_mi===0?'disabled':''}>◀</button>
-  <button class="reorder-arrow" onclick="reorderMember('${m.id}',1)" title="Move right" ${_mi===S.members.length-1?'disabled':''}>▶</button>
-</div>
-</div>`;}).join('')}</div>`}
-</div>`;
-}
-
 /* ════ LABELS ════ */
 function renderLabels(){
   return`<div class="fu">
@@ -12005,7 +12068,14 @@ function openMemberProfile(id,tab){
    The five 'Motivations & Aspirations' answers used to be one block of text each (m.motivWhy …). They are now lists of items
    (m.motivWhyItems …). Nothing is rewritten up front: until someone saves the profile, the old text is split into items on the fly
    with deterministic ids (so two people opening it at once derive the same items, never duplicates). The old text is kept as-is. */
-const MEM_LIST_KEYS=['motivWhy','motivWant','motivTravel','motivExperiences','motivProducts'];
+const MEM_FIELDS=[
+    {key:'motivWhy',label:'Why am I doing this?',placeholder:'What drives your involvement with Airwiggles…',icon:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'},
+    {key:'motivWant',label:'What do I want to get out of it?',placeholder:'Skills, connections, opportunities…',icon:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'},
+    {key:'motivTravel',label:'Where would I like to travel?',placeholder:'Places, events, conferences…',icon:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'},
+    {key:'motivExperiences',label:'What experiences would I like to have?',placeholder:'Collaborations, events, milestones…',icon:'<path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'},
+    {key:'motivProducts',label:'What products would I like to get?',placeholder:'Software, gear, tools, prizes…',icon:'<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>'},
+];
+const MEM_LIST_KEYS=MEM_FIELDS.map(f=>f.key);
 function memLines(txt){return String(txt||'').split(/\r?\n/).map(l=>l.replace(/^\s*(?:[-•*·]|\d+[.)])\s+/,'').trim()).filter(Boolean);}
 function memListItems(m,key){
   const a=m[key+'Items'];
@@ -12047,13 +12117,7 @@ function memberProfileModalHtml(id,tab){
   const activeProjs=[...new Set(activeTasks.map(t=>t.projectId))].map(pid=>getProject(pid)).filter(Boolean);
   const recentLog=(m.timeLog||[]).slice(-5).reverse();
 
-  const motFields=[
-    {key:'motivWhy',label:'Why am I doing this?',placeholder:'What drives your involvement with Airwiggles…',icon:'<circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/>'},
-    {key:'motivWant',label:'What do I want to get out of it?',placeholder:'Skills, connections, opportunities…',icon:'<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>'},
-    {key:'motivTravel',label:'Where would I like to travel?',placeholder:'Places, events, conferences…',icon:'<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/>'},
-    {key:'motivExperiences',label:'What experiences would I like to have?',placeholder:'Collaborations, events, milestones…',icon:'<path d="M18 8h1a4 4 0 010 8h-1"/><path d="M2 8h16v9a4 4 0 01-4 4H6a4 4 0 01-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/>'},
-    {key:'motivProducts',label:'What products would I like to get?',placeholder:'Software, gear, tools, prizes…',icon:'<polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/>'},
-  ];
+  const motFields=MEM_FIELDS;
 
   setTimeout(mpAutoAll,40);
   return`<div class="mo-box mo-wide" style="max-width:620px;">
