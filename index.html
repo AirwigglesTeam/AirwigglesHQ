@@ -5233,7 +5233,7 @@ function _renderImpl(){
   if(!c)return;
   hideBlockTooltip();
   const _scrollY=c.scrollTop; // save scroll before re-render
-  if(S.detailId){c.innerHTML=renderDetail(S.detailId);initBlockedHover();return;}
+  if(S.detailId){c.innerHTML=renderDetail(S.detailId);initBlockedHover();setTimeout(scrollProjGantts,30);return;}
   switch(V){
     case'dashboard':try{c.innerHTML=renderDash();}catch(e){console.error('Dashboard error:',e);c.innerHTML=`<div class='fu'><div class='page-hd'><div class='page-title'><em>Dashboard</em></div></div><div class='empty'><div class='empty-ico'><svg width="28" height="28" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round" style="opacity:.35"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg></div><div class='empty-txt'>Error loading dashboard: ${escHtml(e.message)}</div></div></div>`;}setTimeout(()=>{scrollGanttToday();initCoworkTooltips();},60);break;
     
@@ -5660,12 +5660,14 @@ function mcGridDays(y,m){
 function mcCollect(sc,days){
   const lo=days[0],hi=days[days.length-1];
   const by={};const at=d=>by[d]||(by[d]={tasks:[],cw:[],marks:[]});
-  const mf=sc?null:S.activeMember;   // the 'my view' member filter belongs to the dashboard; a project page shows the whole project
-  const projs=sc?[getProject(sc)].filter(Boolean):S.projects.filter(p=>p.status==='active');
+  const cf=sc==='camp'?(S.campaignFilter||{}):null;   // the Campaign board has its own project / phase / member filters
+  const mf=cf?(cf.member||null):(sc?null:S.activeMember);   // the 'my view' member filter belongs to the dashboard; a project page shows the whole project
+  const projs=cf?S.projects.filter(p=>p.status==='active'&&(!cf.project||p.id===cf.project)):(sc?[getProject(sc)].filter(Boolean):S.projects.filter(p=>p.status==='active'));
   const pids=new Set(projs.map(p=>p.id));
   S.tasks.forEach(t=>{
     if(!pids.has(t.projectId))return;
     if(mf&&!(t.assignees||[]).includes(mf))return;
+    if(cf&&cf.phase&&t.phase!==cf.phase)return;
     const d=t.endDate||t.startDate;if(!d||d<lo||d>hi)return;
     at(d).tasks.push(t);
   });
@@ -5801,15 +5803,22 @@ document.addEventListener('click',e=>{if(Date.now()-_mcNoClick<80){e.stopPropaga
 document.addEventListener('contextmenu',e=>{if(_mcDrag&&_mcDrag.touch&&e.target.closest&&e.target.closest('[data-mcdrag]'))e.preventDefault();});
 
 /* ── Inside event / project / admin pages: collapsed by default, scoped to that project ── */
-function renderProjectCalendar(p){
-  const open=!!(window._pcOpen&&window._pcOpen[p.id]);
-  return '<div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;user-select:none;" data-pcal-hd="'+p.id+'" onclick="pcToggle(\''+p.id+'\')" role="button" aria-expanded="'+open+'">'
-    +'<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:'+(open?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg>'
-    +'<span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Calendar</span>'
-    +'<span style="font-size:.62rem;color:var(--muted);">tasks and co-working days by month</span></div>'
-    +(open?'<div class="card"><div class="card-bd" data-mcal-host="'+p.id+'">'+renderMonthCal(p.id)+'</div></div>':'');
+/* Event / project / admin pages: Timeline and Calendar tabs, both closed by default, one open at a time. */
+function _projTimeline(p){
+  const dated=S.tasks.some(t=>t.projectId===p.id&&(t.startDate||t.endDate));
+  if(!p.startDate&&!p.endDate&&!dated)return '<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.8rem;">Add a start or end date to the project, or dates to its tasks, to see it on a timeline.</div></div>';
+  return renderGantt([p],false,{all:true,noCowork:true,id:'gantt-scroll-'+p.id,pid:p.id});
 }
-function pcToggle(pid){window._pcOpen=window._pcOpen||{};window._pcOpen[pid]=!window._pcOpen[pid];const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p)h.innerHTML=renderProjectCalendar(p);else render();}
+function renderProjectCalendar(p){
+  const cur=(window._pvOpen&&window._pvOpen[p.id])||'';
+  const tab=(k,l,at)=>'<button class="dtab" '+at+' aria-expanded="'+(cur===k)+'" onclick="pvSet(\''+p.id+'\',\''+k+'\')">'+_dashChev(cur===k)+l+'</button>';
+  return '<div class="dtabs" style="margin-bottom:10px;">'+tab('tl','Timeline','data-ptl-hd="'+p.id+'"')+tab('cal','Calendar','data-pcal-hd="'+p.id+'"')
+    +(cur==='tl'?'<button class="btn btn-ghost btn-xs" style="margin-left:auto;font-size:.65rem;" onclick="scrollGanttToday(\'gantt-scroll-'+p.id+'\')">Today</button>':'')+'</div>'
+    +(cur==='tl'?'<div data-ptl="'+p.id+'">'+_projTimeline(p)+'</div>':'')
+    +(cur==='cal'?'<div class="card"><div class="card-bd" data-mcal-host="'+p.id+'">'+renderMonthCal(p.id)+'</div></div>':'');
+}
+function pvSet(pid,k){window._pvOpen=window._pvOpen||{};window._pvOpen[pid]=(window._pvOpen[pid]===k)?'':k;const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p){h.innerHTML=renderProjectCalendar(p);setTimeout(scrollProjGantts,20);}else render();}
+function pcToggle(pid){pvSet(pid,'cal');}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -6223,14 +6232,9 @@ ${_dashQuickHtml()}
 /* ════ OKR FUNCTIONS ════ */
 
 // ── Utility ──
-function campGanttToggle(){
-  window._campGanttOpen=window._campGanttOpen===false;
-  const open=window._campGanttOpen!==false,w=el('campaign-gantt'),i=el('camp-gantt-chev'),b=el('camp-gantt-btn');
-  if(w)w.style.display=open?'':'none';
-  if(i)i.style.transform=open?'none':'rotate(-90deg)';
-  if(b)b.textContent=open?'Hide timeline':'Show timeline';
-  if(i&&i.parentNode)i.parentNode.setAttribute('aria-expanded',open);
-}
+function _campTopCur(){const v=window._campTop;return v==='none'?'':(v==='cal'?'cal':'tl');}
+function campTopSet(k){window._campTop=(_campTopCur()===k)?'none':k;render();}
+function campGanttToggle(){campTopSet('tl');}
 function toggleProjOkr(pid){
   window._okrOpen=window._okrOpen||{};window._okrOpen[pid]=window._okrOpen[pid]===false;
   const open=window._okrOpen[pid]!==false,b=el('ev-okr-body-'+pid),i=el('okr-ico-'+pid);
@@ -7779,7 +7783,7 @@ ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style
   ${renderProjectNotes(p)}
 </div>
 
-<!-- CALENDAR (collapsed by default) -->
+<!-- TIMELINE + CALENDAR (tabs, both closed by default) -->
 <div class="detail-sec" style="grid-column:1 / -1;" data-pcal="${p.id}">
   ${renderProjectCalendar(p)}
 </div>
@@ -8179,7 +8183,8 @@ function _ganttOrder(projects){
     .sort((a,b)=>a.g-b.g||(a.g===2?(a.key<b.key?1:a.key>b.key?-1:0):(a.key<b.key?-1:a.key>b.key?1:0)))
     .map(x=>x.p);
 }
-function renderGantt(projects,fullPage=false){
+function renderGantt(projects,fullPage=false,opts){
+  opts=opts||{};
   projects=_ganttOrder(projects);
   const gmonths=getGanttMonths();
   const totalDays=ganttTotalDays();
@@ -8194,7 +8199,7 @@ function renderGantt(projects,fullPage=false){
   }).join('');
   let rows='';
   projects.forEach(p=>{
-    const comp=projComp(p);const isExp=S.expandedGantt.includes(p.id);
+    const comp=projComp(p);const isExp=!!opts.all||S.expandedGantt.includes(p.id);
     const _bp0=barP(p.startDate,p.endDate);
     const openEnded=projType(p)==='ongoing'&&!p.endDate&&!!p.startDate&&!!_bp0;   // ongoing work with no end date runs off the right edge
     const bp=openEnded?{l:_bp0.l,w:Math.max(totalW-_bp0.l,8)}:_bp0;
@@ -8233,12 +8238,17 @@ function renderGantt(projects,fullPage=false){
       const safeRange=dateRange.replace(/'/g,"\\'");
       return'<div style="position:absolute;left:'+seg.l+'px;width:'+seg.w+'px;height:14px;background:'+bg+';border:1px solid '+col+'44;border-radius:3px;display:flex;align-items:center;overflow:hidden;cursor:default;" onmouseenter="showPhaseTip(event,\''+safeTip+'\',\''+safeStatus+'\',\''+safeDays+'\',\''+safeRange+'\')" onmouseleave="hidePhaseTip()">'+label+'</div>';
     }).join(''):'';
-    const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(t.startDate||t.endDate))
+    const _dated=t=>!!(t.startDate||t.endDate);
+    const _kids=id=>S.tasks.filter(x=>x.parentId===id);
+    const _hasDated=(t,d)=>_dated(t)||(d<3&&_kids(t.id).some(k=>_hasDated(k,d+1)));
+    const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(opts.all?_hasDated(t,0):_dated(t)))
       .sort((a,b)=>((a.endDate||a.startDate)<(b.endDate||b.startDate)?-1:(a.endDate||a.startDate)>(b.endDate||b.startDate)?1:0));   // dated tasks only, soonest first
-    rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')"><button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button><div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${escHtml(p.name)}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
-    if(isExp)top.forEach(t=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" style="left:${tb.l}px;width:${tb.w}px;height:11px;background:${p.color}18;border:1px solid ${p.color}35;"><div class="gbar-fill" style="width:${tc}%;background:${p.color}80;"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub"><span class="grow-lbl-name" style="font-size:.68rem;color:var(--text2);">${escHtml(t.name)}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;});
+    rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')">${opts.all?'':`<button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button>`}<div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${escHtml(p.name)}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
+    const _trow=(t,depth)=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" style="left:${tb.l}px;width:${tb.w}px;height:${depth?9:11}px;background:${p.color}${depth?'12':'18'};border:1px solid ${p.color}${depth?'28':'35'};"><div class="gbar-fill" style="width:${tc}%;background:${p.color}${depth?'60':'80'};"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub"${depth?` style="padding-left:${14+depth*12}px;"`:''}><span class="grow-lbl-name" style="font-size:${depth?'.64':'.68'}rem;color:${depth?'var(--muted)':'var(--text2)'};">${escHtml(t.name)}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;
+      if(opts.all&&depth<3)_kids(t.id).filter(k=>_hasDated(k,0)).sort((x,y)=>String(x.endDate||x.startDate||'9').localeCompare(String(y.endDate||y.startDate||'9'))).forEach(k=>_trow(k,depth+1));};
+    if(isExp)top.forEach(t=>_trow(t,0));
   });
-  const inner=`<div class="gantt-scroll" id="gantt-scroll"><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;"><div class="today-ln" style="left:${175+Math.max(0,todayOffset)*DPX}px;height:100%;"><span class="today-tag">TODAY</span></div>${renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
+  const inner=`<div class="gantt-scroll" id="${opts.id||'gantt-scroll'}"${opts.pid?` data-pgantt="${opts.pid}"`:''}><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;"><div class="today-ln" style="left:${175+Math.max(0,todayOffset)*DPX}px;height:100%;"><span class="today-tag">TODAY</span></div>${opts.noCowork?'':renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
   if(fullPage)return`<div class="fu"><div class="page-hd"><div class="page-title">Gantt <em>Timeline</em></div></div>${inner}</div>`;
   return inner;
 }
@@ -8288,7 +8298,9 @@ function getPhaseBars(p){
   return segments;
 }
 function toggleGExp(id){const i=S.expandedGantt.indexOf(id);i>=0?S.expandedGantt.splice(i,1):S.expandedGantt.push(id);save();render();}
-function scrollGanttToday(){const g=el('gantt-scroll');if(g)g.scrollLeft=Math.max(0,(doy(new Date())-20)*DPX);}
+function scrollGanttToday(id){const g=el(id||'gantt-scroll');if(g)g.scrollLeft=Math.max(0,(doy(new Date())-20)*DPX);}
+/* project-page timelines open scrolled to the project itself (its start, or today when it is running) */
+function scrollProjGantts(){document.querySelectorAll('[data-pgantt]').forEach(g=>{const p=getProject(g.dataset.pgantt);if(!p)return;const t=_localToday();const d=(p.startDate&&p.endDate&&p.startDate<=t&&t<=p.endDate)?t:(p.startDate||p.endDate||t);const off=ganttDayOffset(d);g.scrollLeft=Math.max(0,(off===null?doy(new Date()):off)*DPX-20);});}
 
 function renderCoworkRow(totalW){
   if(!S.coworkDays)S.coworkDays=[];
@@ -8412,18 +8424,12 @@ function renderCampaign(){
   </div>
 </div>
 
-<!-- Timeline -->
-<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
-    <span style="display:inline-flex;align-items:center;gap:8px;cursor:pointer;font-size:.7rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.07em;" onclick="campGanttToggle()" role="button" aria-expanded="${window._campGanttOpen!==false}">Timeline<svg id="camp-gantt-chev" width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${window._campGanttOpen!==false?'none':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg></span>
-    <div style="display:flex;gap:6px;">
-      <button class="btn btn-ghost btn-xs" onclick="scrollGanttToday()" style="font-size:.65rem;">Today</button>
-      <button class="btn btn-ghost btn-xs" id="camp-gantt-btn" onclick="campGanttToggle()" style="font-size:.65rem;">${window._campGanttOpen!==false?'Hide timeline':'Show timeline'}</button>
-    </div>
-  </div>
-  <div id="campaign-gantt" style="${window._campGanttOpen!==false?'':'display:none;'}background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;">
-    ${renderGantt(allProjs)}
-  </div>
+<!-- Timeline / Calendar (one open at a time; Timeline by default) -->
+<div style="margin-bottom:22px;" id="camp-top">
+  ${(()=>{const cur=_campTopCur();const tab=(k,l)=>`<button class="dtab" id="ctab-${k}" aria-expanded="${cur===k}" onclick="campTopSet('${k}')">${_dashChev(cur===k)}${l}</button>`;
+    return `<div class="dtabs">${tab('tl','Timeline')}${tab('cal','Calendar')}${cur==='tl'?`<button class="btn btn-ghost btn-xs" onclick="scrollGanttToday()" style="margin-left:auto;font-size:.65rem;">Today</button>`:''}</div>`
+      +(cur==='tl'?`<div id="campaign-gantt" style="background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;">${renderGantt(allProjs)}</div>`:'')
+      +(cur==='cal'?`<div id="campaign-calendar" class="card"><div class="card-bd" data-mcal-host="camp">${renderMonthCal('camp')}</div></div>`:'');})()}
 </div>
 
 <!-- Filter bar — projects, phases, members as clickable pills -->
