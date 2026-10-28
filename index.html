@@ -1372,6 +1372,14 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .pcc-st{flex-shrink:0;font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 8px;border-radius:10px;line-height:1.5;white-space:nowrap;background:var(--surface3);color:var(--muted);}
 .pcc-st.now{background:color-mix(in srgb,var(--acc) 20%,transparent);color:var(--acc);}
 .pcc-r1 .ec-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+
+/* v71: backlog rows stack two to a cell, about one card tall */
+.dash-stack{display:flex;flex-direction:column;gap:10px;flex:1;min-width:0;}
+.dash-cell.stk{align-self:stretch;display:flex;flex-direction:column;}
+.dash-stack .dash-crow{flex:1;max-height:58px;margin:0;}
+@media(max-width:1100px){.dash-cell.stk{display:block;}}
+.dash-stack.one .dash-crow{flex:none;}
+.dash-cell.stk:has(.dash-stack.one){align-self:start;}
 </style>
 </head>
 <body>
@@ -6112,7 +6120,6 @@ ${_dashQuickHtml()}
       <button class="chip${(S.projFilter||'active')==='active'?' on':''}" onclick="S.projFilter='active';save();render()">Active (${S.projects.filter(p=>p.status==='active').length})</button>
       <button class="chip${(S.projFilter||'active')==='backlog'?' on':''}" onclick="S.projFilter='backlog';save();render()">Backlog (${S.projects.filter(p=>p.status==='backlog').length})</button>
       <button class="chip${(S.projFilter||'active')==='completed'?' on':''}" onclick="S.projFilter='completed';save();render()">Archive (${S.projects.filter(p=>p.status==='completed').length})</button>
-      <button class="btn btn-acc btn-sm" style="margin-left:auto;" onclick="newProjOfType('')">+ New Event</button>
     </div>
     ${(()=>{
       if(!_dsOn('events'))return'';
@@ -6236,20 +6243,22 @@ ${_dashQuickHtml()}
         else if(_hd)_evCells.push(_hd);
         _evCells.push(h);
       });
-      const _cell=(c,r,html)=>`<div class="dash-cell" style="--c:${c};--r:${r}">${html}</div>`;
+      /* Backlog / archived projects are one-line rows: stack them two to a cell, so a pair is about as tall as one full card */
+      const _pairUp=arr=>{const out=[];let run=[];const fl=()=>{for(let i=0;i<run.length;i+=2)out.push('<div class="dash-stack'+(i+1>=run.length?' one':'')+'">'+run.slice(i,i+2).join('')+'</div>');run=[];};arr.forEach(h=>{if(h.indexOf('<div class="dash-crow')===0)run.push(h);else{fl();out.push(h);}});fl();return out;};
+      const _cell=(c,r,html)=>`<div class="dash-cell${html.indexOf('<div class="dash-stack')===0?' stk':''}" style="--c:${c};--r:${r}">${html}</div>`;
       const _colHd=(c,t,label,n,off)=>`<div class="dash-col-hd" style="--c:${c};--r:1" ${t==='event'?'':`onclick="projSecToggle('${t}')" `}>
           ${t==='event'?'':`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .15s;transform:rotate(${off?-90:0}deg);"><polyline points="6 9 12 15 18 9"/></svg>`}
           <span class="dash-col-lbl">${label}</span><span class="dash-col-n">${n}</span>
           <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="event.stopPropagation();newProjOfType('${t}')">+ New</button>
         </div>`;
       const _cols=[];
-      if(filtered.length)_cols.push(`<div class="dash-col" data-proj-col="event">${_colHd(_cols.length+1,'event','Events',filtered.length,false)}${_evCells.map((h,i)=>_cell(1,i+2,h)).join('')}</div>`);
-      _other.forEach(([t,items])=>{
+      _cols.push(`<div class="dash-col" data-proj-col="event">${_colHd(1,'event','Events',filtered.length,false)}${_pairUp(_evCells).map((h,i)=>_cell(1,i+2,h)).join('')}</div>`);
+      Object.keys(PROJ_TYPES).filter(t=>t!=='event').forEach(t=>{
+        const items=(_other.find(x=>x[0]===t)||[t,[]])[1];
         const c=_cols.length+1,off=!!(window._projSecOff||{})[t];
-        _cols.push(`<div class="dash-col" data-proj-sec="${t}">${_colHd(c,t,PROJ_TYPES[t].plural,items.length,off)}${off?'':items.map((p,i)=>_cell(c,i+2,_card(p,''))).join('')}</div>`);
+        _cols.push(`<div class="dash-col" data-proj-sec="${t}">${_colHd(c,t,PROJ_TYPES[t].plural,items.length,off)}${off?'':_pairUp(items.map(p=>_card(p,''))).map((h,i)=>_cell(c,i+2,h)).join('')}</div>`);
       });
-      const _add=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:.7rem;color:var(--muted);" data-proj-add="1">Add:${Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>`<button class="btn btn-ghost btn-xs" onclick="newProjOfType('${t}')">+ ${PROJ_TYPES[t].label}</button>`).join('')}</div>`;
-      return '<div class="dash-cols">'+_cols.join('')+'</div>'+_add;
+      return '<div class="dash-cols">'+_cols.join('')+'</div>';
 
     })()}
   </div>
