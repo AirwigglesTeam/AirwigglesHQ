@@ -2916,7 +2916,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=87;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=88;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -3832,7 +3832,7 @@ function redo(){
 
 /* ── load — reconcile this device's stored copy with the server (merge, never overwrite) ── */
 async function load(){
-  try{const lr=await PF.load();if(lr&&lr.remote&&!lr.failed){setTimeout(_sessionSnapshot,5000);setTimeout(_pfRecurRepairOnce,2500);}}catch(e){console.warn('Sync load failed:',e);}
+  try{const lr=await PF.load();if(lr&&lr.remote&&!lr.failed){setTimeout(_sessionSnapshot,5000);setTimeout(_pfRecurRepairOnce,2500);setTimeout(_pfRemoveToolsOnce,3000);}}catch(e){console.warn('Sync load failed:',e);}
   _applyDefaults();
   _lastKnownCounts={
     projects:(S.projects||[]).length,
@@ -3876,7 +3876,7 @@ function _applyDefaults(){
   S.members.forEach(m=>{if(!m.timeLog)m.timeLog=[];if(m.isDirector===undefined)m.isDirector=false;});
   S.tasks=(S.tasks||[]).filter(Boolean);
   S.projects=(S.projects||[]).filter(Boolean);
-  S.projects.forEach(p=>{if(!p.expenses)p.expenses=[];if(!p.tools)p.tools=[];if(p.budget===undefined)p.budget=0;if(!p.phaseWeeks)p.phaseWeeks={planning:null,prelaunch:null,postEvent:null};});
+  S.projects.forEach(p=>{if(!p.expenses)p.expenses=[];if(p.budget===undefined)p.budget=0;if(!p.phaseWeeks)p.phaseWeeks={planning:null,prelaunch:null,postEvent:null};});
   if(!S.settings.phaseDefaults)S.settings.phaseDefaults={planning:2,prelaunch:6,postEvent:2};
   if(!S.settings.shortcuts)S.settings.shortcuts={};
   (S.tasks||[]).forEach(t=>{if(t.phase===undefined)t.phase='';});
@@ -6496,6 +6496,20 @@ function _pfRecurRepairOnce(){
   }catch(e){console.warn('recurring subtask repair failed',e);}
 }
 
+/* The per-project "Tools" list was removed from the app. One time per workspace, delete any leftover tools data from projects and saved templates. */
+function _pfRemoveToolsOnce(){
+  try{
+    S.settings=S.settings||{};
+    if(S.settings.toolsRemoved)return;
+    let n=0;
+    (S.projects||[]).forEach(p=>{if(p&&'tools' in p){delete p.tools;n++;}});
+    (S.projectTemplates||[]).forEach(t=>{if(t&&'tools' in t){delete t.tools;n++;}});
+    S.settings.toolsRemoved=1;
+    save();
+    if(n)render();
+  }catch(e){console.warn('tools cleanup failed',e);}
+}
+
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
 function _myWorkGroups(meId){
@@ -7935,7 +7949,7 @@ ${filtered.length===0?`<div class="empty"><div class="empty-ico">${ICO.folder}</
 function openDetail(id){S.detailId=id;render();}
 function renderDetail(id){
   const p=getProject(id);if(!p)return'';
-  const _adm=projType(p)==='admin'||/^\s*admin\s*$/i.test(p.name||'');   // Admin pages (type Admin, or a page named Admin) are a lean task list: no overview, objectives, tools or expenses
+  const _adm=projType(p)==='admin'||/^\s*admin\s*$/i.test(p.name||'');   // Admin pages (type Admin, or a page named Admin) are a lean task list: no overview, objectives or expenses
   const comp=projComp(p);
   const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);
   const expTotal=(p.expenses||[]).reduce((a,e)=>a+e.amount,0);
@@ -8199,30 +8213,6 @@ ${_adm?'':`<!-- EVENT OKRs -->
       </div>`).join('')+`<button class="ql-btn add-ql" style="margin-top:4px;" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>`;
   })()}
 </div>
-
-${_adm?'':`<!-- PROJECT TOOLS -->
-<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Tools</span>
-    <button class="btn btn-ghost btn-xs" onclick="_openToolModal('${p.id}',null)">+ Add tool</button>
-  </div>
-  ${(p.tools||[]).length===0?`<div style="font-size:.75rem;color:var(--muted);">No tools added yet.</div>`:`
-  <div style="display:flex;flex-direction:column;gap:6px;">
-    ${(p.tools||[]).map(tool=>{
-      const costStyle=tool.cost==='free'?'background:rgba(31,186,122,.12);color:var(--green);':tool.cost==='subscription'?'background:rgba(61,130,240,.12);color:var(--blue);':tool.cost==='onetime'?'background:rgba(240,201,107,.12);color:var(--yellow);':'background:var(--surface3);color:var(--muted);';
-      const costLabel=tool.cost==='free'?'Free':tool.cost==='subscription'?'Subscription':tool.cost==='onetime'?'One-time':'—';
-      return`<div style="display:flex;align-items:center;gap:10px;padding:8px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:9px;">
-        ${tool.url?`<img src="https://www.google.com/s2/favicons?domain=${tryDomain(tool.url)}&sz=32" onerror="this.style.display='none'" style="width:16px;height:16px;flex-shrink:0;" alt="">`:
-        `<div style="width:16px;height:16px;flex-shrink:0;background:var(--surface3);border-radius:3px;"></div>`}
-        <span style="flex:1;font-size:.82rem;font-weight:600;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(tool.name)}</span>
-        <span style="font-size:.68rem;padding:2px 8px;border-radius:20px;flex-shrink:0;${costStyle}">${costLabel}</span>
-        ${tool.url?`<a href="${escHtml(tool.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()" style="color:var(--muted);display:flex;flex-shrink:0;" title="Open tool"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg></a>`:''}
-        <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:0 2px;" onclick="editProjectTool('${p.id}','${tool.id}')" title="Edit">✎</button>
-        <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;padding:0 2px;" onclick="deleteProjectTool('${p.id}','${tool.id}')" title="Remove">×</button>
-      </div>`;
-    }).join('')}
-  </div>`}
-</div>`}
 
 <!-- SPONSORS IN PROJECT -->
 ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style="margin-bottom:18px;">
@@ -9278,7 +9268,6 @@ function _confirmSaveProjTemplate(projId){
     color:p.color||COLORS[0],
     tasks:captureTasks(allTasks),
     expenses:(p.expenses||[]).map(e=>({id:uid(),desc:e.desc,amount:e.amount,cat:e.cat,date:''})),
-    tools:(p.tools||[]).map(t=>({id:uid(),name:t.name,cost:t.cost,url:t.url})),
     savedAt:toISO(new Date()),
   };
   S.projectTemplates.push(tmpl);
@@ -11083,7 +11072,7 @@ function importData(input){
       if(!S.projects)S.projects=[];
       S.projects.forEach(p=>{
         if(!p.expenses)p.expenses=[];
-        if(!p.tools)p.tools=[];
+        
         if(p.budget===undefined)p.budget=0;
         if(!p.phaseWeeks)p.phaseWeeks={planning:null,prelaunch:null,postEvent:null};
         if(!p.sponsors)p.sponsors=[];
@@ -11535,68 +11524,6 @@ function toggleProdDelivered(projectId,sponsorId,prodIdx){
   if(!rows.length){render();}
 }
 
-function _openToolModal(projId,toolId){
-  const p=getProject(projId);if(!p)return;
-  const tool=toolId?(p.tools||[]).find(t=>t.id===toolId):null;
-  const mc=el('mc');mc.style.display='flex';
-  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
-  <div class="mo-box" style="max-width:400px;">
-    <div class="mo-hd"><span class="mo-title">${tool?'Edit tool':'Add tool'}</span><button class="mo-close" onclick="closeModal()">&#215;</button></div>
-    <div class="mo-body">
-      <div class="field"><label class="flbl">Tool name *</label><input class="inp" id="pt-tool-name" value="${escHtml(tool?.name||'')}" placeholder="Splice, Output, iZotope…"></div>
-      <div class="field"><label class="flbl">Cost type</label>
-        <select class="sel" id="pt-tool-cost">
-          <option value="free" ${(tool?.cost||'free')==='free'?'selected':''}>Free</option>
-          <option value="subscription" ${tool?.cost==='subscription'?'selected':''}>Subscription</option>
-          <option value="onetime" ${tool?.cost==='onetime'?'selected':''}>One-time payment</option>
-        </select>
-      </div>
-      <div class="field"><label class="flbl">URL</label><input class="inp" id="pt-tool-url" type="url" value="${escHtml(tool?.url||'')}" placeholder="https://…"></div>
-    </div>
-    <div class="mo-ft">
-      <button class="btn btn-ghost" onclick="closeModal()">Cancel</button>
-      <button class="btn btn-acc" onclick="saveProjectTool('${projId}','${toolId||''}')">Save</button>
-    </div>
-  </div></div>`;
-  setTimeout(()=>el('pt-tool-name')?.focus(),60);
-}
-function saveProjectTool(projId,toolId){
-  const p=getProject(projId);if(!p)return;
-  const name=el('pt-tool-name')?.value.trim();
-  const cost=el('pt-tool-cost')?.value||'free';
-  const url=el('pt-tool-url')?.value.trim()||'';
-  if(!name)return;
-  if(!p.tools)p.tools=[];
-  if(toolId){
-    const t=p.tools.find(x=>x.id===toolId);
-    if(t){t.name=name;t.cost=cost;t.url=url;}
-  } else {
-    p.tools.push({id:uid(),name,cost,url});
-  }
-  save();closeModal();render();
-}
-
-function deleteProjectTool(projId,toolId){
-  const p=getProject(projId);if(!p)return;
-  const mc=el('mc');mc.style.display='flex';
-  const ov=document.createElement('div');
-  ov.className='mo';
-  ov.setAttribute('data-pid',projId);
-  ov.setAttribute('data-tid',toolId);
-  ov.onclick=function(e){if(e.target===ov)closeModal();};
-  ov.innerHTML='<div class="mo-box" style="max-width:320px;">'+
-    '<div class="mo-hd"><span class="mo-title">Remove tool</span>'+
-    '<button class="mo-close" onclick="closeModal()">&#215;</button></div>'+
-    '<div class="mo-body"><p style="font-size:.84rem;">Remove this tool from the project?</p></div>'+
-    '<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'+
-    '<button class="btn btn-danger" id="dt-confirm-btn">Remove</button></div></div>';
-  mc.innerHTML='';mc.appendChild(ov);
-  document.getElementById('dt-confirm-btn').onclick=function(){
-    var proj=getProject(projId);
-    if(proj){proj.tools=(proj.tools||[]).filter(function(t){return t.id!==toolId;});}
-    save();closeModal();render();
-  };
-}
 function projExpModalHtml(projId,expId){
   const p=getProject(projId);if(!p)return'';
   const exp=expId?(p.expenses||[]).find(e=>e.id===expId):null;
@@ -15307,11 +15234,6 @@ function saveProjExp(projId,expId){
     p.expenses.push({id:uid(),name,amount,category,notes});
   }
   save();closeModal();render();
-}
-
-/* Project tool edit */
-function editProjectTool(projId,toolId){
-  openModal('projTool',{projId,toolId});
 }
 
 function saveMemberTime(memberId){
