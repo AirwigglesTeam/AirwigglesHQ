@@ -1367,6 +1367,11 @@ body.mcal-dragging *{cursor:grabbing !important;}
   .dash-cell{margin-bottom:10px;}
   .dash-col-hd{margin-bottom:10px;}
 }
+
+/* v69: status pill on the card name row (replaces the Happening now caption) */
+.pcc-st{flex-shrink:0;font-size:.58rem;font-weight:700;letter-spacing:.06em;text-transform:uppercase;padding:1px 8px;border-radius:10px;line-height:1.5;white-space:nowrap;background:var(--surface3);color:var(--muted);}
+.pcc-st.now{background:color-mix(in srgb,var(--acc) 20%,transparent);color:var(--acc);}
+.pcc-r1 .ec-name{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -6225,7 +6230,9 @@ ${_dashQuickHtml()}
           if(_g==='later'||_g==='finished'||(_g==='soon'&&_gi.idx(p)>=4)){if(_hd)_evCells.push(_hd);_evCells.push(_dashCompactRow(p));return;}
         }
         let h=_card(p,'');
-        if(_hd&&h.indexOf('<div class="ec-card')===0)h=h.replace(/^(<div class="ec-card[^>]*>)/,'$1'+_hd.replace(/\$/g,'$$$$'));
+        /* Status shows as a small pill on the card's name row, so cards keep exactly the same size and margins */
+        const _pl={now:['now','Now'],soon:['soon','Soon'],undated:['undated','No dates']}[_g];
+        if(_pl&&h.indexOf('<div class="ec-card')===0)h=h.replace(/(<div class="ec-name">[^<]*<\/div>)/,'$1<span class="pcc-st '+_pl[0]+'">'+_pl[1]+'</span>');
         else if(_hd)_evCells.push(_hd);
         _evCells.push(h);
       });
