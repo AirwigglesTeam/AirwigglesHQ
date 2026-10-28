@@ -1392,11 +1392,14 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .rc-row{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--border2);cursor:pointer}
 .rc-row input{margin-top:3px;flex:none;width:18px;height:18px}
 .rc-more{margin-top:12px}.rc-more summary{cursor:pointer;font-size:.74rem;color:var(--muted);padding:4px 0}
-#pf-recover,#pf-integrity,#pf-hold,#pf-old{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
+#pf-recover,#pf-integrity,#pf-hold,#pf-old,#pf-update,#pf-storage,#pf-nudge{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
 .pf-warn{font-size:.72rem;line-height:1.45;color:var(--red,#e5534b);background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
 #pf-integrity{border-color:var(--red,#e5534b)!important;bottom:70px}
 #pf-hold{border-color:var(--red,#e5534b)!important;bottom:130px;z-index:10000}
 #pf-old{border-color:var(--red,#e5534b)!important;bottom:12px;z-index:10001}
+#pf-update{bottom:12px;z-index:10002}
+#pf-storage{border-color:var(--red,#e5534b)!important;bottom:70px;z-index:10001}
+#pf-nudge{bottom:12px;z-index:9998}
 </style>
 </head>
 <body>
@@ -2526,14 +2529,15 @@ function _pfReadStored(){
 function _pfWriteStored(rec){
   let str;try{str=JSON.stringify(rec);}catch(_){return false;}
   const put=()=>{try{localStorage.setItem(PF_STORE_KEY,str);try{localStorage.setItem('pf6m',JSON.stringify({tab:rec.tab||null,ts:rec.ts||0}));}catch(_){}return true;}catch(_){return false;}};
-  if(put()){try{localStorage.removeItem('pf4');}catch(_){}return true;}
+  if(put()){try{localStorage.removeItem('pf4');}catch(_){}try{_pfNoteStore(true);}catch(_){}return true;}
   // Quota full: shed rolling backups (the server holds the real history) until the live record fits.
   try{
     let b=JSON.parse(localStorage.getItem(PF_BACKUP_KEY)||'[]');
-    while(b.length>1){b=b.slice(Math.ceil(b.length/2));localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(b));if(put())return true;}
+    while(b.length>1){b=b.slice(Math.ceil(b.length/2));localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(b));if(put()){try{_pfNoteStore(true);}catch(_){}return true;}}
     localStorage.removeItem(PF_BACKUP_KEY);
-    if(put())return true;
+    if(put()){try{_pfNoteStore(true);}catch(_){}return true;}
   }catch(_){}
+  try{_pfNoteStore(false);}catch(_){}
   return false;
 }
 function _pfStash(str){            // a local copy that lost to the server on first contact — keep it restorable
@@ -2912,7 +2916,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=84;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=86;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6353,6 +6357,98 @@ function _pfHoldChoose(c){
   PF.resolveHold(c);
   const b=document.getElementById('pf-hold');if(b)b.remove();
 }
+/* ════ UPDATE CHECK: tells an open tab/phone when a newer ProjectFlow has been uploaded, so old copies get refreshed ════
+   Cheap by design: a HEAD request (no body) compares the page's ETag / Last-Modified / size with what it was at load.
+   Only when that changes is the page read once to compare release numbers (PF_BUILD). Never forces a refresh. */
+const PF_UPD={base:null,last:0,noSig:false,dismissed:null};
+async function _pfUpdFetch(method){
+  const r=await fetch(location.origin+location.pathname,{method,cache:'no-store'});
+  if(!r.ok)return null;
+  const sig=[r.headers.get('etag')||'',r.headers.get('last-modified')||'',r.headers.get('content-length')||''].join('|');
+  return{sig,text:method==='GET'?await r.text():null};
+}
+async function _pfUpdateCheck(force){
+  try{
+    if(!/^https?:$/.test(location.protocol)||navigator.onLine===false)return;
+    const gap=PF_UPD.noSig?30*60*1000:2*60*1000;          // servers that give no validators cost a full download, so check rarely
+    if(!force&&Date.now()-PF_UPD.last<gap)return;
+    PF_UPD.last=Date.now();
+    const h=await _pfUpdFetch('HEAD');if(!h)return;
+    const hasSig=h.sig!=='||';
+    PF_UPD.noSig=!hasSig;
+    if(PF_UPD.base===null&&hasSig){PF_UPD.base=h.sig;return;}   // first look: remember what this copy looks like
+    if(hasSig&&h.sig===PF_UPD.base)return;                       // unchanged since load
+    const g=await _pfUpdFetch('GET');if(!g||!g.text)return;
+    const m=/const PF_BUILD\s*=\s*(\d+)/.exec(g.text);const rb=m?+m[1]:0;
+    if(hasSig)PF_UPD.base=h.sig;
+    if(rb>PF_BUILD)_pfUpdateBanner(rb);
+  }catch(_){}
+}
+function _pfUpdateBanner(rb){
+  const d=PF_UPD.dismissed;if(d&&d.b===rb&&Date.now()-d.t<60*60*1000)return;
+  if(document.getElementById('pf-update'))return;
+  const b=document.createElement('div');b.id='pf-update';
+  b.innerHTML='<span style="flex:1;min-width:200px"><b>A new version of ProjectFlow is available.</b> Refresh to use it. Anything you have not saved yet is saved first.</span><button class="btn btn-acc btn-sm" id="pf-update-go" onclick="_pfUpdateGo()">Refresh now</button><button class="btn btn-ghost btn-sm" onclick="_pfUpdateLater('+rb+')">Later</button>';
+  document.body.appendChild(b);
+}
+function _pfUpdateLater(rb){PF_UPD.dismissed={b:rb,t:Date.now()};const b=document.getElementById('pf-update');if(b)b.remove();}
+async function _pfUpdateGo(){
+  const btn=document.getElementById('pf-update-go');if(btn){btn.disabled=true;btn.textContent='Saving…';}
+  try{
+    if(_pfUnsynced){PF.saveNow();for(let i=0;i<30&&_pfUnsynced;i++)await new Promise(r=>setTimeout(r,300));}
+    if(_pfUnsynced&&!confirm('Some changes have not reached the server yet (they are kept on this device and will sync after the refresh). Refresh anyway?')){if(btn){btn.disabled=false;btn.textContent='Refresh now';}return;}
+  }catch(_){}
+  location.reload();
+}
+setTimeout(()=>_pfUpdateCheck(true),4000);                                   // remember what this copy looks like
+setInterval(()=>_pfUpdateCheck(false),10*60*1000);
+document.addEventListener('visibilitychange',()=>{if(document.visibilityState==='visible')_pfUpdateCheck(false);});
+/* ════ LOCAL SAFETY NET: tell people when this browser cannot keep its offline copy, and nudge a regular backup download ════ */
+const PF_LS_LIMIT=5000000;                      // characters a browser typically lets one site keep (conservative)
+let _pfStoreFailed=false;
+function _pfStorageReport(){
+  let total=0,live=0,backups=0;
+  try{for(let i=0;i<localStorage.length;i++){const k=localStorage.key(i),v=localStorage.getItem(k)||'';const n=k.length+v.length;total+=n;if(k===PF_STORE_KEY)live=n;if(k===PF_BACKUP_KEY)backups=n;}}catch(_){}
+  return{total,live,backups,pct:Math.round(total/PF_LS_LIMIT*100)};
+}
+/* called by the storage writer: ok=false means even the live record could not be kept on this device */
+function _pfNoteStore(ok){
+  if(ok===!_pfStoreFailed)return;    // no change
+  _pfStoreFailed=!ok;
+  let b=document.getElementById('pf-storage');
+  if(ok){if(b)b.remove();return;}
+  if(b)return;
+  b=document.createElement('div');b.id='pf-storage';
+  b.innerHTML='<span style="flex:1;min-width:200px"><b>This browser is out of storage space.</b> Your changes still save to the server, but this device can no longer keep its own offline copy, so a lost connection could cost recent edits. Free some space (clear site data for other sites, or use a different browser profile) and download a backup.</span><button class="btn btn-acc btn-sm" onclick="downloadFullBackup()">Download backup</button><button class="btn btn-ghost btn-sm" onclick="this.closest(\'#pf-storage\').remove()">Dismiss</button>';
+  document.body.appendChild(b);
+}
+/* one quiet heads-up per session when local storage is getting full (backups are shed automatically, so this is rare) */
+let _pfStoreWarned=false;
+function _pfStorageCheck(){
+  try{
+    const r=_pfStorageReport();
+    if(r.pct>=85&&!_pfStoreWarned){_pfStoreWarned=true;showToast('This browser\'s storage is '+r.pct+'% full. Older local backups will be dropped automatically; the server keeps your data.',9000);}
+  }catch(_){}
+}
+/* weekly backup nudge */
+function _pfBackupNudgeCheck(force){
+  try{
+    if(!(S.projects||[]).length&&!(S.tasks||[]).length)return;
+    let iso=null,snooze=0;try{iso=localStorage.getItem('pf_last_backup');snooze=+localStorage.getItem('pf_backup_snooze')||0;}catch(_){}
+    const days=iso?Math.floor((Date.now()-new Date(iso).getTime())/864e5):null;
+    const b=document.getElementById('pf-nudge');
+    if(days!==null&&days<7){if(b)b.remove();return;}
+    if(!force&&Date.now()<snooze)return;
+    if(b)return;
+    const n=document.createElement('div');n.id='pf-nudge';
+    n.innerHTML='<span style="flex:1;min-width:200px"><b>Time for a backup.</b> '+(days===null?'No full backup has been downloaded from this device yet.':'Your last full backup was '+days+' days ago.')+' It takes one click and keeps a copy outside this browser and the server.</span><button class="btn btn-acc btn-sm" onclick="_pfNudgeDownload()">Download backup</button><button class="btn btn-ghost btn-sm" onclick="_pfNudgeLater()">Remind me tomorrow</button>';
+    document.body.appendChild(n);
+  }catch(_){}
+}
+function _pfNudgeLater(){try{localStorage.setItem('pf_backup_snooze',String(Date.now()+864e5));}catch(_){}const b=document.getElementById('pf-nudge');if(b)b.remove();}
+async function _pfNudgeDownload(){await downloadFullBackup();_pfBackupNudgeCheck(true);}
+setTimeout(()=>{_pfStorageCheck();_pfBackupNudgeCheck(false);},25000);
+setInterval(()=>{_pfStorageCheck();_pfBackupNudgeCheck(false);},6*60*60*1000);
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
