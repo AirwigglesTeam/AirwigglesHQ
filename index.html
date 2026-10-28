@@ -1386,6 +1386,13 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .tdot:hover{transform:translateY(-50%) scale(1.3);}
 .tdot.multi{width:18px;height:18px;margin-left:-2px;font-size:.58rem;}
 .tdot.od{box-shadow:0 0 0 2px var(--red);}
+/* v73 compare & restore */
+.rc-sec{display:flex;align-items:center;gap:8px;margin:4px 0 6px;font-size:.8rem}
+.rc-grp{margin-bottom:8px}.rc-gh{font-size:.68rem;font-weight:700;text-transform:uppercase;letter-spacing:.05em;color:var(--acc);margin:6px 0 2px}
+.rc-row{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--border2);cursor:pointer}
+.rc-row input{margin-top:3px;flex:none;width:18px;height:18px}
+.rc-more{margin-top:12px}.rc-more summary{cursor:pointer;font-size:.74rem;color:var(--muted);padding:4px 0}
+#pf-recover{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
 </style>
 </head>
 <body>
@@ -2309,7 +2316,7 @@ function create(env){
       }catch(e){failed=true;lastErr=e;}
       const localState=stored&&stored.s&&isObj(stored.s)?(()=>{const o=clone(stored.s);env.normalize(o);return o;})():null;
       // restore the ancestor history saved alongside the local state — only trusted as a consistent pair
-      let hist=null;
+      let hist=null,loadReport=null;
       if(localState&&stored.v===5&&Array.isArray(stored.h)&&stored.h.length){
         try{
           const ref=project(localState);
@@ -2324,11 +2331,12 @@ function create(env){
           H=hist;seqNow=Math.max(seqNow,stored.sq||0);
           const r=mergeStep(R);
           if(r.needWrite)schedule(0);
+          try{if(env.onLoadReport&&(stored.sq||0)>(R.meta.seq||0))env.onLoadReport({stashed:false,rollback:true});}catch(_){}
         }else{
           // no trustworthy history → server is the truth; keep any local copy as an orphan backup
           if(localState&&env.stash){
             const lp=project(localState);
-            if(stable(lp)!==stable(R.proj)){try{env.stash(JSON.stringify(localState));}catch(_){}}
+            if(stable(lp)!==stable(R.proj)){try{env.stash(JSON.stringify(localState));loadReport={stashed:true};}catch(_){}}
           }
           const ns=clone(R.proj);
           const seedFrom=localState||R.seed||{};
@@ -2340,6 +2348,7 @@ function create(env){
           seqNow=Math.max(seqNow,R.meta.seq||0);
         }
         persistNow();
+        if(loadReport){try{if(env.onLoadReport)env.onLoadReport(loadReport);}catch(_){}}
       }else{
         if(localState)env.replaceState(localState);
         resetSeen();
@@ -2505,6 +2514,7 @@ const PF=PFSync.create({
     _pfConn('synced');
     if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
   },
+  onLoadReport:info=>_pfLoadReport(info),
   clientId:_myClientId,
   debounceMs:500,
   loadTimeoutMs:25000
@@ -3086,7 +3096,8 @@ async function renderPBHistoryList(){
         <div style="font-size:.78rem;font-weight:600;">${escHtml(s.label||'Auto')}</div>
         <div style="font-size:.68rem;color:var(--muted);">${age} · ${count} items · ${dt.toLocaleString()}</div>
       </div>
-      <button class="btn btn-ghost btn-xs" onclick="restoreHistorySnapshot('${s.id}')">Restore</button>
+      <button class="btn btn-acc btn-xs" onclick="rcFromServer('${s.id}')" title="See what differs and restore only what you pick">Compare</button>
+      <button class="btn btn-ghost btn-xs" onclick="restoreHistorySnapshot('${s.id}')" title="Replace everything with this snapshot">Restore all</button>
     </div>`;
   }).join('');
 }
@@ -5981,6 +5992,154 @@ function renderTeam(){
   h+='<div style="font-size:.7rem;color:var(--muted);margin-top:6px;border-top:1px solid var(--border);padding-top:8px;">'+(sum.unassigned?'<span style="color:var(--yellow);">'+sum.unassigned+' open task'+(sum.unassigned===1?'':'s')+' with nobody assigned</span>':'Every open task has an owner')+' · '+sum.totalOpen+' assignments across the team</div></div></div>';
   h+='<div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,340px),1fr));gap:14px;align-items:start;">'+sum.stats.map((x,i)=>_tmCard(x.m,x.s,i,sum.stats.length)).join('')+'</div></div>';
   return h;
+}
+/* ════ RESTORE FROM A BACKUP: compare a backup with the live workspace and put back only what you choose ════
+   A full restore replaces everything, including other people's newer work. This compares instead: it lists the
+   differences (un-ticked tasks, reopened events, deleted items, changed settings icons) and applies only the rows you tick,
+   through the normal save path, so it syncs, can be undone, and leaves everything else exactly as it is. */
+const RC_FIELDS=['done','kStatus','name','description','startDate','endDate','priority','phase','assignees','labels','parentId','projectId'];
+const RC_FIELD_LABEL={done:'tick',kStatus:'board status',name:'name',description:'description',startDate:'start date',endDate:'due date',priority:'priority',phase:'phase',assignees:'assignees',labels:'labels',parentId:'parent task',projectId:'project'};
+const RC_STATUS={active:'Active',completed:'Archived',backlog:'Backlog'};
+const _rcEq=(a,b)=>JSON.stringify(a===undefined?null:a)===JSON.stringify(b===undefined?null:b);
+const _rcClone=x=>JSON.parse(JSON.stringify(x));
+
+/* Pure: list what differs between a backup (snap) and the live data (cur). Restoring a row sets the live value to the backup's. */
+function rcDiff(snap,cur){
+  cur=cur||S;const rows=[];
+  if(!snap||typeof snap!=='object')return rows;
+  const arr=x=>Array.isArray(x)?x.filter(o=>o&&typeof o==='object'&&o.id):[];
+  const sP=arr(snap.projects),cP=arr(cur.projects),sT=arr(snap.tasks),cT=arr(cur.tasks);
+  const cpm=new Map(cP.map(p=>[p.id,p])),ctm=new Map(cT.map(t=>[t.id,t]));
+  const pname=id=>{const p=cpm.get(id)||sP.find(x=>x.id===id);return p?p.name:'(no project)';};
+  for(const p of sP){
+    const c=cpm.get(p.id);
+    if(!c){rows.push({kind:'projDel',pid:p.id,group:p.name,loss:true,proj:p,text:'Project <b>'+escHtml(p.name)+'</b> is in the backup but missing now'});continue;}
+    if((p.status||'active')!==(c.status||'active'))
+      rows.push({kind:'projStatus',pid:p.id,group:p.name,loss:(c.status||'active')==='active'&&(p.status||'active')!=='active',to:p.status||'active',text:'<b>'+escHtml(p.name)+'</b> was <b>'+(RC_STATUS[p.status||'active']||p.status)+'</b> in the backup, now '+(RC_STATUS[c.status||'active']||c.status)});
+  }
+  for(const t of sT){
+    const c=ctm.get(t.id);
+    if(!c){rows.push({kind:'taskDel',tid:t.id,group:pname(t.projectId),loss:true,task:t,text:'Task <b>'+escHtml(t.name)+'</b> was deleted since the backup'});continue;}
+    const f=RC_FIELDS.filter(q=>!_rcEq(t[q],c[q]));
+    if(!f.length)continue;
+    const vals={};f.forEach(q=>vals[q]=t[q]);
+    if(f.includes('done')&&!f.includes('kStatus'))vals.kStatus=t.kStatus;
+    let text,loss=false;
+    if(f.includes('done')){
+      loss=!!t.done&&!c.done;
+      text='Task <b>'+escHtml(t.name)+'</b>: '+(t.done?'ticked off in the backup, open now':'open in the backup, ticked off now');
+      const other=f.filter(q=>q!=='done'&&q!=='kStatus');
+      if(other.length)text+=' <span style="color:var(--muted);">(also: '+other.map(q=>RC_FIELD_LABEL[q]).join(', ')+')</span>';
+    }else{
+      const sh=q=>{const a=t[q],b=c[q];if(['name','priority','startDate','endDate','phase'].includes(q))return RC_FIELD_LABEL[q]+' '+escHtml(String(b||'none'))+' → '+escHtml(String(a||'none'));return RC_FIELD_LABEL[q];};
+      text='Task <b>'+escHtml(t.name)+'</b>: '+f.filter(q=>q!=='kStatus'||f.length===1).map(sh).join(', ')+' <span style="color:var(--muted);">(backup value restores)</span>';
+    }
+    rows.push({kind:'taskMod',tid:t.id,group:pname(c.projectId),loss,vals,text});
+  }
+  // settings: sidebar icons per view, then any other setting that differs
+  const ss=(snap.settings&&typeof snap.settings==='object')?snap.settings:{},cs=cur.settings||{};
+  const sni=ss.navIcons||{},cni=cs.navIcons||{};
+  for(const v of Object.keys(sni))if(sni[v]!==cni[v])rows.push({kind:'navIcon',view:v,group:'Settings',loss:true,to:sni[v],text:'Sidebar icon for <b>'+escHtml(v)+'</b>: backup had <b>'+escHtml(String(sni[v]))+'</b>, now '+escHtml(String(cni[v]||'default'))});
+  for(const k of Object.keys(ss)){
+    if(k==='navIcons'||k==='devTodos')continue;
+    if(!_rcEq(ss[k],cs[k])){const v=ss[k];const brief=(typeof v==='string'||typeof v==='number'||typeof v==='boolean')?String(v).slice(0,40):'(a list or group of values)';
+      rows.push({kind:'setting',key:k,group:'Settings',loss:true,val:ss[k],text:'Setting <b>'+escHtml(k)+'</b> differs: backup had <b>'+escHtml(brief)+'</b>'});}
+  }
+  return rows;
+}
+
+/* Apply the chosen rows through the normal save path. Returns {done,skipped}. */
+function rcApply(sel){
+  const order={projDel:0,projStatus:1,taskDel:2,taskMod:3,navIcon:4,setting:5};
+  let done=0,skipped=0;
+  saveWithUndo('Restore from backup');
+  try{PF.allowRevive();}catch(_){}
+  [...sel].sort((a,b)=>order[a.kind]-order[b.kind]).forEach(r=>{
+    if(r.kind==='projDel'){if(getProject(r.pid)){skipped++;return;}const p=_rcClone(r.proj);S.projects.push(p);done++;}
+    else if(r.kind==='projStatus'){const p=getProject(r.pid);if(!p){skipped++;return;}p.status=r.to;done++;}
+    else if(r.kind==='taskDel'){
+      if(getTask(r.tid)||!getProject(r.task.projectId)){skipped++;return;}
+      const t=_rcClone(r.task);if(t.parentId&&!getTask(t.parentId))t.parentId=null;
+      S.tasks.push(t);done++;}
+    else if(r.kind==='taskMod'){const t=getTask(r.tid);if(!t){skipped++;return;}Object.keys(r.vals).forEach(q=>{t[q]=_rcClone(r.vals[q]);});if(r.vals.done!==undefined&&r.vals.kStatus===undefined)t.kStatus=r.vals.done?'done':'todo';done++;}
+    else if(r.kind==='navIcon'){S.settings=S.settings||{};S.settings.navIcons=S.settings.navIcons||{};S.settings.navIcons[r.view]=r.to;done++;}
+    else if(r.kind==='setting'){S.settings=S.settings||{};S.settings[r.key]=_rcClone(r.val);done++;}
+  });
+  try{applyNavIcons();}catch(_){}
+  saveNow();render();
+  return{done,skipped};
+}
+
+/* ── the panel ── */
+function rcOpen(snap,label){
+  if(!snap||typeof snap!=='object'||!Array.isArray(snap.tasks)&&!Array.isArray(snap.projects)){alert('That does not look like a ProjectFlow backup.');return;}
+  window._rc={snap,label,rows:rcDiff(snap)};
+  rcRender();
+}
+function rcRender(){
+  const rc=window._rc;if(!rc)return;
+  const loss=rc.rows.filter(r=>r.loss),other=rc.rows.filter(r=>!r.loss);
+  const grp=rows=>{
+    const g={};rows.forEach(r=>{(g[r.group||'Other']=g[r.group||'Other']||[]).push(r);});
+    return Object.keys(g).map(k=>'<div class="rc-grp"><div class="rc-gh">'+escHtml(k)+'</div>'+g[k].map(r=>'<label class="rc-row"><input type="checkbox" data-rc="'+rc.rows.indexOf(r)+'" onchange="rcCount()"><span>'+r.text+'</span></label>').join('')+'</div>').join('');
+  };
+  const mc=el('mc');
+  mc.innerHTML='<div class="mo" onclick="if(event.target.classList.contains(\'mo\'))closeModal()"><div class="mo-box" style="max-width:640px;">'
+    +'<div class="mo-hd"><span class="mo-title">Compare with backup</span><button class="mo-close" onclick="closeModal()">×</button></div>'
+    +'<div class="mo-body" style="font-size:.8rem;line-height:1.5;max-height:68vh;overflow:auto;">'
+    +'<div style="color:var(--text2);margin-bottom:10px;">Backup: <b>'+escHtml(rc.label||'backup')+'</b>. Tick only what you want put back. Everything else stays exactly as it is now, and you can undo afterwards.</div>'
+    +(rc.rows.length===0?'<div style="padding:18px 4px;color:var(--green);font-weight:600;">Nothing differs: the backup matches the live data for tasks, projects and settings.</div>'
+    :(loss.length?'<div class="rc-sec"><b>Looks like something was lost</b> <span style="color:var(--muted);">('+loss.length+')</span><span style="margin-left:auto;display:flex;gap:6px;"><button class="btn btn-ghost btn-xs" onclick="rcTick(true)">Tick all</button><button class="btn btn-ghost btn-xs" onclick="rcTick(false)">Clear</button></span></div>'+grp(loss):'<div style="padding:8px 2px;color:var(--muted);">Nothing in the backup looks lost.</div>')
+      +(other.length?'<details class="rc-more"><summary>Other differences, usually newer work you should leave alone ('+other.length+')</summary>'+grp(other)+'</details>':''))
+    +'<div style="margin-top:10px;font-size:.68rem;color:var(--muted);">Compared: projects, tasks and settings. Members, sponsors and finance are not compared.</div>'
+    +'</div><div class="mo-ft" style="display:flex;gap:8px;align-items:center;"><span id="rc-n" style="font-size:.72rem;color:var(--muted);flex:1;">0 selected</span><button class="btn btn-ghost" onclick="closeModal()">Close</button><button class="btn btn-acc" id="rc-go" disabled onclick="rcRestoreSelected()">Restore selected</button></div></div></div>';
+  mc.style.display='flex';
+}
+function rcTick(on){document.querySelectorAll('#mc .rc-grp input[data-rc]').forEach(c=>{if(on&&!(window._rc.rows[+c.dataset.rc].loss))return;c.checked=!!on;});rcCount();}
+function rcCount(){const n=document.querySelectorAll('#mc input[data-rc]:checked').length;const a=document.getElementById('rc-n'),b=document.getElementById('rc-go');if(a)a.textContent=n+' selected';if(b)b.disabled=!n;}
+function rcRestoreSelected(){
+  const rc=window._rc;if(!rc)return;
+  const sel=[...document.querySelectorAll('#mc input[data-rc]:checked')].map(c=>rc.rows[+c.dataset.rc]);
+  if(!sel.length)return;
+  const r=rcApply(sel);window._rc=null;closeModal();
+  showToast('Restored '+r.done+' item'+(r.done!==1?'s':'')+(r.skipped?' ('+r.skipped+' skipped: already there or their project is gone)':'')+'. Undo is available.',6000);
+}
+
+/* entry points */
+function rcFromLocal(ts){const b=listLocalBackups().find(x=>x.ts===ts);if(!b)return;let s;try{s=JSON.parse(b.data);}catch(_){alert('That backup could not be read.');return;}rcOpen(s,(b.label?b.label+' · ':'')+new Date(b.ts).toLocaleString('en-GB'));}
+async function rcFromServer(id){
+  try{const r=await fetch(PB_URL+'/api/collections/workspace_history/records/'+id,{headers:{Authorization:_pbToken}});if(!r.ok)throw new Error('fetch failed');
+    const rec=await r.json();const s=typeof rec.data==='string'?JSON.parse(rec.data):rec.data;rcOpen(s,'server snapshot · '+new Date(rec.saved_at).toLocaleString('en-GB'));}
+  catch(e){alert('Could not load that snapshot: '+e.message);}
+}
+function rcFromFile(input){
+  const f=input.files&&input.files[0];if(!f)return;input.value='';
+  const rd=new FileReader();rd.onload=e=>{try{rcOpen(JSON.parse(e.target.result),'file · '+f.name);}catch(_){alert('That file is not valid JSON.');}};rd.readAsText(f);
+}
+function rcFromStash(){
+  const b=listLocalBackups().filter(x=>x.label==='Unsynced local copy').pop();
+  if(!b){alert('The saved copy is no longer available.');return;}
+  rcFromLocal(b.ts);
+}
+
+/* Banner shown after load when this browser's own copy was set aside in favour of the server's, and it holds things the server lacks */
+function _pfRecoverBanner(lossCount){
+  let b=document.getElementById('pf-recover');if(b)b.remove();
+  b=document.createElement('div');b.id='pf-recover';
+  b.innerHTML='<span style="flex:1;min-width:200px"><b>Your saved copy on this browser was different from the server’s.</b> The server’s version was loaded, and your copy was kept as a backup. '+lossCount+' thing'+(lossCount!==1?'s':'')+' in it look'+(lossCount===1?'s':'')+' like they were lost (for example ticked tasks, archived events or settings).</span>'
+    +'<button class="btn btn-acc btn-sm" onclick="rcFromStash();this.closest(\'#pf-recover\').remove()">Review &amp; restore</button><button class="btn btn-ghost btn-sm" onclick="this.closest(\'#pf-recover\').remove()">Dismiss</button>';
+  document.body.appendChild(b);
+}
+function _pfLoadReport(info){
+  if(!info)return;
+  if(info.stashed){
+    const st=listLocalBackups().filter(x=>x.label==='Unsynced local copy').pop();if(!st)return;
+    let snap;try{snap=JSON.parse(st.data);}catch(_){return;}
+    const n=rcDiff(snap).filter(r=>r.loss).length;
+    if(n)_pfRecoverBanner(n);
+  }else if(info.rollback){
+    showToast('The server’s copy was older than this browser’s, so your newer data was written back to the server.',9000);
+  }
 }
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
@@ -10169,7 +10328,8 @@ function renderBackupList(){
     html2+='<div style="font-size:.67rem;color:var(--muted);margin-top:2px;">'+stats+'</div>';
     html2+='</div>';
     html2+='<button class="btn btn-ghost btn-xs" data-backup-dl="'+safeTs+'" title="Download">&#x2B07;</button>';
-    html2+='<button class="btn btn-acc btn-xs" data-backup-restore="'+safeTs+'">Restore</button>';
+    html2+='<button class="btn btn-acc btn-xs" data-backup-compare="'+safeTs+'" title="See what differs and restore only what you pick">Compare</button>';
+    html2+='<button class="btn btn-ghost btn-xs" data-backup-restore="'+safeTs+'" title="Replace everything with this backup">Restore all</button>';
     html2+='<button class="btn btn-danger btn-xs" data-backup-del="'+safeTs+'" title="Delete">&#215;</button>';
     html2+='</div>';
   });
@@ -10178,9 +10338,10 @@ function renderBackupList(){
   // Event delegation — avoids onclick quote escaping issues
   el2.onclick=function(ev){
     const btn=ev.target.closest('button');if(!btn)return;
-    const ts=btn.dataset.backupDl||btn.dataset.backupRestore||btn.dataset.backupDel;
+    const ts=btn.dataset.backupDl||btn.dataset.backupRestore||btn.dataset.backupDel||btn.dataset.backupCompare;
     if(!ts)return;
-    if(btn.dataset.backupDl)downloadLocalBackup(ts);
+    if(btn.dataset.backupCompare)rcFromLocal(ts);
+    else if(btn.dataset.backupDl)downloadLocalBackup(ts);
     else if(btn.dataset.backupRestore)restoreLocalBackup(ts);
     else if(btn.dataset.backupDel){deleteLocalBackup(ts);renderBackupList();}
   };
@@ -10205,6 +10366,11 @@ function renderSettings(){
   <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importData(this)">
   <!-- Auto-backup list -->
   <div id="pf-backup-list"></div>
+  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('rc-file-input').click()">Compare with a backup file…</button>
+    <span style="font-size:.7rem;color:var(--muted);">Pick a downloaded backup to see what differs and restore only what you choose.</span>
+    <input type="file" id="rc-file-input" accept=".json,application/json" style="display:none" onchange="rcFromFile(this)">
+  </div>
   <!-- PocketBase version history -->
   <div style="margin-top:18px;">
     <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
