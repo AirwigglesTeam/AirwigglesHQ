@@ -1350,6 +1350,23 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .dash-col .pcc-r3{row-gap:6px;}
 @media(max-width:1100px){.dash-cols{grid-template-columns:repeat(2,minmax(0,1fr));}}
 @media(max-width:600px){.dash-cols{grid-template-columns:minmax(0,1fr);}}
+
+/* v67: aligned rows across category columns (cards are grid cells), caption lives inside the first card of a group */
+.dash-cols{row-gap:10px;column-gap:16px;}
+.dash-col{display:contents;}
+.dash-col-hd{grid-column:var(--c);grid-row:var(--r);margin:0;}
+.dash-cell{grid-column:var(--c);grid-row:var(--r);min-width:0;align-self:start;}
+.dash-cell .ec-card,.dash-cell .dash-crow{margin-bottom:0;}
+.ec-card>.dash-grp-hd{margin:0;padding:9px 12px 0;color:var(--acc);font-size:.66rem;}
+.ec-card>.dash-grp-hd span{color:var(--acc)!important;}
+.dash-cell>.dash-grp-hd{margin:0;color:var(--acc);font-size:.66rem;}
+.dash-cell>.dash-grp-hd span{color:var(--acc)!important;}
+@media(max-width:1100px){
+  .dash-col{display:block;min-width:0;}
+  .dash-col-hd,.dash-cell{grid-column:auto;grid-row:auto;}
+  .dash-cell{margin-bottom:10px;}
+  .dash-col-hd{margin-bottom:10px;}
+}
 </style>
 </head>
 <body>
@@ -5323,7 +5340,7 @@ function ecShowTab(projId,tab,save=true){
 function _dKey(){return (typeof _pbUser!=='undefined'&&_pbUser&&(_pbUser.id||_pbUser.email))||'device';}
 function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
 function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
-const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['links','Quick links'],['team','Team'],['calendar','Calendar']];
+const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['team','Team'],['calendar','Calendar']];
 /* Most sections are on unless hidden. Opt-in sections (new ones) stay off until someone switches them on, so nobody's dashboard changes under them. */
 /* Dashboard top row: Timeline, Calendar and Team share one panel. Opening one closes the others; clicking the open one closes it. */
 function dashTopSet(k){window._dashTop=(_dashTopCur()===k)?'none':k;render();}
@@ -5381,7 +5398,7 @@ function _qlBtn(q){return `<a href="${escHtml(q.url)}" target="_blank" rel="noop
 function _pccDate(iso){const t=fmtD(iso);return String(iso).slice(0,4)===String(_localToday()).slice(0,4)?t.replace(/\s\d{4}$/,''):t;}
 function dashNotesToggle(){window._dashNotesOpen=!window._dashNotesOpen;render();}
 function _dashQuickHtml(){
-  const links=_dsOn('links'),notes=_dsOn('notes');
+  const links=false,notes=_dsOn('notes');   // Quick links are hidden on the dashboard for now (data and add/edit code are kept); set links=_dsOn('links') to bring them back
   if(!links&&!notes)return'';
   const n=(S.quickNotes||[]).filter(x=>!x.org).length,open=!!window._dashNotesOpen;
   let h='<div class="dash-quick'+(open?' notes-open':'')+'" id="dash-quick">';
@@ -6195,30 +6212,37 @@ ${_dashQuickHtml()}
         </div>
       </div>`;
       };
-      let _out=filtered.map(p=>{
-      const _g=_gi?(p.status==='active'?_gi.of(p):'other'):'other';
-      let _pre='';
-      if(_g!==_lastG){_lastG=_g;if(_gi&&_g!=='other')_pre=_dashGroupHd(_g,_gi);}
-      if(_gi&&_g!=='other'){
-        if(!_dashGrpOpen(_g))return _pre;
-        if(_g==='later'||_g==='finished'||(_g==='soon'&&_gi.idx(p)>=4))return _pre+_dashCompactRow(p);
-      }
-      return _card(p,_pre);
-      }).join('');
-      /* Category columns: Events | Ongoing | Projects | Admin side by side, cards stacked inside each column */
-      const _colHd=(t,label,n,off)=>`<div class="dash-col-hd" ${t==='event'?'':`onclick="projSecToggle('${t}')" `}>
+      /* Rows line up across columns: every card is a grid cell at (column, row), so the first card of each
+         category starts at the same height, and so does the second, and so on. The group captions (Happening now…)
+         live inside the first card of their group so they never push a card out of line. */
+      const _evCells=[];
+      filtered.forEach(p=>{
+        const _g=_gi?(p.status==='active'?_gi.of(p):'other'):'other';
+        let _hd='';
+        if(_g!==_lastG){_lastG=_g;if(_gi&&_g!=='other')_hd=_dashGroupHd(_g,_gi);}
+        if(_gi&&_g!=='other'){
+          if(!_dashGrpOpen(_g)){if(_hd)_evCells.push(_hd);return;}
+          if(_g==='later'||_g==='finished'||(_g==='soon'&&_gi.idx(p)>=4)){if(_hd)_evCells.push(_hd);_evCells.push(_dashCompactRow(p));return;}
+        }
+        let h=_card(p,'');
+        if(_hd&&h.indexOf('<div class="ec-card')===0)h=h.replace(/^(<div class="ec-card[^>]*>)/,'$1'+_hd.replace(/\$/g,'$$$$'));
+        else if(_hd)_evCells.push(_hd);
+        _evCells.push(h);
+      });
+      const _cell=(c,r,html)=>`<div class="dash-cell" style="--c:${c};--r:${r}">${html}</div>`;
+      const _colHd=(c,t,label,n,off)=>`<div class="dash-col-hd" style="--c:${c};--r:1" ${t==='event'?'':`onclick="projSecToggle('${t}')" `}>
           ${t==='event'?'':`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .15s;transform:rotate(${off?-90:0}deg);"><polyline points="6 9 12 15 18 9"/></svg>`}
           <span class="dash-col-lbl">${label}</span><span class="dash-col-n">${n}</span>
           <button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="event.stopPropagation();newProjOfType('${t}')">+ New</button>
         </div>`;
       const _cols=[];
-      if(filtered.length)_cols.push(`<div class="dash-col" data-proj-col="event">${_colHd('event','Events',filtered.length,false)}<div class="dash-pgrid">${_out}</div></div>`);
+      if(filtered.length)_cols.push(`<div class="dash-col" data-proj-col="event">${_colHd(_cols.length+1,'event','Events',filtered.length,false)}${_evCells.map((h,i)=>_cell(1,i+2,h)).join('')}</div>`);
       _other.forEach(([t,items])=>{
-        const off=!!(window._projSecOff||{})[t];
-        _cols.push(`<div class="dash-col" data-proj-sec="${t}">${_colHd(t,PROJ_TYPES[t].plural,items.length,off)}${off?'':'<div class="dash-pgrid">'+items.map(p=>_card(p,'')).join('')+'</div>'}</div>`);
+        const c=_cols.length+1,off=!!(window._projSecOff||{})[t];
+        _cols.push(`<div class="dash-col" data-proj-sec="${t}">${_colHd(c,t,PROJ_TYPES[t].plural,items.length,off)}${off?'':items.map((p,i)=>_cell(c,i+2,_card(p,''))).join('')}</div>`);
       });
       const _add=`<div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;margin-top:14px;font-size:.7rem;color:var(--muted);" data-proj-add="1">Add:${Object.keys(PROJ_TYPES).filter(t=>t!=='event').map(t=>`<button class="btn btn-ghost btn-xs" onclick="newProjOfType('${t}')">+ ${PROJ_TYPES[t].label}</button>`).join('')}</div>`;
-      return '<div class="dash-cols" style="--n:'+Math.min(4,_cols.length||1)+'">'+_cols.join('')+'</div>'+_add;
+      return '<div class="dash-cols">'+_cols.join('')+'</div>'+_add;
 
     })()}
   </div>
@@ -7339,7 +7363,7 @@ ${filtered.length===0?`<div class="empty"><div class="empty-ico">${ICO.folder}</
 function openDetail(id){S.detailId=id;render();}
 function renderDetail(id){
   const p=getProject(id);if(!p)return'';
-  const _adm=projType(p)==='admin';   // Admin pages are a lean task list: no overview, objectives, tools or expenses
+  const _adm=projType(p)==='admin'||/^\s*admin\s*$/i.test(p.name||'');   // Admin pages (type Admin, or a page named Admin) are a lean task list: no overview, objectives, tools or expenses
   const comp=projComp(p);
   const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId);
   const expTotal=(p.expenses||[]).reduce((a,e)=>a+e.amount,0);
