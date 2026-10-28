@@ -6939,6 +6939,8 @@ function _updateTaskRowInPlace(id){
 
 function spawnRecurring(t){
   if(!t.recur||!t.recur.enabled)return;
+  /* A subtask under a recurring parent never spawns on its own: the parent's next occurrence brings the whole checklist with it. */
+  if(t.parentId){const par=getTask(t.parentId);if(par&&par.recur&&par.recur.enabled)return;}
   if(t.recurNext&&getTask(t.recurNext))return;                       // already scheduled: un-ticking and re-ticking must not add copies
   const today=_localToday();
   let nextEnd='',nextStart='';
@@ -6948,8 +6950,21 @@ function spawnRecurring(t){
   /* Dated tasks get an id made from the series and the due date, so two people ticking it off at once produce ONE next task, not two. */
   const id=(nextEnd||nextStart)?root+'_r'+(nextEnd||nextStart):uid();
   if(getTask(id)){t.recurNext=id;return;}
-  S.tasks.push({...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:null,recurRoot:root,recurNext:''});
+  S.tasks.push({...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:t.parentId||null,recurRoot:root,recurNext:''});
   t.recurNext=id;
+  /* Subtasks (and their subtasks) come along: not done, dates moved by the same amount as the parent, no recurrence of their own.
+     Their ids come from the new parent's id plus the original subtask's id, so the same copy is produced however many people tick at once. */
+  const shift=t.endDate&&nextEnd?Math.round((Date.parse(nextEnd)-Date.parse(t.endDate))/864e5):(t.startDate&&nextStart?Math.round((Date.parse(nextStart)-Date.parse(t.startDate))/864e5):0);
+  const idMap={};idMap[t.id]=id;
+  const kids=[];const walk=pid=>S.tasks.filter(c=>c.parentId===pid&&!c.recurNext).forEach(c=>{kids.push(c);walk(c.id);});
+  walk(t.id);
+  kids.forEach(c=>{idMap[c.id]=id+'_s_'+(c.subRoot||c.id);});
+  kids.forEach(c=>{
+    const nid=idMap[c.id];if(getTask(nid))return;
+    S.tasks.push({...c,id:nid,parentId:idMap[c.parentId]||id,subRoot:c.subRoot||c.id,done:false,kStatus:c.kStatus==='done'?'todo':c.kStatus,slackReminder:{},
+      startDate:c.startDate?addDays(c.startDate,shift):'',endDate:c.endDate?addDays(c.endDate,shift):'',
+      blockedBy:(c.blockedBy||[]).map(b=>idMap[b]).filter(Boolean),recur:{...(c.recur||{}),enabled:false},recurRoot:undefined,recurNext:''});
+  });
 }
 
 function quickAddSub(parentId){
