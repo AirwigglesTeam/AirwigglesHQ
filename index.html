@@ -1392,9 +1392,10 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .rc-row{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--border2);cursor:pointer}
 .rc-row input{margin-top:3px;flex:none;width:18px;height:18px}
 .rc-more{margin-top:12px}.rc-more summary{cursor:pointer;font-size:.74rem;color:var(--muted);padding:4px 0}
-#pf-recover,#pf-integrity{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
+#pf-recover,#pf-integrity,#pf-hold{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
 .pf-warn{font-size:.72rem;line-height:1.45;color:var(--red,#e5534b);background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
 #pf-integrity{border-color:var(--red,#e5534b)!important;bottom:70px}
+#pf-hold{border-color:var(--red,#e5534b)!important;bottom:130px;z-index:10000}
 </style>
 </head>
 <body>
@@ -1964,6 +1965,8 @@ function create(env){
   let running=false,again=false,timer=null,persistTimer=null,backoff=0,stopped=false;
   let lastErr=null;
   let seqNow=0;             // highest write sequence number seen/written
+  let held=null;             // an incoming change that looks like a mass reversal, waiting for the user's decision
+  const BRAKE_N=3;           // this many un-ticks + reopened events + deletions arriving in ONE incoming change pauses sync
   let wrote=false;           // a write happened this run: schedule a cheap verification afterwards
   let revive=false;         // set by undo/restore: let the next sync re-add items someone else deleted
 
@@ -2116,6 +2119,15 @@ function create(env){
 
   /* The heart of it: merge a remote snapshot into live local state.
      Synchronous — nothing can interleave between reading S and adopting. */
+  /* what an incoming merge result would REVERSE in the live data: ticks removed, archived events reopened, items deleted */
+  function reversals(Lp,M){
+    const o={untick:[],reopen:[],del:[]};
+    const tm=new Map((M.tasks||[]).filter(hasId).map(t=>[t.id,t])),pm=new Map((M.projects||[]).filter(hasId).map(p=>[p.id,p]));
+    for(const t of (Lp.tasks||[])){if(!hasId(t))continue;const m=tm.get(t.id);if(!m)o.del.push(t.name||t.id);else if(t.done&&!m.done)o.untick.push(t.name||t.id);}
+    for(const p of (Lp.projects||[])){if(!hasId(p))continue;const m=pm.get(p.id);if(!m)o.del.push((p.name||p.id)+' (project)');else if(p.status==='completed'&&m.status==='active')o.reopen.push(p.name||p.id);}
+    o.n=o.untick.length+o.reopen.length+o.del.length;
+    return o;
+  }
   function mergeStep(R){
     if(env.prepare)env.prepare();          // normalise live state (defaults) so it compares like-for-like with remote
     noteDeletes();
@@ -2143,6 +2155,11 @@ function create(env){
       if(M){
         M._tomb=mergeTomb(Lp._tomb,R.proj._tomb);
         applyTombs(M);
+      }
+      if(M&&R.keep){M=clone(Lp);M._tomb=mergeTomb(Lp._tomb,R.proj._tomb);applyTombs(M);}   // user chose to keep this device's data over the incoming change
+      else if(M&&env.onHold&&!R.approved&&stable(M)!==ls){
+        const rv=reversals(Lp,M);
+        if(rv.n>=BRAKE_N)return{held:true,rev:rv,changed:false,needWrite:false,changes:null};
       }
     }
     LOG('merge',{rWid:R.meta.wid,rSeq:R.meta.seq,anc:b===null?'none':(H.findIndex(c=>c.proj===b)),H:H.map(c=>c.wid&&c.wid.slice(0,4)+'@'+c.seq),local:(Lp.tasks||[]).map(t=>t.id).join(','),remote:(R.proj.tasks||[]).map(t=>t.id).join(',')});
@@ -2175,6 +2192,7 @@ function create(env){
         if(stable(loc)!==(R.str||(R.str=stable(R.proj)))){try{env.stash(JSON.stringify(loc));}catch(_){}}
       }
       const r=mergeStep(R);
+      if(r.held){holdIt(R,r.rev);return;}
       if(r.changed){try{env.onApplied({by:R.meta.by,byName:R.meta.byName,client:R.meta.client,seq:R.meta.seq,changes:r.changes||[]});}catch(e){console.error(e);}}
       if(!r.needWrite){persistNow();env.status('synced');return;}
     }
@@ -2205,8 +2223,16 @@ function create(env){
     if(stable(project(S()))!==stable(snap))again=true; // edited while writing
   }
 
+  function holdIt(R,rv){
+    held={R,rev:rv};
+    const cut=a=>a.slice(0,8);
+    const info={untick:rv.untick.length,reopen:rv.reopen.length,del:rv.del.length,names:{untick:cut(rv.untick),reopen:cut(rv.reopen),del:cut(rv.del)},by:R.meta.by,byName:R.meta.byName};
+    try{env.status('error','⚠ Sync paused: review the incoming changes');}catch(_){}
+    try{env.onHold&&env.onHold(info);}catch(e){console.error(e);}
+  }
   async function run(){
     if(stopped)return;
+    if(held)return;                       // waiting for the user's decision: no merging, no writing
     if(running){again=true;return;}
     running=true;
     try{
@@ -2287,6 +2313,14 @@ function create(env){
     flush:persistNow,
     foldSiblings,
     allowRevive(){revive=true;},
+    held(){return held?{n:held.rev.n}:null;},
+    resolveHold(choice){
+      if(!held)return;
+      const R=held.R;held=null;
+      if(choice==='apply')R.approved=true;else R.keep=true;
+      try{env.onHold&&env.onHold(null);}catch(_){}
+      schedule(0);
+    },
     requestSync(ms){if(running){again=true;return;}schedule(ms||0);},
     async poll(){
       if(stopped||running||timer)return;
@@ -2334,7 +2368,8 @@ function create(env){
           env.replaceState(localState);resetSeen();
           H=hist;seqNow=Math.max(seqNow,stored.sq||0);
           const r=mergeStep(R);
-          if(r.needWrite)schedule(0);
+          if(r.held)holdIt(R,r.rev);
+          else if(r.needWrite)schedule(0);
           try{if(env.onLoadReport&&(stored.sq||0)>(R.meta.seq||0))env.onLoadReport({stashed:false,rollback:true});}catch(_){}
         }else{
           // no trustworthy history → server is the truth; keep any local copy as an orphan backup
@@ -2565,6 +2600,7 @@ const PF=PFSync.create({
     _dailySnapshotIfDue();
   },
   onLoadReport:info=>_pfLoadReport(info),
+  onHold:info=>_pfOnHold(info),
   clientId:_myClientId,
   debounceMs:500,
   loadTimeoutMs:25000
@@ -6214,6 +6250,28 @@ function _pfLoadReport(info){
   }else if(info.rollback){
     showToast('The server’s copy was older than this browser’s, so your newer data was written back to the server.',9000);
   }
+}
+
+/* ── brake: an incoming sync that would un-tick / reopen / delete several things at once waits for a decision ── */
+function _pfOnHold(info){
+  let b=document.getElementById('pf-hold');if(b)b.remove();
+  if(!info)return;
+  const parts=[];
+  if(info.untick)parts.push('un-tick <b>'+info.untick+'</b> task'+(info.untick!==1?'s':''));
+  if(info.reopen)parts.push('reopen <b>'+info.reopen+'</b> archived project'+(info.reopen!==1?'s':''));
+  if(info.del)parts.push('delete <b>'+info.del+'</b> item'+(info.del!==1?'s':''));
+  const names=[].concat(info.names.reopen,info.names.untick,info.names.del).slice(0,8).map(escHtml).join(', ');
+  b=document.createElement('div');b.id='pf-hold';
+  b.innerHTML='<span style="flex:1;min-width:220px"><b>Sync paused.</b> A change'+(info.byName?' from '+escHtml(info.byName):' from the server')+' would '+parts.join(', ').replace(/, ([^,]*)$/,' and $1')+'. This often means an older copy is overwriting newer work. Nothing has been changed here yet.'
+    +(names?'<br><span style="color:var(--muted)">'+names+(info.untick+info.reopen+info.del>8?', …':'')+'</span>':'')+'</span>'
+    +'<button class="btn btn-ghost btn-sm" onclick="_pfHoldChoose(\'apply\')">Apply their changes</button><button class="btn btn-acc btn-sm" onclick="_pfHoldChoose(\'keep\')">Keep what I have</button>';
+  document.body.appendChild(b);
+}
+function _pfHoldChoose(c){
+  if(c==='keep'&&!confirm('Keep what is on this device? Your version will replace the incoming change on the server.'))return;
+  if(c==='apply'&&!confirm('Apply the incoming change here? This will un-tick, reopen or delete the items listed. You can undo afterwards.'))return;
+  PF.resolveHold(c);
+  const b=document.getElementById('pf-hold');if(b)b.remove();
 }
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
