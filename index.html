@@ -1380,6 +1380,12 @@ body.mcal-dragging *{cursor:grabbing !important;}
 @media(max-width:1100px){.dash-cell.stk{display:block;}}
 .dash-stack.one .dash-crow{flex:none;}
 .dash-cell.stk:has(.dash-stack.one){align-self:start;}
+
+/* v72: ongoing projects show open tasks as due-date dots on the timeline */
+.tdot{position:absolute;top:50%;transform:translateY(-50%);width:14px;height:14px;border-radius:50%;background:var(--tc,var(--acc));border:2px solid var(--surface);box-shadow:0 0 0 1px color-mix(in srgb,var(--tc,var(--acc)) 55%,transparent);cursor:pointer;display:flex;align-items:center;justify-content:center;font-size:.5rem;font-weight:700;color:#111;line-height:1;transition:transform .12s;z-index:2;}
+.tdot:hover{transform:translateY(-50%) scale(1.3);}
+.tdot.multi{width:18px;height:18px;margin-left:-2px;font-size:.58rem;}
+.tdot.od{box-shadow:0 0 0 2px var(--red);}
 </style>
 </head>
 <body>
@@ -6818,6 +6824,29 @@ function _posCoworkTip(e,tip){
   if(top+th>window.innerHeight-8)top=window.innerHeight-th-8;
   tip.style.left=left+'px';tip.style.top=top+'px';
 }
+/* Ongoing projects on the timeline: one dot per due date, hover for the task detail */
+function _tdotTasks(pid,d){return S.tasks.filter(t=>t.projectId===pid&&!t.done&&t.endDate===d);}
+function showTaskDotTip(e,pid,d){
+  const tip=el('cowork-tooltip');if(!tip)return;
+  const ts=_tdotTasks(pid,d);if(!ts.length)return;
+  const p=getProject(pid);
+  const diff=Math.round((Date.parse(d)-Date.parse(_localToday()))/864e5);
+  const when=diff<0?Math.abs(diff)+' day'+(diff===-1?'':'s')+' overdue':diff===0?'Due today':'Due in '+diff+' day'+(diff===1?'':'s');
+  const who=t=>(t.assignees||[]).map(id=>getMember(id)).filter(Boolean).map(m=>m.name.split(' ')[0]).join(', ');
+  let h='<div class="cwtt-title">'+(ts.length===1?escHtml(ts[0].name):ts.length+' tasks due')+'</div>';
+  h+='<div class="cwtt-row"><span'+(diff<0?' style="color:var(--red);font-weight:600;"':'')+'>'+escHtml(fmtD(d))+' · '+when+'</span></div>';
+  if(p)h+='<div class="cwtt-row"><span style="width:7px;height:7px;border-radius:50%;background:'+p.color+';display:inline-block;margin-top:5px;flex-shrink:0;"></span><span>'+escHtml(p.name)+'</span></div>';
+  if(ts.length===1){
+    const t=ts[0];
+    h+='<div class="cwtt-row"><span>Priority: '+escHtml(t.priority||'Medium')+(who(t)?' · '+escHtml(who(t)):' · Unassigned')+'</span></div>';
+    if(t.description)h+='<div class="cwtt-row"><span>'+escHtml(String(t.description).slice(0,120))+(String(t.description).length>120?'…':'')+'</span></div>';
+  }else{
+    ts.slice(0,6).forEach(t=>{h+='<div class="cwtt-row"><span>• '+escHtml(t.name)+(who(t)?' <span style="color:var(--muted);">('+escHtml(who(t))+')</span>':'')+'</span></div>';});
+    if(ts.length>6)h+='<div class="cwtt-row"><span style="color:var(--muted);">+ '+(ts.length-6)+' more</span></div>';
+  }
+  tip.innerHTML=h;tip.classList.add('visible');_posCoworkTip(e,tip);
+}
+function tdotClick(pid,d){hideCoworkTip();const ts=_tdotTasks(pid,d);if(ts.length===1)openModal('task',ts[0].id);else if(ts.length)openDetail(pid);}
 function hideCoworkTip(){const tip=el('cowork-tooltip');if(tip)tip.classList.remove('visible');}
 
 function showPhaseTip(e,phase,status,daysLine,dateRange){
@@ -8315,7 +8344,9 @@ function _renderGanttInner(projects,fullPage=false,opts){
     const _bp0=barP(p.startDate,p.endDate);
     const openEnded=projType(p)==='ongoing'&&!p.endDate&&!!p.startDate&&!!_bp0;   // ongoing work with no end date runs off the right edge
     const bp=openEnded?{l:_bp0.l,w:Math.max(totalW-_bp0.l,8)}:_bp0;
-    const bHtml=bp?`<div class="gbar" style="left:${bp.l}px;width:${bp.w}px;background:${p.color}22;border:1px solid ${p.color}55;${openEnded?'border-right:2px dashed '+p.color+'99;':''}" onclick="openDetail('${p.id}')">${openEnded?'':`<div class="gbar-fill" style="width:${comp}%;background:${p.color};"></div>`}<div class="gbar-txt">${escHtml(p.name)}${openEnded?' · ongoing':' · '+comp+'%'}</div></div>`:'';
+    /* Ongoing work has no end, so it gets no bar: its open tasks with a due date show as dots (hover for detail) */
+    const _perp=projType(p)==='ongoing'&&!opts.all;
+    const bHtml=(bp&&!_perp)?`<div class="gbar" style="left:${bp.l}px;width:${bp.w}px;background:${p.color}22;border:1px solid ${p.color}55;${openEnded?'border-right:2px dashed '+p.color+'99;':''}" onclick="openDetail('${p.id}')">${openEnded?'':`<div class="gbar-fill" style="width:${comp}%;background:${p.color};"></div>`}<div class="gbar-txt">${escHtml(p.name)}${openEnded?' · ongoing':' · '+comp+'%'}</div></div>`:'';
     // Phase segments rendered as a separate row below the project bar
     const phaseBars=getPhaseBars(p);
     const today=new Date();today.setHours(0,0,0,0);
@@ -8353,9 +8384,16 @@ function _renderGanttInner(projects,fullPage=false,opts){
     const _dated=t=>!!(t.startDate||t.endDate);
     const _kids=id=>S.tasks.filter(x=>x.parentId===id);
     const _hasDated=(t,d)=>_dated(t)||(d<3&&_kids(t.id).some(k=>_hasDated(k,d+1)));
-    const top=S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(opts.all?_hasDated(t,0):_dated(t)))
+    let dotHtml='';
+    if(_perp){
+      const by={};S.tasks.forEach(t=>{if(t.projectId===p.id&&!t.done&&t.endDate)(by[t.endDate]=by[t.endDate]||[]).push(t);});
+      const tdy=_localToday();
+      dotHtml=Object.keys(by).map(d=>{const off=ganttDayOffset(d);if(off===null||off<0||off>=totalDays)return'';const n=by[d].length;
+        return '<div class="tdot'+(d<tdy?' od':'')+(n>1?' multi':'')+'" style="left:'+(off*_dpx()+_dpx()/2-8)+'px;--tc:'+p.color+';" onmouseenter="showTaskDotTip(event,\''+p.id+'\',\''+d+'\')" onmouseleave="hideCoworkTip()" onclick="tdotClick(\''+p.id+'\',\''+d+'\')">'+(n>1?n:'')+'</div>';}).join('');
+    }
+    const top=_perp?[]:S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(opts.all?_hasDated(t,0):_dated(t)))
       .sort((a,b)=>((a.endDate||a.startDate)<(b.endDate||b.startDate)?-1:(a.endDate||a.startDate)>(b.endDate||b.startDate)?1:0));   // dated tasks only, soonest first
-    rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')">${opts.all?'':`<button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button>`}<div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${escHtml(p.name)}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
+    rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')">${opts.all?'':`<button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button>`}<div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${escHtml(p.name)}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${dotHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
     const _trow=(t,depth)=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" style="left:${tb.l}px;width:${tb.w}px;height:${depth?9:11}px;background:${p.color}${depth?'12':'18'};border:1px solid ${p.color}${depth?'28':'35'};"><div class="gbar-fill" style="width:${tc}%;background:${p.color}${depth?'60':'80'};"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub"${depth?` style="padding-left:${14+depth*12}px;"`:''}><span class="grow-lbl-name" style="font-size:${depth?'.64':'.68'}rem;color:${depth?'var(--muted)':'var(--text2)'};">${escHtml(t.name)}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;
       if(opts.all&&depth<3)_kids(t.id).filter(k=>_hasDated(k,0)).sort((x,y)=>String(x.endDate||x.startDate||'9').localeCompare(String(y.endDate||y.startDate||'9'))).forEach(k=>_trow(k,depth+1));};
     if(isExp)top.forEach(t=>_trow(t,0));
