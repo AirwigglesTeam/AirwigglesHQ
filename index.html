@@ -3186,13 +3186,13 @@ async function renderPBHistoryList(){
   }
   const badge=t=>t==='daily'?'Daily':t==='session'?'Session start':'Auto';
   el3.innerHTML=warn+warn2+clean+snaps.map(s=>{
-    const dt=new Date(s.saved_at);
-    const age=_timeAgo(dt);
+    const dt=s.saved_at?new Date(s.saved_at):null;
+    const age=dt?_timeAgo(dt):'time unknown';
     const count=s.item_count||'?';
     return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2);">
       <div style="flex:1;min-width:0;">
         <div style="font-size:.78rem;font-weight:600;">${escHtml(s.label||'Auto')} <span style="font-size:.62rem;font-weight:600;color:var(--muted);">${badge(_histTier(s.label))}</span></div>
-        <div style="font-size:.68rem;color:var(--muted);">${age} · ${count} items · ${dt.toLocaleString()}</div>
+        <div style="font-size:.68rem;color:var(--muted);">${age} · ${count} items${dt?' · '+dt.toLocaleString():''}</div>
       </div>
       <button class="btn btn-acc btn-xs" onclick="rcFromServer('${s.id}')" title="See what differs and restore only what you pick">Compare</button>
       <button class="btn btn-ghost btn-xs" onclick="restoreHistorySnapshot('${s.id}')" title="Replace everything with this snapshot">Restore all</button>
@@ -3235,7 +3235,7 @@ async function _saveHistorySnapshot(label='Auto',manual){
 }
 /* Read the snapshot list: small, cheap and never automatic. Two query shapes (a bad sort/field gives a bare HTTP 400 on some setups),
    short timeouts, and a circuit breaker so a struggling server is never hammered. Returns {items,err}. */
-const _HIST_VARIANTS=['?sort=-@rowid&perPage=30&skipTotal=1&fields=id,label,saved_at,item_count,created,workspace','?perPage=30&skipTotal=1&fields=id,label,saved_at,item_count,created,workspace'];
+const _HIST_VARIANTS=['?perPage=N&skipTotal=1&fields=id,label,saved_at,item_count','?sort=-@rowid&perPage=N&skipTotal=1&fields=id,label,saved_at,item_count','?perPage=N&skipTotal=1&fields=id,label'];
 let _histVariant=-1,_histDownAt=0;
 const _histDown=()=>Date.now()-_histDownAt<10*60*1000;     // history trouble in the last 10 minutes: skip all automatic history work
 async function _histFetchAll(n){
@@ -3244,12 +3244,12 @@ async function _histFetchAll(n){
   const notes=[];
   for(const i of order){
     try{
-      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records'+(n?_HIST_VARIANTS[i].replace('perPage=30','perPage='+n):_HIST_VARIANTS[i]),{headers:{Authorization:_pbToken},cache:'no-store'},15000);
-      if(!r.ok){notes.push('query '+(i+1)+': '+await _histErr(r));if(r.status===400)continue;break;}   // only a 400 (bad sort/field) is worth a second shape
+      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records'+_HIST_VARIANTS[i].replace('perPage=N','perPage='+(n||100)),{headers:{Authorization:_pbToken},cache:'no-store'},15000);
+      if(!r.ok){notes.push('query '+(i+1)+': '+await _histErr(r));if(r.status===400||r.status>=500)continue;break;}   // a rejected query shape (400 / server error) is worth the next, simpler shape; auth errors are not
       const d=await r.json();_histVariant=i;
       const items=((d.items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE)).map(x=>({...x,saved_at:x.saved_at||x.created||''}));
       items.sort((a,b)=>a.saved_at<b.saved_at?1:a.saved_at>b.saved_at?-1:0);   // newest first
-      _histDownAt=0;return{items,err:''};
+      _histDownAt=0;return{items:n?items:items.slice(0,40),err:''};
     }catch(e){notes.push('query '+(i+1)+': '+(e&&e.name==='AbortError'?'timed out (the server is slow or overloaded)':String(e&&e.message||e)));break;}   // network trouble: stop, don't pile on
   }
   _histVariant=-1;_histDownAt=Date.now();return{items:[],err:notes.join(' · ')};
