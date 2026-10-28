@@ -7361,7 +7361,6 @@ function projCardHtml(p){
 }
 
 /* ════ PROJECTS + BACKLOG (combined) ════ */
-function projSecToggle(t){if(!window._projSecOff)window._projSecOff={};window._projSecOff[t]=!window._projSecOff[t];render();}
 function renderProjects(){
   const filter=S.projFilter||'all';
   const all=S.projects;
@@ -9405,7 +9404,7 @@ function renderFinance(){
     const budgets=S.finance.budgets||{};
     const allItems=[...S.finance.recurring,...S.finance.oneoff.map(e=>({...e,freq:'One-off'}))];
     const catSpend={};
-    allItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catSpend[e.cat]=(catSpend[e.cat]||0)+v;});
+    allItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catSpend[e.cat||'Other']=(catSpend[e.cat||'Other']||0)+v;});
     const allCats=[...new Set([...FIN_CAT_NAMES,...Object.keys(catSpend)])];
     const totalBudget=allCats.reduce((a,cat)=>a+(parseFloat(budgets[cat])||0),0);
     const totalSpend=allCats.reduce((a,cat)=>a+(catSpend[cat]||0),0);
@@ -9661,7 +9660,7 @@ function generateFinanceReport(){
   const budgets=S.finance.budgets||{};
   const catItems=[...S.finance.recurring,...S.finance.oneoff.map(e=>({...e,freq:'One-off'}))];
   const catSpend={};
-  catItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catSpend[e.cat]=(catSpend[e.cat]||0)+v;});
+  catItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catSpend[e.cat||'Other']=(catSpend[e.cat||'Other']||0)+v;});
   const allCats=Object.keys(FIN_CATS);
   const brandName=S.settings?.brandName||'Airwiggles — ProjectFlow';
   const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
@@ -9986,16 +9985,16 @@ function renderFinCharts(){
 
   // Category breakdowns
   const allItems=[...S.finance.recurring,...S.finance.oneoff.map(e=>({...e,freq:'One-off'}))];
-  const catTotals={};allItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catTotals[e.cat]=(catTotals[e.cat]||0)+v;});
+  const catTotals={};allItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catTotals[e.cat||'Other']=(catTotals[e.cat||'Other']||0)+v;});
   const catKeys=Object.keys(catTotals),catVals=catKeys.map(k=>catTotals[k]),catColors=catKeys.map(k=>(FIN_CATS[k]||{c:'#888'}).c);
 
   if(tab==='overview'||tab==='categories'){
     mkDonut('fin-donut-main',['Recurring','One-off','Project Exp','Net profit','Corp tax'],[rec,oo,proj,Math.max(0,net),ct.tax],['#e06060','#f0a500','#f59e0b','#1fba7a','#8b5cf6'],'fin-leg-main');
     mkDonut('fin-donut-cat',catKeys,catVals,catColors,'fin-leg-cat');
     mkDonut('fin-donut-cat-ov',catKeys,catVals,catColors,'fin-leg-cat-ov');
-    const recCat={};S.finance.recurring.forEach(e=>{recCat[e.cat]=(recCat[e.cat]||0)+finAnn(e);});
+    const recCat={};S.finance.recurring.forEach(e=>{recCat[e.cat||'Other']=(recCat[e.cat||'Other']||0)+finAnn(e);});
     mkDonut('fin-donut-rec',Object.keys(recCat),Object.values(recCat),Object.keys(recCat).map(k=>(FIN_CATS[k]||{c:'#888'}).c));
-    const ooCat={};S.finance.oneoff.forEach(e=>{ooCat[e.cat]=(ooCat[e.cat]||0)+e.amount;});
+    const ooCat={};S.finance.oneoff.forEach(e=>{ooCat[e.cat||'Other']=(ooCat[e.cat||'Other']||0)+e.amount;});
     mkDonut('fin-donut-oo',Object.keys(ooCat),Object.values(ooCat),Object.keys(ooCat).map(k=>(FIN_CATS[k]||{c:'#888'}).c));
   }
   if(tab==='tax'){
@@ -14595,7 +14594,7 @@ function previewMemberPhoto(input){
 function clearAll(){
   if(!confirm('This will permanently delete ALL your data. Are you absolutely sure?'))return;
   if(!confirm('Last chance — this cannot be undone. Delete everything?'))return;
-  S=JSON.parse(JSON.stringify(window._S_DEFAULTS||{projects:[],tasks:[],members:[],labels:[],areas:[],quickLinks:[],taskTemplates:[],coworkDays:[],sponsors:[],finance:{recurring:[],oneoff:[]},settings:{},members:[]}));
+  S=JSON.parse(JSON.stringify(window._S_DEFAULTS||{projects:[],tasks:[],members:[],labels:[],areas:[],quickLinks:[],taskTemplates:[],coworkDays:[],sponsors:[],finance:{recurring:[],oneoff:[]},settings:{}}));
   _lastKnownCounts={projects:0,tasks:0,members:0,sponsors:0};
   saveNow();render();
 }
