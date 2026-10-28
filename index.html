@@ -3226,23 +3226,23 @@ async function _saveHistorySnapshot(label='Auto'){
 }
 /* Read the snapshot list. Different PocketBase setups name/allow different fields, and a bad sort or field gives a bare HTTP 400,
    so try progressively simpler queries and remember the first one that works. Returns {items,err}. */
-const _HIST_VARIANTS=['?sort=-saved_at&perPage=200&fields=id,label,saved_at,item_count,created,workspace','?sort=-created&perPage=200&fields=id,label,saved_at,item_count,created,workspace','?perPage=200&fields=id,label,saved_at,item_count,created','?perPage=200'];
+const _HIST_VARIANTS=['?sort=-saved_at&perPage=200&fields=id,label,saved_at,item_count,created,workspace','?sort=-created&perPage=200&fields=id,label,saved_at,item_count,created,workspace','?perPage=200&fields=id,label,saved_at,item_count,created','?perPage=25&fields=id,label,saved_at,item_count','?perPage=25&page=1'];
 let _histVariant=-1;
 async function _histFetchAll(){
   if(!_pbToken)return{items:[],err:'not signed in'};
   const order=_histVariant>=0?[_histVariant]:_HIST_VARIANTS.map((_,i)=>i);
-  let err='';
+  const notes=[];
   for(const i of order){
     try{
-      const r=await fetch(PB_URL+'/api/collections/workspace_history/records'+_HIST_VARIANTS[i],{headers:{Authorization:_pbToken},cache:'no-store'});
-      if(!r.ok){err=await _histErr(r);if(r.status===400)continue;if(_histVariant>=0)_histVariant=-1;return{items:[],err};}
+      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records'+_HIST_VARIANTS[i],{headers:{Authorization:_pbToken},cache:'no-store'},30000);
+      if(!r.ok){notes.push('query '+(i+1)+': '+await _histErr(r));if(r.status===401||r.status===403)break;continue;}
       const d=await r.json();_histVariant=i;
       const items=((d.items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE)).map(x=>({...x,saved_at:x.saved_at||x.created||''}));
       items.sort((a,b)=>a.saved_at<b.saved_at?1:a.saved_at>b.saved_at?-1:0);   // newest first
       return{items,err:''};
-    }catch(e){err=String(e&&e.message||e);break;}
+    }catch(e){notes.push('query '+(i+1)+': '+(e&&e.name==='AbortError'?'timed out':String(e&&e.message||e)));}   // network/CORS failure: try the next, simpler query
   }
-  _histVariant=-1;return{items:[],err};
+  _histVariant=-1;return{items:[],err:notes.join(' · ')};
 }
 async function _pruneHistory(){
   try{
