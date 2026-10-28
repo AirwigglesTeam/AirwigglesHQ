@@ -1392,8 +1392,9 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .rc-row{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--border2);cursor:pointer}
 .rc-row input{margin-top:3px;flex:none;width:18px;height:18px}
 .rc-more{margin-top:12px}.rc-more summary{cursor:pointer;font-size:.74rem;color:var(--muted);padding:4px 0}
-#pf-recover{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
+#pf-recover,#pf-integrity{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
 .pf-warn{font-size:.72rem;line-height:1.45;color:var(--red,#e5534b);background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
+#pf-integrity{border-color:var(--red,#e5534b)!important;bottom:70px}
 </style>
 </head>
 <body>
@@ -2199,6 +2200,8 @@ function create(env){
     wrote=true;
     persistNow();
     try{env.onSaved(snap);}catch(e){console.error(e);}
+    // read-back check (fire-and-forget, never blocks or alters the sync): did the server really keep what we sent?
+    if(T.verify){try{Promise.resolve(T.verify(wid,res.token)).then(v=>{try{env.onVerify&&env.onVerify(v);}catch(_){}} ,()=>{});}catch(_){}}
     if(stable(project(S()))!==stable(snap))again=true; // edited while writing
   }
 
@@ -2434,6 +2437,50 @@ async function _pbPut(str,id,base){
   return{token:_pbTok(rec)};
 }
 
+/* Read-back: after a save, ask the server whether the record really holds the version we just wrote (tail marker _wid).
+   Anything unexpected (network, other writers) is treated as "can't tell" so this never raises a false alarm. */
+let _pbVerifyNoFilter=false,_pbVerifyN=0;
+async function _pbVerify(wid,token){
+  try{
+    _pbVerifyN++;
+    if(!_pbVerifyNoFilter){
+      const f=encodeURIComponent('(workspace="'+PB_WORKSPACE+'" && data~\'"_wid":"'+wid+'"\')');
+      const r=await _pbReq('/api/collections/workspace_state/records?filter='+f+'&perPage=1&fields=id,updated,updated_at',{},15000);
+      if(!r.ok)return{ok:null};
+      const d=await r.json();
+      if(d.items&&d.items.length)return{ok:true};
+    }else if(_pbVerifyN%10)return{ok:null};          // filter unusable on this server: full read-back only every 10th save
+    const full=await _pbGetFull();                    // filter missed: read the record properly before judging
+    if(!full)return{ok:false,reason:'the workspace record is missing on the server'};
+    if(full.token!==token)return{ok:null};          // someone else wrote since: not our concern here
+    let o=full.data;if(typeof o==='string'){try{o=JSON.parse(o);}catch(_){return{ok:false,reason:'the server holds data that cannot be read back'};}}
+    if(o&&o._wid===wid){_pbVerifyNoFilter=true;return{ok:true};}
+    return{ok:false,reason:'the server record does not match what was sent (it may be cutting data off — check the field size limit of workspace_state.data)'};
+  }catch(_){return{ok:null};}
+}
+function _pfOnVerify(v){
+  if(!v||v.ok===null||v.ok===undefined)return;
+  let b=document.getElementById('pf-integrity');
+  if(v.ok){if(b)b.remove();return;}
+  if(b)return;
+  b=document.createElement('div');b.id='pf-integrity';
+  b.innerHTML='<span style="flex:1;min-width:200px"><b>Your last save may not have been stored correctly:</b> '+escHtml(v.reason||'unverified')+'. Your data is still on this device. Download a backup now to be safe.</span>'
+    +'<button class="btn btn-acc btn-sm" onclick="exportData()">Download backup</button><button class="btn btn-ghost btn-sm" onclick="this.closest(\'#pf-integrity\').remove()">Dismiss</button>';
+  document.body.appendChild(b);
+}
+/* Watchdog: if edits stay unconfirmed for 30 s with no error reported, say so and retry */
+let _pfSaveSince=0;
+setInterval(()=>{
+  try{
+    if(!_pfUnsynced){_pfSaveSince=0;return;}
+    if(!_pfSaveSince){_pfSaveSince=Date.now();return;}
+    if(Date.now()-_pfSaveSince>=30000&&!_pfBadSince&&_pbToken){
+      _pfConn('error','Changes not confirmed as saved after 30 seconds — retrying');
+      PF.requestSync(0);
+    }
+  }catch(_){}
+},5000);
+
 function _pfReadStored(){
   try{const r=localStorage.getItem(PF_STORE_KEY);if(r){const o=JSON.parse(r);if(o&&o.s)return o;}}catch(_){}
   try{const r=localStorage.getItem('pf4');if(r){const s=JSON.parse(r);if(s&&typeof s==='object')return{v:4,s,h:[],sq:0};}}catch(_){}
@@ -2481,7 +2528,8 @@ const PF=PFSync.create({
   normalize:o=>{const prev=S;S=o;try{_applyDefaults();}finally{S=prev;}},
   prepare:()=>_applyDefaults(),
   localKeys:PF_LOCAL_KEYS,
-  transport:{head:_pbHead,get:_pbGetFull,put:_pbPut},
+  transport:{head:_pbHead,get:_pbGetFull,put:_pbPut,verify:_pbVerify},
+  onVerify:v=>_pfOnVerify(v),
   readStored:_pfReadStored,
   peekMeta:()=>{try{return JSON.parse(localStorage.getItem('pf6m')||'null');}catch(_){return null;}},
   writeStored:_pfWriteStored,
@@ -3140,11 +3188,30 @@ async function _saveHistorySnapshot(label='Auto'){
     return true;
   }catch(e){_histState.lastErr=String(e&&e.message||e);console.warn('History snapshot failed:',e);return false;}
 }
+/* Read the snapshot list. Different PocketBase setups name/allow different fields, and a bad sort or field gives a bare HTTP 400,
+   so try progressively simpler queries and remember the first one that works. Returns {items,err}. */
+const _HIST_VARIANTS=['?sort=-saved_at&perPage=200&fields=id,label,saved_at,item_count,created,workspace','?sort=-created&perPage=200&fields=id,label,saved_at,item_count,created,workspace','?perPage=200&fields=id,label,saved_at,item_count,created','?perPage=200'];
+let _histVariant=-1;
+async function _histFetchAll(){
+  if(!_pbToken)return{items:[],err:'not signed in'};
+  const order=_histVariant>=0?[_histVariant]:_HIST_VARIANTS.map((_,i)=>i);
+  let err='';
+  for(const i of order){
+    try{
+      const r=await fetch(PB_URL+'/api/collections/workspace_history/records'+_HIST_VARIANTS[i],{headers:{Authorization:_pbToken},cache:'no-store'});
+      if(!r.ok){err=await _histErr(r);if(r.status===400)continue;if(_histVariant>=0)_histVariant=-1;return{items:[],err};}
+      const d=await r.json();_histVariant=i;
+      const items=((d.items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE)).map(x=>({...x,saved_at:x.saved_at||x.created||''}));
+      items.sort((a,b)=>a.saved_at<b.saved_at?1:a.saved_at>b.saved_at?-1:0);   // newest first
+      return{items,err:''};
+    }catch(e){err=String(e&&e.message||e);break;}
+  }
+  _histVariant=-1;return{items:[],err};
+}
 async function _pruneHistory(){
   try{
-    const r=await fetch(PB_URL+'/api/collections/workspace_history/records?sort=saved_at&perPage=200&fields=id,label,saved_at,workspace',{headers:{Authorization:_pbToken}});
-    if(!r.ok)return;
-    const items=((await r.json()).items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE);
+    const {items:newest,err}=await _histFetchAll();if(err)return;
+    const items=newest.slice().reverse();               // oldest first
     const cap={rolling:PB_MAX_HISTORY,daily:PB_MAX_DAILY,session:PB_MAX_SESSION},g={rolling:[],daily:[],session:[]};
     items.forEach(x=>g[_histTier(x.label)].push(x));
     const del=[];Object.keys(g).forEach(k=>{if(g[k].length>cap[k])del.push(...g[k].slice(0,g[k].length-cap[k]));});
@@ -3169,13 +3236,9 @@ async function _sessionSnapshot(){
 }
 
 async function listHistorySnapshots(){
-  if(!_pbToken){_histState.listErr='not signed in';return[];}
-  try{
-    const r=await fetch(PB_URL+'/api/collections/workspace_history/records?sort=-saved_at&perPage=200&fields=id,label,saved_at,item_count,workspace',{headers:{Authorization:_pbToken},cache:'no-store'});
-    if(!r.ok){_histState.listErr=await _histErr(r);return[];}
-    _histState.listErr=null;
-    return ((await r.json()).items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE);
-  }catch(e){_histState.listErr=String(e&&e.message||e);return[];}
+  const {items,err}=await _histFetchAll();
+  _histState.listErr=err||null;
+  return items;
 }
 
 async function restoreHistorySnapshot(id){
