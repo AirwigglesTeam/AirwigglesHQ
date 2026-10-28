@@ -2916,7 +2916,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=86;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=87;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -3832,7 +3832,7 @@ function redo(){
 
 /* ── load — reconcile this device's stored copy with the server (merge, never overwrite) ── */
 async function load(){
-  try{const lr=await PF.load();if(lr&&lr.remote&&!lr.failed)setTimeout(_sessionSnapshot,5000);}catch(e){console.warn('Sync load failed:',e);}
+  try{const lr=await PF.load();if(lr&&lr.remote&&!lr.failed){setTimeout(_sessionSnapshot,5000);setTimeout(_pfRecurRepairOnce,2500);}}catch(e){console.warn('Sync load failed:',e);}
   _applyDefaults();
   _lastKnownCounts={
     projects:(S.projects||[]).length,
@@ -6449,6 +6449,52 @@ function _pfNudgeLater(){try{localStorage.setItem('pf_backup_snooze',String(Date
 async function _pfNudgeDownload(){await downloadFullBackup();_pfBackupNudgeCheck(true);}
 setTimeout(()=>{_pfStorageCheck();_pfBackupNudgeCheck(false);},25000);
 setInterval(()=>{_pfStorageCheck();_pfBackupNudgeCheck(false);},6*60*60*1000);
+/* ════ ONE-TIME REPAIR: recurring tasks created before subtasks were carried over get their subtasks back ════
+   For every OPEN recurring occurrence that has no subtasks, find the nearest earlier occurrence in its series that does,
+   and copy that checklist (not done, dates shifted, no recurrence of its own), using the same ids the live copy logic uses,
+   so running it on two devices at once, or twice, can never produce duplicates. Completed occurrences are left alone. */
+function _pfRepairRecurringSubtasks(){
+  const tasks=S.tasks||[];
+  const prev=new Map();
+  tasks.forEach(t=>{if(t&&t.recurNext)prev.set(t.recurNext,t);});
+  const kidsOf=id=>tasks.filter(c=>c.parentId===id);
+  let added=0,occ=0;
+  [...tasks].forEach(O=>{
+    if(!O||O.done||!prev.has(O.id))return;                          // only open occurrences that were spawned from an earlier one
+    if(kidsOf(O.id).length)return;                                   // already has a checklist: leave it
+    let T=prev.get(O.id),guard=0;
+    while(T&&!kidsOf(T.id).length&&guard++<200)T=prev.get(T.id);   // nearest earlier occurrence WITH subtasks
+    if(!T||!kidsOf(T.id).length)return;
+    const base=T.endDate||T.startDate,tgt=O.endDate||O.startDate;
+    const shift=(base&&tgt)?Math.round((Date.parse(tgt)-Date.parse(base))/864e5):0;
+    const idMap={};idMap[T.id]=O.id;
+    const kids=[];const walk=pid=>S.tasks.filter(c=>c.parentId===pid&&!c.recurNext).forEach(c=>{kids.push(c);walk(c.id);});
+    walk(T.id);
+    if(!kids.length)return;
+    kids.forEach(c=>{idMap[c.id]=O.id+'_s_'+(c.subRoot||c.id);});
+    let n=0;
+    kids.forEach(c=>{
+      const nid=idMap[c.id];if(getTask(nid))return;
+      S.tasks.push({...c,id:nid,parentId:idMap[c.parentId]||O.id,subRoot:c.subRoot||c.id,done:false,kStatus:c.kStatus==='done'?'todo':c.kStatus,slackReminder:{},
+        startDate:c.startDate?addDays(c.startDate,shift):'',endDate:c.endDate?addDays(c.endDate,shift):'',
+        blockedBy:(c.blockedBy||[]).map(b=>idMap[b]).filter(Boolean),recur:{...(c.recur||{}),enabled:false},recurRoot:undefined,recurNext:''});
+      n++;
+    });
+    if(n){added+=n;occ++;}
+  });
+  return{added,occ};
+}
+/* runs once per workspace (flag stored in the shared settings), only after a clean sync with the server */
+function _pfRecurRepairOnce(){
+  try{
+    S.settings=S.settings||{};
+    if(S.settings.recurSubRepair)return;
+    const r=_pfRepairRecurringSubtasks();
+    S.settings.recurSubRepair=1;
+    save();
+    if(r.added){render();showToast('Restored '+r.added+' subtask'+(r.added!==1?'s':'')+' on '+r.occ+' upcoming recurring task'+(r.occ!==1?'s':'')+'.',9000);}
+  }catch(e){console.warn('recurring subtask repair failed',e);}
+}
 
 /* ════ DASHBOARD: My work — everything assigned to me, grouped by urgency ════ */
 function mwToggle(g){window._mwAll=window._mwAll||{};window._mwAll[g]=!window._mwAll[g];render();}
