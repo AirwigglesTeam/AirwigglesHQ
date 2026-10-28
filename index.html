@@ -3165,21 +3165,29 @@ function _validateBeforeSave(){
  * ─────────────────────────────────────────────────── */
 const PB_MAX_HISTORY=20; // keep last 20 server-side snapshots
 
-let _histLoaded=false;
-async function renderPBHistoryList(){
+let _histLoaded=false,_histRows=[],_histPage=0,_histMoreAvail=false;
+async function _histMore(){
+  const snaps=await listHistorySnapshots(_histPage+1);
+  if(!_histState.listErr){_histPage++;_histRows=_histRows.concat(snaps);_histMoreAvail=snaps.length>=8;}
+  renderPBHistoryList(true);
+}
+async function renderPBHistoryList(keep){
   const el2=document.getElementById('pb-history-list');
   if(!el2)return;
   const warn2=_histState.lastErr?'<div class="pf-warn">The last snapshot could not be saved: '+escHtml(_histState.lastErr)+'. Snapshots need the <b>workspace_history</b> collection with a <b>data</b> field that allows long text (Editor or JSON, or a large Max).</div>':'';
-  if(!_histLoaded){      // never automatic: the first load can be heavy on a big collection, so it waits for a click
+  if(!_histLoaded){      // never automatic: waits for a click
     el2.innerHTML=warn2+'<button class="btn btn-ghost btn-sm" onclick="_histLoaded=true;renderPBHistoryList()">Load server snapshots</button>';
     return;
   }
-  el2.innerHTML='<div style="color:var(--muted);font-size:.78rem;">Loading…</div>';
-  const snaps=await listHistorySnapshots();
+  if(keep!==true){      // fresh load: first small page only
+    el2.innerHTML='<div style="color:var(--muted);font-size:.78rem;">Loading…</div>';
+    _histPage=1;_histRows=await listHistorySnapshots(1);_histMoreAvail=_histRows.length>=8;
+  }
   const el3=document.getElementById('pb-history-list');if(!el3)return;
+  const snaps=_histRows;
   const total=_histState.listErr?null:await _histCount();
-  const warn=_histState.listErr?'<div class="pf-warn">Could not read server snapshots: '+escHtml(_histState.listErr)+'. <a href="#" onclick="renderPBHistoryList();return false;">Retry</a><br>If this says timed out or HTTP 502, the server is struggling, often because the snapshot table has grown very large. Use <b>Clean up old snapshots</b> once it responds, or delete old records in the PocketBase admin (workspace_history).</div>':'';
-  const clean=(total!==null&&total>70)?'<div class="pf-warn">The server holds <b>'+total+'</b> snapshots (only the newest are shown). <button class="btn btn-acc btn-xs" onclick="_histCleanup()">Clean up old snapshots</button></div>':'';
+  const warn=_histState.listErr?'<div class="pf-warn">Could not read server snapshots: '+escHtml(_histState.listErr)+'. <a href="#" onclick="renderPBHistoryList();return false;">Retry</a><br>If this says timed out or HTTP 502, the server is struggling to read the snapshot table (each snapshot is a full copy of your data). Try <b>Clean up old snapshots</b>, or delete old records in the PocketBase admin (workspace_history).</div>':'';
+  const clean=(total!==null&&total>70)?'<div class="pf-warn">The server holds <b>'+total+'</b> snapshots. <button class="btn btn-acc btn-xs" onclick="_histCleanup()">Clean up old snapshots</button></div>':'';
   if(snaps.length===0){
     el3.innerHTML=warn+warn2+clean+(warn?'':'<div style="color:var(--muted);font-size:.78rem;">No snapshots yet. One is saved at the start of each session, once a day, and every 5 changes.</div>');
     return;
@@ -3197,7 +3205,7 @@ async function renderPBHistoryList(){
       <button class="btn btn-acc btn-xs" onclick="rcFromServer('${s.id}')" title="See what differs and restore only what you pick">Compare</button>
       <button class="btn btn-ghost btn-xs" onclick="restoreHistorySnapshot('${s.id}')" title="Replace everything with this snapshot">Restore all</button>
     </div>`;
-  }).join('');
+  }).join('')+(_histMoreAvail?'<div style="padding:8px 0;"><button class="btn btn-ghost btn-xs" onclick="_histMore()">Show older</button></div>':'');
 }
 
 function _timeAgo(date){
@@ -3235,21 +3243,21 @@ async function _saveHistorySnapshot(label='Auto',manual){
 }
 /* Read the snapshot list: small, cheap and never automatic. Two query shapes (a bad sort/field gives a bare HTTP 400 on some setups),
    short timeouts, and a circuit breaker so a struggling server is never hammered. Returns {items,err}. */
-const _HIST_VARIANTS=['?perPage=N&skipTotal=1&fields=id,label,saved_at,item_count','?sort=-@rowid&perPage=N&skipTotal=1&fields=id,label,saved_at,item_count','?perPage=N&skipTotal=1&fields=id,label'];
+const _HIST_VARIANTS=['?sort=-@rowid&perPage=N&skipTotal=1&fields=id,label,saved_at,item_count','?perPage=N&skipTotal=1&fields=id,label,saved_at,item_count','?perPage=N&skipTotal=1&fields=id,label'];
 let _histVariant=-1,_histDownAt=0;
 const _histDown=()=>Date.now()-_histDownAt<10*60*1000;     // history trouble in the last 10 minutes: skip all automatic history work
-async function _histFetchAll(n){
+async function _histFetchAll(n,page){
   if(!_pbToken)return{items:[],err:'not signed in'};
   const order=_histVariant>=0?[_histVariant]:_HIST_VARIANTS.map((_,i)=>i);
   const notes=[];
   for(const i of order){
     try{
-      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records'+_HIST_VARIANTS[i].replace('perPage=N','perPage='+(n||100)),{headers:{Authorization:_pbToken},cache:'no-store'},15000);
+      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records'+_HIST_VARIANTS[i].replace('perPage=N','perPage='+(n||8)+'&page='+(page||1)),{headers:{Authorization:_pbToken},cache:'no-store'},15000);
       if(!r.ok){notes.push('query '+(i+1)+': '+await _histErr(r));if(r.status===400||r.status>=500)continue;break;}   // a rejected query shape (400 / server error) is worth the next, simpler shape; auth errors are not
       const d=await r.json();_histVariant=i;
       const items=((d.items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE)).map(x=>({...x,saved_at:x.saved_at||x.created||''}));
       items.sort((a,b)=>a.saved_at<b.saved_at?1:a.saved_at>b.saved_at?-1:0);   // newest first
-      _histDownAt=0;return{items:n?items:items.slice(0,40),err:''};
+      _histDownAt=0;return{items,err:''};
     }catch(e){notes.push('query '+(i+1)+': '+(e&&e.name==='AbortError'?'timed out (the server is slow or overloaded)':String(e&&e.message||e)));break;}   // network trouble: stop, don't pile on
   }
   _histVariant=-1;_histDownAt=Date.now();return{items:[],err:notes.join(' · ')};
@@ -3258,17 +3266,31 @@ async function _histCount(){                                  // cheap: one row,
   try{const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?perPage=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},12000);
     if(!r.ok)return null;const d=await r.json();return typeof d.totalItems==='number'?d.totalItems:null;}catch(_){return null;}
 }
+/* PocketBase loads whole rows (each snapshot is ~270 KB of data) even when only a few fields are requested, so every history query
+   stays tiny (a handful of rows). Pruning works per tier with server-side filters, one cheap row at a time. */
+const _HIST_TIER_FILTER={rolling:"label!~'Daily ' && label!~'Session start'",daily:"label~'Daily '",session:"label~'Session start'"};
+async function _histTierCount(t){
+  try{const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?filter='+encodeURIComponent('('+_HIST_TIER_FILTER[t]+')')+'&perPage=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},12000);
+    if(!r.ok)return null;const d=await r.json();return typeof d.totalItems==='number'?d.totalItems:null;}catch(_){return null;}
+}
+async function _histOldestId(filter){                // the oldest single record (optionally within a tier); tries insertion order, then the date field
+  for(const sort of ['@rowid','saved_at']){
+    try{const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?'+(filter?'filter='+encodeURIComponent('('+filter+')')+'&':'')+'sort='+encodeURIComponent(sort)+'&perPage=1&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},12000);
+      if(r.ok){const it=((await r.json()).items||[])[0];return it?it.id:null;}
+      if(r.status!==400)return null;}catch(_){return null;}
+  }
+  return null;
+}
+async function _histDelete(id){try{const d=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+id,{method:'DELETE',headers:{Authorization:_pbToken}},15000);return d.ok||d.status===404;}catch(_){return false;}}
 async function _pruneHistory(){
   try{
     if(_histDown())return;
-    const total=await _histCount();
-    if(total===null||total<=PB_MAX_HISTORY+PB_MAX_DAILY+PB_MAX_SESSION)return;      // nothing to prune: no heavier query at all
-    const {items:newest,err}=await _histFetchAll(100);if(err)return;
-    const items=newest.slice().reverse();               // oldest first (of the newest 30 shown; older surplus is handled by Clean up)
-    const cap={rolling:PB_MAX_HISTORY,daily:PB_MAX_DAILY,session:PB_MAX_SESSION},g={rolling:[],daily:[],session:[]};
-    items.forEach(x=>g[_histTier(x.label)].push(x));
-    const del=[];Object.keys(g).forEach(k=>{if(g[k].length>cap[k])del.push(...g[k].slice(0,g[k].length-cap[k]));});
-    for(const x of del)await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+x.id,{method:'DELETE',headers:{Authorization:_pbToken}},15000).catch(()=>{});
+    const cap={rolling:PB_MAX_HISTORY,daily:PB_MAX_DAILY,session:PB_MAX_SESSION};
+    for(const t of Object.keys(cap)){
+      let c=await _histTierCount(t);if(c===null)return;
+      let guard=0;
+      while(c>cap[t]&&guard++<12){const id=await _histOldestId(_HIST_TIER_FILTER[t]);if(!id||!await _histDelete(id))return;c--;}
+    }
   }catch(e){}
 }
 /* Clean up: the server may hold hundreds of old snapshots (pruning used to fail silently). Delete the oldest ones, a few at a time, keeping the newest 60. */
@@ -3283,8 +3305,8 @@ async function _histCleanup(btn){
   while(!stop&&total-deleted>KEEP){
     let ids=[];
     try{
-      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=@rowid&perPage=20&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},20000);
-      const r2=r.ok?r:await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?perPage=20&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},20000);
+      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=@rowid&perPage=5&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},20000);
+      const r2=r.ok?r:await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=saved_at&perPage=5&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},20000);
       if(!r2.ok)break;ids=((await r2.json()).items||[]).map(x=>x.id);
     }catch(_){break;}
     if(!ids.length)break;
@@ -3314,8 +3336,8 @@ async function _sessionSnapshot(){
   }catch(_){}
 }
 
-async function listHistorySnapshots(){
-  const {items,err}=await _histFetchAll();
+async function listHistorySnapshots(page){
+  const {items,err}=await _histFetchAll(8,page||1);
   _histState.listErr=err||null;
   return items;
 }
