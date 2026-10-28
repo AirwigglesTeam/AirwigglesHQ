@@ -1392,10 +1392,11 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .rc-row{display:flex;gap:8px;align-items:flex-start;padding:6px 4px;border-bottom:1px solid var(--border2);cursor:pointer}
 .rc-row input{margin-top:3px;flex:none;width:18px;height:18px}
 .rc-more{margin-top:12px}.rc-more summary{cursor:pointer;font-size:.74rem;color:var(--muted);padding:4px 0}
-#pf-recover,#pf-integrity,#pf-hold{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
+#pf-recover,#pf-integrity,#pf-hold,#pf-old{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
 .pf-warn{font-size:.72rem;line-height:1.45;color:var(--red,#e5534b);background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
 #pf-integrity{border-color:var(--red,#e5534b)!important;bottom:70px}
 #pf-hold{border-color:var(--red,#e5534b)!important;bottom:130px;z-index:10000}
+#pf-old{border-color:var(--red,#e5534b)!important;bottom:12px;z-index:10001}
 </style>
 </head>
 <body>
@@ -2454,7 +2455,7 @@ async function _pbPut(str,id,base){
   let r;
   if(id){
     // pfbase = the server version this save was merged against; the optional server hook answers 409 if it has moved on
-    const pfb=base?'&pfbase='+encodeURIComponent(String(base).split('|')[0]):'';
+    const pfb='&pfv='+PF_BUILD+(base?'&pfbase='+encodeURIComponent(String(base).split('|')[0]):'');
     r=await _pbReq('/api/collections/workspace_state/records/'+id+'?fields=id,updated,updated_at'+pfb,{method:'PATCH',headers:hd,body},40000);
     if(r.status===404){_pbRecordId=null;throw Object.assign(new Error('record missing'),{retry:true});}
     if(r.status===409){throw Object.assign(new Error('changed elsewhere — merging again'),{retry:true,conflict:true});}
@@ -2464,6 +2465,7 @@ async function _pbPut(str,id,base){
   }
   if(!r.ok){
     let m='';try{const eb=await r.json();m=eb.message||JSON.stringify(eb.data||{}).slice(0,120);}catch(_){}
+    if(r.status===426||/pf_old_build/.test(m)){_pfOldBuild();throw Object.assign(new Error('This copy of ProjectFlow is out of date — refresh the page to keep saving (your changes are kept on this device)'),{fatal:true});}
     if(r.status>=500||r.status===429||r.status===408)throw new Error('Server unavailable ('+r.status+')');
     throw Object.assign(new Error('HTTP '+r.status+(m?': '+m:'')),{fatal:true});
   }
@@ -2859,6 +2861,13 @@ function _pfStartConn(){
   document.head.appendChild(st);
 })();
 
+/* The server refused this copy as too old (build gate / strict mode): say so plainly, once, with a one-click refresh */
+function _pfOldBuild(){
+  if(document.getElementById('pf-old'))return;
+  const b=document.createElement('div');b.id='pf-old';
+  b.innerHTML='<span style="flex:1;min-width:200px"><b>This copy of ProjectFlow is out of date.</b> The server has stopped accepting saves from it, so nothing can be overwritten by mistake. Your changes are still kept on this device. Refresh to load the latest version.</span><button class="btn btn-acc btn-sm" onclick="location.reload()">Refresh now</button>';
+  document.body.appendChild(b);
+}
 /* Is the optional PocketBase save-guard hook installed? Sends a harmless empty save that claims a version that
    cannot be current: a guarded server refuses it (409), an unguarded one just accepts the no-op. */
 async function _pfCheckGuard(){
@@ -2867,8 +2876,13 @@ async function _pfCheckGuard(){
   try{
     if(!_pbRecordId)await _pbHead();
     if(!_pbRecordId){out.textContent='No workspace record on the server yet — save something first.';return;}
-    const r=await _pbReq('/api/collections/workspace_state/records/'+_pbRecordId+'?fields=id,updated&pfbase='+encodeURIComponent('guard-check-0000'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:'{}'},15000);
-    if(r.status===409)out.innerHTML='<b style="color:var(--green)">✓ Server guard is active.</b> Out-of-date saves are refused by the server and retried after a merge.';
+    const r=await _pbReq('/api/collections/workspace_state/records/'+_pbRecordId+'?fields=id,updated&pfv=999999&pfbase='+encodeURIComponent('guard-check-0000'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:'{}'},15000);
+    if(r.status===409){
+      let gate='';
+      try{const r0=await _pbReq('/api/collections/workspace_state/records/'+_pbRecordId+'?fields=id,updated&pfv=0&pfbase='+encodeURIComponent('guard-check-0000'),{method:'PATCH',headers:{'Content-Type':'application/json'},body:'{}'},15000);
+        gate=r0.status===426?' <b style="color:var(--green)">Old-version blocking is ON</b> (copies older than the minimum release cannot save).':' Old-version blocking is off (optional: set MIN_BUILD in the hook).';}catch(_){}
+      out.innerHTML='<b style="color:var(--green)">✓ Server guard is active.</b> Out-of-date saves are refused by the server and retried after a merge.'+gate+' This is release '+PF_BUILD+'.';
+    }
     else if(r.ok)out.innerHTML='<b style="color:var(--yellow)">Server guard not installed.</b> Saving works normally; install <code>projectflow_guard.pb.js</code> in PocketBase <code>pb_hooks</code> for the extra protection.';
     else out.textContent='The server answered '+r.status+' — could not tell.';
   }catch(e){out.textContent='Could not check: '+(e&&e.message||e);}
@@ -2898,6 +2912,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
+const PF_BUILD=84;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
