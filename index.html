@@ -1393,6 +1393,7 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .rc-row input{margin-top:3px;flex:none;width:18px;height:18px}
 .rc-more{margin-top:12px}.rc-more summary{cursor:pointer;font-size:.74rem;color:var(--muted);padding:4px 0}
 #pf-recover{position:fixed;left:12px;right:12px;bottom:12px;z-index:9999;display:flex;flex-wrap:wrap;gap:10px;align-items:center;padding:12px 14px;background:var(--surface);border:1px solid var(--acc);border-radius:10px;box-shadow:0 6px 24px rgba(0,0,0,.35);font-size:.78rem;line-height:1.45;max-width:760px;margin:0 auto}
+.pf-warn{font-size:.72rem;line-height:1.45;color:var(--red,#e5534b);background:rgba(229,83,75,.08);border:1px solid rgba(229,83,75,.35);border-radius:8px;padding:8px 10px;margin-bottom:8px}
 </style>
 </head>
 <body>
@@ -2513,6 +2514,7 @@ const PF=PFSync.create({
     _lastSavePayloadCounts={tasks:(S.tasks||[]).length,projects:(S.projects||[]).length,members:(S.members||[]).length,labels:(S.labels||[]).length};
     _pfConn('synced');
     if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
+    _dailySnapshotIfDue();
   },
   onLoadReport:info=>_pfLoadReport(info),
   clientId:_myClientId,
@@ -3083,17 +3085,21 @@ async function renderPBHistoryList(){
   const el2=document.getElementById('pb-history-list');
   if(!el2)return;
   const snaps=await listHistorySnapshots();
+  const el3=document.getElementById('pb-history-list');if(!el3)return;
+  const warn=_histState.listErr?'<div class="pf-warn">Could not read server snapshots: '+escHtml(_histState.listErr)+'. <a href="#" onclick="renderPBHistoryList();return false;">Retry</a></div>':'';
+  const warn2=_histState.lastErr?'<div class="pf-warn">The last snapshot could not be saved: '+escHtml(_histState.lastErr)+'. Snapshots need the <b>workspace_history</b> collection with a <b>data</b> field that allows long text (a Text field is capped at 5,000 characters by default; use Editor or JSON, or set Max to 0 = unlimited in newer PocketBase set a large max).</div>':'';
   if(snaps.length===0){
-    el2.innerHTML='<div style="color:var(--muted);font-size:.78rem;">No snapshots yet — they\'re saved automatically every 5 changes.</div>';
+    el3.innerHTML=warn+warn2+(warn?'':'<div style="color:var(--muted);font-size:.78rem;">No snapshots yet. One is saved at the start of each session, once a day, and every 5 changes.</div>');
     return;
   }
-  el2.innerHTML=snaps.map(s=>{
+  const badge=t=>t==='daily'?'Daily':t==='session'?'Session start':'Auto';
+  el3.innerHTML=warn+warn2+snaps.map(s=>{
     const dt=new Date(s.saved_at);
     const age=_timeAgo(dt);
     const count=s.item_count||'?';
     return`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border2);">
-      <div style="flex:1;">
-        <div style="font-size:.78rem;font-weight:600;">${escHtml(s.label||'Auto')}</div>
+      <div style="flex:1;min-width:0;">
+        <div style="font-size:.78rem;font-weight:600;">${escHtml(s.label||'Auto')} <span style="font-size:.62rem;font-weight:600;color:var(--muted);">${badge(_histTier(s.label))}</span></div>
         <div style="font-size:.68rem;color:var(--muted);">${age} · ${count} items · ${dt.toLocaleString()}</div>
       </div>
       <button class="btn btn-acc btn-xs" onclick="rcFromServer('${s.id}')" title="See what differs and restore only what you pick">Compare</button>
@@ -3110,61 +3116,66 @@ function _timeAgo(date){
   return Math.round(sec/86400)+'d ago';
 }
 
+/* Snapshot tiers (each pruned separately so a burst of auto-snapshots can never push out the good old ones):
+ *   rolling  'Auto #n' / 'Manual'  – last PB_MAX_HISTORY (20)
+ *   daily    'Daily YYYY-MM-DD'    – one per day, last PB_MAX_DAILY (30)
+ *   session  'Session start'       – the server's state as loaded, before this session writes anything, last PB_MAX_SESSION (10) */
+const PB_MAX_DAILY=30,PB_MAX_SESSION=10;
+const _histState={lastOk:null,lastErr:null,listErr:null};
+function _histTier(label){label=String(label||'');return /^Daily /.test(label)?'daily':/^Session start/.test(label)?'session':'rolling';}
+async function _histErr(r){let m='';try{const j=await r.json();m=(j&&j.message)||'';const d=j&&j.data;if(d&&typeof d==='object'){const k=Object.keys(d);if(k.length)m+=' ('+k.map(x=>x+': '+((d[x]&&d[x].message)||'invalid')).join('; ')+')';}}catch(_){}return 'HTTP '+r.status+(m?' – '+m:'');}
 async function _saveHistorySnapshot(label='Auto'){
-  if(!_pbToken)return;
+  if(!_pbToken)return false;
   try{
-    const itemCount=(S.projects||[]).length+(S.tasks||[]).length+
-                    (S.members||[]).length+(S.sponsors||[]).length;
-    const body=JSON.stringify({
-      workspace:PB_WORKSPACE,
-      saved_at:new Date().toISOString(),
-      label,
-      data:JSON.stringify({...S,finance:{...S.finance,finAuth:false}}),
-      item_count:itemCount
-    });
-    await fetch(PB_URL+'/api/collections/workspace_history/records',{
-      method:'POST',
-      headers:{Authorization:_pbToken,'Content-Type':'application/json'},
-      body
-    });
-    // Prune old snapshots — keep only last PB_MAX_HISTORY
+    const itemCount=(S.projects||[]).length+(S.tasks||[]).length+(S.members||[]).length+(S.sponsors||[]).length;
+    const rec={workspace:PB_WORKSPACE,saved_at:new Date().toISOString(),label,data:JSON.stringify({...S,finance:{...S.finance,finAuth:false}}),item_count:itemCount};
+    const post=o=>fetch(PB_URL+'/api/collections/workspace_history/records',{method:'POST',headers:{Authorization:_pbToken,'Content-Type':'application/json'},body:JSON.stringify(o)});
+    let r=await post(rec);
+    if(!r.ok&&r.status===400){                       // collection may lack the optional "workspace" column: retry without it
+      const first=await _histErr(r);const o2={...rec};delete o2.workspace;r=await post(o2);
+      if(!r.ok){_histState.lastErr=first+' | retry: '+await _histErr(r);return false;}
+    }else if(!r.ok){_histState.lastErr=await _histErr(r);return false;}
+    _histState.lastOk=new Date().toISOString();_histState.lastErr=null;
     _pruneHistory();
-  }catch(e){console.warn('History snapshot failed:',e);}
+    return true;
+  }catch(e){_histState.lastErr=String(e&&e.message||e);console.warn('History snapshot failed:',e);return false;}
 }
-
 async function _pruneHistory(){
   try{
-    // Fetch all snapshots sorted oldest first
-    const r=await fetch(
-      PB_URL+'/api/collections/workspace_history/records?filter=(workspace="'+PB_WORKSPACE+'")&sort=saved_at&perPage=200',
-      {headers:{Authorization:_pbToken}}
-    );
+    const r=await fetch(PB_URL+'/api/collections/workspace_history/records?sort=saved_at&perPage=200&fields=id,label,saved_at,workspace',{headers:{Authorization:_pbToken}});
     if(!r.ok)return;
-    const d=await r.json();
-    const items=d.items||[];
-    if(items.length<=PB_MAX_HISTORY)return;
-    // Delete oldest ones
-    const toDelete=items.slice(0,items.length-PB_MAX_HISTORY);
-    await Promise.all(toDelete.map(item=>
-      fetch(PB_URL+'/api/collections/workspace_history/records/'+item.id,{
-        method:'DELETE',
-        headers:{Authorization:_pbToken}
-      })
-    ));
+    const items=((await r.json()).items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE);
+    const cap={rolling:PB_MAX_HISTORY,daily:PB_MAX_DAILY,session:PB_MAX_SESSION},g={rolling:[],daily:[],session:[]};
+    items.forEach(x=>g[_histTier(x.label)].push(x));
+    const del=[];Object.keys(g).forEach(k=>{if(g[k].length>cap[k])del.push(...g[k].slice(0,g[k].length-cap[k]));});
+    await Promise.all(del.map(x=>fetch(PB_URL+'/api/collections/workspace_history/records/'+x.id,{method:'DELETE',headers:{Authorization:_pbToken}})));
   }catch(e){}
+}
+/* daily + session snapshots (best effort, never block the app) */
+function _dayKey(){const d=new Date();return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0');}
+async function _dailySnapshotIfDue(){
+  try{
+    const k=_dayKey();if(localStorage.getItem('pf_last_daily')===k)return;
+    if(!(S.tasks||[]).length&&!(S.projects||[]).length)return;
+    if(await _saveHistorySnapshot('Daily '+k))localStorage.setItem('pf_last_daily',k);
+  }catch(_){}
+}
+async function _sessionSnapshot(){
+  try{
+    if(!(S.tasks||[]).length&&!(S.projects||[]).length)return;
+    const last=+localStorage.getItem('pf_last_session_snap')||0;if(Date.now()-last<30*60*1000)return;   // not on every refresh
+    if(await _saveHistorySnapshot('Session start'))localStorage.setItem('pf_last_session_snap',String(Date.now()));
+  }catch(_){}
 }
 
 async function listHistorySnapshots(){
-  if(!_pbToken)return[];
+  if(!_pbToken){_histState.listErr='not signed in';return[];}
   try{
-    const r=await fetch(
-      PB_URL+'/api/collections/workspace_history/records?filter=(workspace="'+PB_WORKSPACE+'")&sort=-saved_at&perPage='+PB_MAX_HISTORY,
-      {headers:{Authorization:_pbToken},cache:'no-store'}
-    );
-    if(!r.ok)return[];
-    const d=await r.json();
-    return d.items||[];
-  }catch(e){return[];}
+    const r=await fetch(PB_URL+'/api/collections/workspace_history/records?sort=-saved_at&perPage=200&fields=id,label,saved_at,item_count,workspace',{headers:{Authorization:_pbToken},cache:'no-store'});
+    if(!r.ok){_histState.listErr=await _histErr(r);return[];}
+    _histState.listErr=null;
+    return ((await r.json()).items||[]).filter(x=>!x.workspace||x.workspace===PB_WORKSPACE);
+  }catch(e){_histState.listErr=String(e&&e.message||e);return[];}
 }
 
 async function restoreHistorySnapshot(id){
@@ -3638,7 +3649,7 @@ function redo(){
 
 /* ── load — reconcile this device's stored copy with the server (merge, never overwrite) ── */
 async function load(){
-  try{await PF.load();}catch(e){console.warn('Sync load failed:',e);}
+  try{const lr=await PF.load();if(lr&&lr.remote&&!lr.failed)setTimeout(_sessionSnapshot,5000);}catch(e){console.warn('Sync load failed:',e);}
   _applyDefaults();
   _lastKnownCounts={
     projects:(S.projects||[]).length,
@@ -10377,7 +10388,7 @@ function renderSettings(){
       <span style="font-size:.72rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;">Server Version History</span>
       <button class="btn btn-acc btn-sm" onclick="_saveHistorySnapshot('Manual');setTimeout(renderPBHistoryList,1500)">Save snapshot now</button>
     </div>
-    <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Snapshots stored in PocketBase — last ${PB_MAX_HISTORY} kept. Auto-saves every 5 changes.</div>
+    <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Stored in PocketBase: a snapshot of the server's data at the start of each session (last ${PB_MAX_SESSION}), one per day (last ${PB_MAX_DAILY} days), and one every 5 changes (last ${PB_MAX_HISTORY}). Each kind is kept separately.</div>
     <div id="pb-history-list"><div style="color:var(--muted);font-size:.78rem;">Loading…</div></div>
   </div>
 
