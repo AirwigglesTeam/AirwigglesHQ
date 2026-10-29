@@ -1498,6 +1498,17 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .tt-sub.done{color:var(--muted);}.tt-sub.done .tt-sn{text-decoration:line-through;}.tt-sub.done .tt-ck{color:var(--green);}
 .tt-sub.focus{color:var(--text);font-weight:700;}.tt-sub.focus .tt-ck{color:var(--acc);}
 .tt-more{font-size:.62rem;color:var(--muted);padding-top:2px;}
+
+/* Finance links row */
+.fin-links{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin:0 0 12px;}
+.fl-chip{display:inline-flex;align-items:stretch;background:var(--surface);border:1px solid var(--border);border-radius:10px;overflow:hidden;}
+.fl-chip:hover{border-color:var(--acc);}
+.fl-a{display:flex;flex-direction:column;gap:1px;padding:6px 8px 6px 12px;text-decoration:none;color:var(--text);position:relative;padding-right:26px;min-width:96px;}
+.fl-a b{font-size:.76rem;font-weight:600;}.fl-a small{font-size:.62rem;color:var(--muted);}
+.fl-a i{position:absolute;right:9px;top:7px;color:var(--acc);font-style:normal;font-size:.8rem;}
+.fl-x{all:unset;cursor:pointer;padding:0 9px;color:var(--muted);font-size:.78rem;border-left:1px solid var(--border);display:grid;place-items:center;}
+.fl-x:hover{color:var(--acc);background:var(--surface2);}.fl-x:focus-visible,.fl-a:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+@media (max-width:640px){.fl-x{padding:0 14px;}.fl-a{min-width:0;}}
 </style>
 </head>
 <body>
@@ -3052,7 +3063,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=101;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=102;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4055,6 +4066,7 @@ function _applyDefaults(){
   if(!S.finance.budgets)S.finance.budgets={};
   if(!S.finance.finAuth)S.finance.finAuth=false;
   if(!S.finance.assets)S.finance.assets=[];
+  if(!Array.isArray(S.finance.links))S.finance.links=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
   if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
   if(!S.taskSort)S.taskSort='default';
@@ -9740,6 +9752,36 @@ function _createSponsorTemplate(type){
 }
 
 /* ════ FINANCE ════ */
+/* ── Finance links (shared with the team; same look as quick links) ── */
+function _finSafeUrl(u){u=(u||'').trim();if(!u)return'';if(!/^[a-z][a-z0-9+.-]*:/i.test(u))u='https://'+u;return /^https?:\/\//i.test(u)?u:'';}
+function _finLinksHtml(){
+  const L=S.finance.links||[];
+  return '<div class="fin-links" id="fin-links">'+L.map(q=>`<span class="fl-chip"><a class="fl-a" href="${escHtml(q.url)}" target="_blank" rel="noopener"><b>${escHtml(q.name)}</b>${q.category?`<small>${escHtml(q.category)}</small>`:''}<i aria-hidden="true">\u2197</i></a><button class="fl-x" title="Edit link" aria-label="Edit ${escHtml(q.name)}" onclick="editFinLink('${q.id}')">\u270E</button></span>`).join('')+`<button class="btn btn-ghost btn-xs fl-add" onclick="editFinLink('')">+ Add link</button></div>`;
+}
+function finLinkModalHtml(id){
+  const q=id?(S.finance.links||[]).find(x=>x.id===id):null;
+  return`<div class="mo-box" style="max-width:370px;">
+<div class="mo-hd"><span class="mo-title">${q?'Edit finance link':'Add finance link'}</span><button class="mo-close" onclick="closeModal()">\u00d7</button></div>
+<div class="mo-body">
+  <div class="field"><label class="flbl">Name *</label><input class="inp" id="fl-nm" value="${escHtml(q?.name||'')}" placeholder="Receipts, Revolut, Xero\u2026"></div>
+  <div class="field"><label class="flbl">URL *</label><input class="inp" id="fl-ur" value="${escHtml(q?.url||'')}" placeholder="https://..."></div>
+  <div class="field"><label class="flbl">Label</label><input class="inp" id="fl-cat" value="${escHtml(q?.category||'')}" placeholder="e.g. Google Drive, Bank (optional)"></div>
+  <div id="fl-err" style="color:var(--red);font-size:.72rem;display:none;">Enter a name and a web address (https://\u2026)</div>
+</div>
+<div class="mo-ft">${q?`<button class="btn btn-ghost" style="margin-right:auto;color:var(--red);" onclick="deleteFinLink('${q.id}')">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveFinLink('${id||''}')">${q?'Save changes':'Add link'}</button></div>
+</div>`;}
+function editFinLink(id){const mc=el('mc');mc.style.display='flex';mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${finLinkModalHtml(id)}</div>`;{const i=el('fl-nm');if(i)i.focus();}}
+function saveFinLink(id){
+  const name=el('fl-nm')?.value.trim(),url=_finSafeUrl(el('fl-ur')?.value),cat=el('fl-cat')?.value.trim()||'';
+  if(!name||!url){const e=el('fl-err');if(e)e.style.display='block';return;}
+  saveWithUndo(id?'Edit finance link':'Add finance link');
+  if(!Array.isArray(S.finance.links))S.finance.links=[];
+  if(id){const i=S.finance.links.findIndex(q=>q.id===id);if(i>=0)S.finance.links[i]={...S.finance.links[i],name,url,category:cat};}
+  else S.finance.links.push({id:uid(),name,url,category:cat});
+  saveNow();closeModal();render();
+}
+function deleteFinLink(id){saveWithUndo('Delete finance link');S.finance.links=(S.finance.links||[]).filter(q=>q.id!==id);saveNow();closeModal();render();}
+
 function renderFinance(){
   const tab=S.finance.finTab||'overview';
   const rev=totalRevenue();
@@ -9760,6 +9802,7 @@ function renderFinance(){
 </div>
 </div>
 
+${_finLinksHtml()}
 <div class="fin-sub-nav">
   ${['overview','recurring','oneoff','categories','tax','projects','savings','payout','budget','assets'].map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${{'oneoff':'One-off','payout':'Team Payout','savings':'Savings','budget':'Budgets'}[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}
   <select class="fsel" style="margin-left:auto;font-size:.72rem;" onchange="S.finance.finYear=parseInt(this.value);save();render();">
@@ -10219,6 +10262,7 @@ function renderAssetsPage(){
   h+='<div class="fu"><div class="page-hd"><div class="page-title">Finances <em>/ Assets</em></div></div>';
 
   // Sub nav (same as other finance tabs)
+  h+=_finLinksHtml();
   h+='<div class="fin-sub-nav">';
   var tabs=['overview','recurring','oneoff','categories','tax','projects','savings','payout','budget','assets'];
   var tabLabels={oneoff:'One-off',payout:'Team Payout',savings:'Savings',budget:'Budgets',assets:'Assets'};
