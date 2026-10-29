@@ -2916,7 +2916,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=88;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=89;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -7958,59 +7958,8 @@ function renderDetail(id){
   const over=hasB&&expTotal>budget;
   const bPct=hasB?Math.min(100,Math.round(expTotal/budget*100)):0;
   const rem=budget-expTotal;
-  return`<div class="fu">
-<div style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" onclick="S.detailId=null;render();">← Back</button></div>
-<div style="margin-bottom:20px;">
-  <!-- Action buttons row — sits above title, wraps naturally on mobile -->
-  <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
-    ${p.status==='completed'?
-      `<button class="btn btn-ghost btn-sm" onclick="reactivateProject('${p.id}')" title="Reactivate">↩ Reactivate</button>`
-    :
-      `<button class="proj-complete-btn${comp===100?' ready':''}" onclick="completeProject('${p.id}',event)" title="${comp===100?'Mark complete':'Complete all tasks first'}" style="width:32px;height:32px;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
-      </button>`
-    }
-    <button class="btn btn-ghost btn-sm" onclick="toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Unpin':'Pin to sidebar'}" style="padding:0 7px;">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="${isBookmarked(p.id)?'var(--acc)':'none'}" stroke="${isBookmarked(p.id)?'var(--acc)':'currentColor'}" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
-    </button>
-    <button class="btn btn-ghost btn-sm" onclick="openModal('project','${p.id}')">Edit</button>
-    <button class="btn btn-ghost btn-sm" onclick="saveProjectAsTemplate('${p.id}')" title="Save this event as a reusable template">Save as template</button>
-    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">Delete</button>
-  </div>
-  <!-- Title row: dot + name + badge -->
-  <div style="display:flex;align-items:center;gap:8px;margin-bottom:8px;min-width:0;">
-    <div style="width:10px;height:10px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
-    <div style="flex:1;min-width:0;">
-      <h1 class="detail-title" style="margin:0 0 4px 0;">${escHtml(p.name)}</h1>
-      <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${p.priority||'Medium'}</span>
-      ${isEvt(p)?'':`<span style="font-size:.62rem;font-weight:700;color:var(--text2);padding:2px 8px;background:var(--surface3);border-radius:4px;margin-left:5px;">${PROJ_TYPES[projType(p)].label}</span>`}
-    </div>
-  </div>
-  <!-- Description -->
-  ${p.description?`<p style="font-size:.84rem;color:var(--text2);font-weight:300;margin:0 0 10px 18px;line-height:1.5;">${escHtml(p.description)}</p>`:''}
-  <!-- Progress + meta -->
-  <div style="margin:0 0 6px 18px;">
-    <div class="prog" style="height:6px;margin-bottom:5px;"><div class="prog-fill" style="width:${comp}%;background:${p.color};"></div></div>
-    <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;">
-      <span style="font-family:'DM Mono',monospace;font-size:.7rem;color:${p.color};">${comp}% · ${top.length} tasks</span>
-      ${hasB?`<div style="display:flex;align-items:center;gap:7px;">
-        <div style="display:flex;flex-direction:column;gap:3px;">
-          <div style="display:flex;align-items:center;gap:6px;flex-wrap:wrap;">
-            <span style="font-family:'DM Mono',monospace;font-size:.7rem;color:${over?'var(--red)':'var(--yellow)'};">${fmtGBP(expTotal)} spent</span>
-            <span style="font-size:.65rem;color:var(--muted);">of ${fmtGBP(budget)} budget</span>
-            ${over?`<span style="font-size:.6rem;padding:1px 6px;background:rgba(224,96,96,.15);color:var(--red);border-radius:3px;font-weight:700;">OVER by ${fmtGBP(Math.abs(rem))}</span>`:`<span style="font-size:.6rem;padding:1px 6px;background:rgba(31,186,122,.1);color:var(--green);border-radius:3px;">${fmtGBP(rem)} remaining</span>`}
-          </div>
-          <div style="width:180px;height:4px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${bPct}%;background:${over?'var(--red)':p.color};border-radius:99px;transition:width .3s;"></div></div>
-        </div>
-      </div>`:expTotal>0?`<span style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--yellow);">${fmtGBP(expTotal)} expenses</span>`:''}
-      ${p.graphicsUrl?`<a href="${p.graphicsUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem;color:var(--acc);text-decoration:none;border:1px solid var(--teal-mid);padding:2px 8px;border-radius:20px;" title="Graphics folder"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> Graphics</a>`:''}      ${p.eventUrl?`<a href="${p.eventUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text2);text-decoration:none;border:1px solid var(--border);padding:2px 8px;border-radius:20px;" title="Event page"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Event page</a>`:''}
-    </div>
-  </div>
-  ${p.status==='completed'?`<div style="display:inline-flex;align-items:center;gap:6px;padding:5px 11px;background:rgba(31,186,122,.12);border:1.5px solid var(--green);border-radius:8px;font-size:.76rem;font-weight:700;color:var(--green);margin-left:18px;"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Completed</div>`:''}
-</div>
-<hr class="div">
-${_adm?'':(()=>{
-  // ── Summary stats ──
+  // ── Banner overview: stat strip + date tile (moved up from the old Overview section; admin pages have none) ──
+  const _ov=_adm?null:(()=>{
   const allTasks=S.tasks.filter(t=>t.projectId===p.id);
   const doneTasks=allTasks.filter(t=>t.done).length;
   const totalTasks=allTasks.length;
@@ -8101,26 +8050,12 @@ ${_adm?'':(()=>{
     return null;
   })();
   const calIcon='<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>';
-
-  const stat=(icon,label,value,color='var(--text2)',sub='')=>`
-    <div style="display:flex;align-items:center;gap:10px;padding:11px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;min-width:0;">
-      <div style="width:30px;height:30px;border-radius:8px;background:${color}18;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="${color}" stroke-width="2" stroke-linecap="round">${icon}</svg>
-      </div>
-      <div style="min-width:0;">
-        <div style="font-size:.7rem;color:var(--muted);font-weight:500;white-space:nowrap;">${label}</div>
-        <div style="font-size:.92rem;font-weight:700;color:${color};font-family:'DM Mono',monospace;white-space:nowrap;">${value}</div>
-        ${sub?`<div style="font-size:.62rem;color:var(--muted);margin-top:1px;">${sub}</div>`:''}
-      </div>
-    </div>`;
-
-  return`<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;gap:10px;margin-bottom:9px;cursor:pointer;" onclick="toggleOverviewExpanded('${p.id}')">
-    <svg id="ov-toggle-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._ovExpanded||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
-    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Overview</span>
-  </div>
-  <div id="ov-body-${p.id}" style="display:${(window._ovExpanded||{})[p.id]!==false?'block':'none'};">
-  <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));gap:8px;">
+  const stat=(icon,label,value,color='var(--text2)',sub='')=>`<div style="background:var(--surface);padding:11px 14px;min-width:0;">
+    <div style="font-size:.62rem;color:var(--muted);font-weight:700;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;">${label}</div>
+    <div style="font-size:1.05rem;font-weight:700;color:${color};font-family:'DM Mono',monospace;white-space:nowrap;margin-top:2px;">${value}</div>
+    ${sub?`<div style="font-size:.64rem;color:var(--muted);margin-top:1px;">${sub}</div>`:''}
+  </div>`;
+  const strip=`<div class="ev-strip" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:1px;background:var(--border);border-top:1px solid var(--border);">
     ${stat('<polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 01-2 2H5a2 2 0 01-2-2V5a2 2 0 012-2h11"/>',
       'Tasks',
       `${doneTasks}/${totalTasks}`,
@@ -8156,16 +8091,58 @@ ${_adm?'':(()=>{
       fulfilledCount===sponsorCount?'var(--green)':fulfilledCount>0?'var(--acc)':'var(--muted)',
       fulfilledCount===sponsorCount?'All fulfilled':fulfilledCount>0?`${sponsorCount-fulfilledCount} remaining`:''
     ):''}
-    ${eventDateTile?stat(calIcon,
-      eventDateTile.label,
-      eventDateTile.value,
-      eventDateTile.color,
-      eventDateTile.sub
-    ):''}
+  </div>`;
+  return{strip,tile:eventDateTile};
+  })();
+  return`<div class="fu">
+<div style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" onclick="S.detailId=null;render();">← Back</button></div>
+<div style="margin-bottom:20px;">
+  <!-- Action buttons row — sits above title, wraps naturally on mobile -->
+  <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+    ${p.status==='completed'?
+      `<button class="btn btn-ghost btn-sm" onclick="reactivateProject('${p.id}')" title="Reactivate">↩ Reactivate</button>`
+    :
+      `<button class="proj-complete-btn${comp===100?' ready':''}" onclick="completeProject('${p.id}',event)" title="${comp===100?'Mark complete':'Complete all tasks first'}" style="width:32px;height:32px;">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="20 6 9 17 4 12"/></svg>
+      </button>`
+    }
+    <button class="btn btn-ghost btn-sm" onclick="toggleBookmark('${p.id}')" title="${isBookmarked(p.id)?'Unpin':'Pin to sidebar'}" style="padding:0 7px;">
+      <svg width="13" height="13" viewBox="0 0 24 24" fill="${isBookmarked(p.id)?'var(--acc)':'none'}" stroke="${isBookmarked(p.id)?'var(--acc)':'currentColor'}" stroke-width="2" stroke-linecap="round"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>
+    </button>
+    <button class="btn btn-ghost btn-sm" onclick="openModal('project','${p.id}')">Edit</button>
+    <button class="btn btn-ghost btn-sm" onclick="saveProjectAsTemplate('${p.id}')" title="Save this event as a reusable template">Save as template</button>
+    <button class="btn btn-danger btn-sm" onclick="deleteProject('${p.id}')">Delete</button>
   </div>
+</div>
+<!-- EVENT BANNER: identity, progress, budget, date and the overview stats in one card -->
+<div class="ev-banner" style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:18px;">
+  <div style="display:flex;flex-wrap:wrap;gap:14px 22px;padding:16px 18px;align-items:center;">
+    <div style="flex:999 1 320px;min-width:0;display:flex;flex-direction:column;gap:7px;">
+      <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;min-width:0;">
+        <div style="width:11px;height:11px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
+        <h1 class="detail-title" style="margin:0;">${escHtml(p.name)}</h1>
+        <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${p.priority||'Medium'}</span>
+        ${isEvt(p)?'':`<span style="font-size:.62rem;font-weight:700;color:var(--text2);padding:2px 8px;background:var(--surface3);border-radius:4px;">${PROJ_TYPES[projType(p)].label}</span>`}
+        <span style="font-family:'DM Mono',monospace;font-size:.68rem;color:${p.color};border:1px solid ${p.color}55;border-radius:20px;padding:2px 9px;white-space:nowrap;">${comp}%${_adm?' · '+top.length+' tasks':' complete'}</span>
+        ${p.status==='completed'?`<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 10px;background:rgba(31,186,122,.12);border:1.5px solid var(--green);border-radius:20px;font-size:.68rem;font-weight:700;color:var(--green);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Completed</span>`:''}
+      </div>
+      ${p.description?`<p style="font-size:.82rem;color:var(--text2);font-weight:300;margin:0;line-height:1.5;">${escHtml(p.description)}</p>`:''}
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+        ${hasB?`<span style="font-family:'DM Mono',monospace;font-size:.68rem;color:${over?'var(--red)':'var(--yellow)'};background:var(--surface2);border:1px solid var(--border);border-radius:20px;padding:2px 9px;">${fmtGBP(expTotal)} spent</span>
+        <span style="font-size:.68rem;color:var(--muted);">of ${fmtGBP(budget)} budget</span>
+        ${over?`<span style="font-size:.62rem;padding:2px 8px;background:rgba(224,96,96,.15);color:var(--red);border-radius:20px;font-weight:700;">OVER by ${fmtGBP(Math.abs(rem))}</span>`:`<span style="font-size:.62rem;padding:2px 8px;background:rgba(31,186,122,.1);color:var(--green);border-radius:20px;">${fmtGBP(rem)} remaining</span>`}`:expTotal>0?`<span style="font-family:'DM Mono',monospace;font-size:.68rem;color:var(--yellow);">${fmtGBP(expTotal)} expenses</span>`:''}
+        ${p.graphicsUrl?`<a href="${p.graphicsUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem;color:var(--acc);text-decoration:none;border:1px solid var(--teal-mid);padding:2px 8px;border-radius:20px;" title="Graphics folder"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> Graphics</a>`:''}
+        ${p.eventUrl?`<a href="${p.eventUrl}" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:4px;font-size:.7rem;color:var(--text2);text-decoration:none;border:1px solid var(--border);padding:2px 8px;border-radius:20px;" title="Event page"><svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 014 10 15.3 15.3 0 01-4 10 15.3 15.3 0 01-4-10 15.3 15.3 0 014-10z"/></svg> Event page</a>`:''}
+      </div>
+    </div>
+    ${_ov&&_ov.tile?`<div class="ev-date" style="flex:1 1 170px;max-width:260px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;padding:11px 16px;">
+      <div style="font-size:.62rem;color:var(--muted);font-weight:700;letter-spacing:.07em;text-transform:uppercase;">${_ov.tile.label}</div>
+      <div style="font-size:1.5rem;font-weight:700;color:${_ov.tile.color};font-family:'DM Mono',monospace;line-height:1.15;margin-top:2px;">${_ov.tile.value}</div>
+      <div style="font-size:.68rem;color:var(--muted);margin-top:2px;">${_ov.tile.sub}</div>
+    </div>`:''}
   </div>
-</div>`;
-})()}
+  ${_ov?_ov.strip:''}
+</div>
 
 
 ${_adm?'':`<!-- EVENT OKRs -->
