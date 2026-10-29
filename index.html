@@ -1734,6 +1734,28 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fy-band{margin-bottom:8px;font-size:.72rem;}
 .fy-fold>summary{padding:11px 16px;}.fy-fold{border:1px solid var(--border);border-radius:12px;margin:0 0 12px;}
 .fy-in{padding:2px 16px 14px;}
+
+/* finance review outcome */
+.fr-snaps{display:flex;flex-wrap:wrap;gap:4px 16px;margin:6px 0 2px}
+.fr-sn{font-size:.74rem;color:var(--text2)}.fr-sn b{font-size:.62rem;letter-spacing:.06em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-right:3px}.fr-sn em{font-style:normal;font-size:.68rem;color:var(--muted)}
+.fr-out .fr-snapline{font-size:.7rem;color:var(--muted);margin:6px 0}
+
+/* close year */
+.fc-sum{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px;margin-bottom:12px}
+.fc-sum div{background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:8px 10px}
+.fc-sum span{display:block;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}.fc-sum b{font-family:var(--mono,monospace);font-size:.95rem}
+.fc-h{font-size:.62rem;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:12px 0 4px}
+.fc-list{margin:0;padding-left:18px;font-size:.78rem;color:var(--text2);display:grid;gap:4px}
+.fc-row{padding:10px 0;border-bottom:1px solid var(--border)}.fc-row:last-child{border:0}.fc-top{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap}
+/* phone pass: finance */
+#fin-plan>.card-hd{flex-wrap:wrap;gap:8px}
+@media(max-width:640px){
+  .fin-pills{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));overflow:visible;gap:8px}
+  .fin-pills .fin-pill{justify-content:center;padding:9px 10px;white-space:normal;text-align:center}
+  .fin-pills .fsel{grid-column:1/-1}
+  #fin-budget .exp-row>input:first-child{flex:1 1 100%}
+  #fin-budget .exp-row .amt-inp{flex:1 1 28%;width:auto;min-width:0;text-align:left}
+}
 </style>
 </head>
 <body>
@@ -3288,7 +3310,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=122;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=125;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6734,7 +6756,7 @@ function _finPlanHtml(){
   const fe=P.funding.length?finFundingEnd(_localToday()):null;
   const fundEnd=fe?`<div class="fb-hint" style="margin:6px 0 0">${fe.over?'Funding ended '+escHtml(fmtD(fe.end))+'. Plan without it from here.':'Funding ends '+escHtml(fmtD(fe.end))+' · '+fe.months+' month'+(fe.months===1?'':'s')+' left.'}</div>`:'';
   const seg=P.funding.length?`<span class="fp-seg" role="group" aria-label="Funding"><button type="button" class="${P.fundingIncluded?'on':''}" onclick="setFundingOn(true)">With funding</button><button type="button" class="${P.fundingIncluded?'':'on'}" onclick="setFundingOn(false)">Without</button></span>`:'';
-  return `<div class="card" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><span style="flex:1"></span>${seg}<button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue streams</button></div><div class="fb-bd">
+  return `<div class="card" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><span style="flex:1"></span>${seg}<button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue streams</button>${finCloseButtonHtml()}</div><div class="fb-bd">
   <p class="fb-hint">Set the plan once at the start of the year. Revenue is then compared with it all year. Projected adds sponsors still in talks and expected event income. ${P.state==='now'?pc+'% of the year has passed.':P.state==='done'?'This year is complete.':'This year has not started.'}</p>
   <div class="fb-strip">
     <div><b>Revenue target${P.funding.length?(P.fundingIncluded?' (with funding)':' (without funding)'):''}</b><span>${money(P.revTarget)}</span><small>${P.projExtra>0?'projected '+money(P.revActual+P.projExtra):'no projections yet'}</small>${P.funding.length?`<small><b style="color:var(--text2);display:inline;font-size:inherit;letter-spacing:0;text-transform:none;">${money(P.coreTarget)}</b> without funding</small>`:''}</div>
@@ -6909,7 +6931,7 @@ function _finFlowHtml(){
   if(!(P.rev>0))return'';
   const seg=[['Costs',Math.min(P.costs-P.teamPay,P.rev),'#d08a3b'],['Team pay',P.teamPay,'#7c5cd6'],['Tax',P.ct.tax,'#e06060'],['Savings',P.savings,'#3b82d6'],['Dividends',P.pool,'#1b9a78']];
   const tot=seg.reduce((a,s)=>a+s[1],0)||1;
-  const bar=seg.filter(s=>s[1]>0).map(s=>`<div style="flex:${s[1]};background:${s[2]}" title="${s[0]} ${m(s[1])}">${s[1]/tot>.09?s[0]:''}</div>`).join('');
+  const bar=seg.filter(s=>s[1]>0).map(s=>`<div style="flex:${s[1]};background:${s[2]}" title="${s[0]} ${m(s[1])}">${s[1]/tot>.15?s[0]:''}</div>`).join('');
   const leg=seg.map(s=>`<span><i style="background:${s[2]}"></i>${s[0]} <b class="mono">${m(s[1])}</b></span>`).join('');
   return`<div class="card fin-flow" id="fin-flow"><div class="hd">Where the money goes<span class="sp"></span>${_foGo('pay','Savings &amp; pay →')}</div><div class="bd"><div class="fo-flow">${bar}</div><div class="fo-leg">${leg}</div>${P.profit<0?`<div class="ff-warn">Costs including team pay are higher than revenue, so there is nothing for tax, savings or dividends.</div>`:''}</div></div>`;
 }
@@ -6955,6 +6977,26 @@ function _frPill(S_){
   if(k==='overdue')return `<span class="pill bad">Overdue by ${S_.days} day${S_.days===1?'':'s'}</span>`;
   return `<span class="pill warn">Not scheduled</span>`;
 }
+/* Outcome of a review: a snapshot of the key figures (captured on request) plus notes on what was decided.
+   review.snap = {fy,cash,rev,costs,profit,savings} ; review.outcome = text */
+function finSnapshotNow(){
+  const P=finPayCalc(),L=finBankLatest();
+  const r2=n=>Math.round(n);
+  return{fy:S.finance.finYear,cash:L?r2((Number(L.cash)||0)+(Number(L.savings)||0)):null,rev:r2(P.rev),costs:r2(P.costs),profit:r2(P.profit),savings:r2(P.savings)};
+}
+function _frHeldWithSnap(){return finReviews().filter(r=>r.snap&&finReviewHeld(r));}
+function _frDelta(a,b){if(a==null||b==null)return'';const d=a-b;if(!d)return'no change';return(d>0?'+':'−')+_finMoney(Math.abs(d));}
+/* Compact "since the review before" lines for the last held review that has a snapshot. */
+function _frSinceHtml(last){
+  if(!last)return'';
+  const snaps=_frHeldWithSnap(),cur=last.snap?last:null;
+  if(!cur){return `<div class="mut" style="margin-top:3px;">Last review: ${_frFmt(last.date)} · <a href="#" onclick="openModal('financeReview','${last.id}');return false;" style="color:var(--acc);">Record outcome</a></div>`;}
+  const prev=snaps.filter(r=>r.date<cur.date).pop(),ps=prev&&prev.snap,cs=cur.snap;
+  const cell=(lbl,v,pv,sameFy)=>v==null?'':`<span class="fr-sn"><b>${lbl}</b> ${_finMoney(v)}${ps&&(sameFy||lbl==='Cash')&&pv!=null?` <em>${_frDelta(v,pv)}</em>`:''}</span>`;
+  const same=ps&&ps.fy===cs.fy;
+  return `<div class="mut" style="margin-top:3px;">Last review: ${_frFmt(cur.date)}${cur.outcome?' · '+escHtml(cur.outcome.length>70?cur.outcome.slice(0,70)+'…':cur.outcome):''} · <a href="#" onclick="openModal('financeReview','${cur.id}');return false;" style="color:var(--acc);">Details</a></div>
+  <div class="fr-snaps">${cell('Cash',cs.cash,ps&&ps.cash,true)}${cell('Profit',cs.profit,ps&&ps.profit,same)}${cell('Savings',cs.savings,ps&&ps.savings,same)}</div>${ps?`<div class="mut" style="font-size:.64rem;">Changes are since ${_frFmt(prev.date)}</div>`:''}`;
+}
 function _finReviewCardHtml(){
   const s=finReviewState(),r=s.review;
   const head=r
@@ -6962,7 +7004,19 @@ function _finReviewCardHtml(){
     :`<div class="big">${s.kind==='overdue'?'Review was due by ':'Next review due by '}${_frFmt(s.dueBy)}</div><div class="mut">For ${s.qLabel} · recommended date ${_frFmt(s.recommended)}</div>`;
   const btn=r?`<button class="btn btn-ghost btn-xs" onclick="openModal('financeReview','${r.id}')">Edit</button>`
     :`<button class="btn btn-acc btn-xs" onclick="openModal('financeReview',null)">Schedule review</button>`;
-  return `<div class="card fin-review" id="fin-review"><div class="card-hd"><span class="card-title">Finance review</span>${_frPill(s)}<span style="margin-left:auto;font-size:.68rem;color:var(--muted);">Quarterly</span></div><div class="card-bd"><div class="fr-row"><div class="fr-main">${head}${s.last?`<div class="mut" style="margin-top:3px;">Last review: ${_frFmt(s.last.date)}</div>`:''}</div>${btn}</div></div></div>`;
+  return `<div class="card fin-review" id="fin-review"><div class="card-hd"><span class="card-title">Finance review</span>${_frPill(s)}<span style="margin-left:auto;font-size:.68rem;color:var(--muted);">Quarterly</span></div><div class="card-bd"><div class="fr-row"><div class="fr-main">${head}${_frSinceHtml(s.last)}</div>${btn}</div></div></div>`;
+}
+function _frSnapLine(sn){return sn?['Cash '+(sn.cash==null?'n/a':_finMoney(sn.cash)),'Revenue '+_finMoney(sn.rev),'Costs '+_finMoney(sn.costs),'Profit '+_finMoney(sn.profit),'Savings '+_finMoney(sn.savings)].join(' · ')+' ('+getFYLabel(sn.fy)+')':'No figures captured yet.';}
+function _frOutcomeHtml(d){
+  return `<div class="field fr-out"><label class="flbl">Outcome</label>
+    <textarea class="txta" id="fr-outcome" style="min-height:64px;resize:vertical;" placeholder="Decisions made and actions agreed…">${escHtml(d.outcome||'')}</textarea>
+    <div class="fr-snapline" id="fr-snapline">${escHtml(_frSnapLine(d.snap))}</div>
+    <button type="button" class="btn btn-ghost btn-xs" onclick="captureFrSnap()">${d.snap?'Re-capture figures now':'Capture figures now'}</button>
+    <input type="hidden" id="fr-snap" value="${escHtml(d.snap?JSON.stringify(d.snap):'')}"></div>`;
+}
+function captureFrSnap(){
+  const sn=finSnapshotNow(),h=document.getElementById('fr-snap'),l=document.getElementById('fr-snapline');
+  if(h)h.value=JSON.stringify(sn);if(l)l.textContent=_frSnapLine(sn);
 }
 function financeReviewModalHtml(id){
   const d=id?(S.finance.reviews||[]).find(x=>x.id===id):null;
@@ -6984,6 +7038,7 @@ function financeReviewModalHtml(id){
   <div class="field"><label class="flbl">Invite members</label>
     <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;">${(S.members||[]).map(m=>{const on=sel.includes(m.id);return`<div data-frm="${m.id}" onclick="toggleFrMember('${m.id}',this)" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:${on?'var(--teal-dim)':'var(--surface2)'};border:1.5px solid ${on?'var(--acc)':'var(--border)'};border-radius:8px;cursor:pointer;"><span style="font-size:.78rem;font-weight:500;">${escHtml(m.name)}</span><span style="font-size:.65rem;margin-left:auto;color:var(--acc);">${on?'✓':''}</span></div>`;}).join('')}</div>
   </div>
+  ${d?_frOutcomeHtml(d):''}
   <input type="hidden" id="fr-members" value="${sel.join(',')}">
   <div id="fr-err" style="display:none;color:var(--red);font-size:.74rem;margin-top:6px;">Please choose a date.</div>
 </div>
@@ -7002,6 +7057,7 @@ function saveFinanceReview(eid){
   if(!date){const e=document.getElementById('fr-err');if(e)e.style.display='block';return;}
   const g=i=>document.getElementById(i);
   const rv={id:eid||uid(),title:g('fr-title').value.trim()||'Finance review',date,startTime:g('fr-start').value||'10:00',endTime:g('fr-end').value||'12:00',notes:g('fr-notes').value.trim(),objectives:g('fr-objectives').value.trim(),members:(g('fr-members').value||'').split(',').filter(Boolean)};
+  if(g('fr-outcome')){rv.outcome=g('fr-outcome').value.trim();try{const sj=g('fr-snap').value;if(sj)rv.snap=JSON.parse(sj);}catch(e){}}
   saveWithUndo(eid?'Edit finance review':'Schedule finance review');
   if(!S.finance.reviews)S.finance.reviews=[];
   const i=S.finance.reviews.findIndex(x=>x.id===eid);
@@ -7331,6 +7387,54 @@ function _finPayHtml(){
   ${fold('fin-fold-src','Revenue sources',srcs.filter(s=>s.linked).length+' linked, '+srcs.filter(s=>!s.linked).length+' manual',srcRows)}
   ${fold('fin-fold-tax','Corporation tax',m(P.ct.tax)+' on '+m(P.profit)+' profit',_finTaxHtml(P.profit,P.ct))}
   ${fold('fin-fold-assets','Assets',assets.length+' on the register · '+m(aVal),`<div class="fy-row"><span class="fy-l">${assets.length} active asset${assets.length===1?'':'s'}</span><span class="fo-mono">${m(aVal)}</span></div><button class="btn btn-ghost btn-xs" style="margin-top:8px" onclick="S.finance.finTab='assets';save();render()">Open the assets register →</button>`)}`;
+}
+/* ── Close the financial year ──
+   S.finance.closedYears = [{id:'fy2026',fy,closedOn,cash,rev,costs,profit,savings,streams:[{name,cat,amount}]}]
+   Closing saves a read-only summary of the selected year, resets the "running total" revenue streams to 0 for the new year
+   (budgets, targets, recurring costs and everything dated stay as they are) and moves to the next year. One Undo reverses it. */
+function finClosedYears(){return (S.finance.closedYears||[]).slice().sort((a,b)=>b.fy-a.fy);}
+function _fcTotalStreams(){return (S.finance.revenueStreams||[]).filter(s=>finStreamKind(s)==='total'&&(parseFloat(s.amount)||0)!==0);}
+function finCloseSummary(){
+  const sn=finSnapshotNow();
+  return Object.assign({},sn,{streams:(S.finance.revenueStreams||[]).map(s=>({name:s.name||'',cat:s.cat||'',amount:Math.round(finStreamFigures(s,sn.fy).full)})).filter(x=>x.amount!==0)});
+}
+function finCloseButtonHtml(){
+  const info=_finFYInfo(S.finance.finYear),near=info.state==='done'||(info.state==='now'&&info.days<=31);
+  return `<button class="btn ${near?'btn-acc':'btn-ghost'} btn-xs" onclick="openFinClose()">Close year</button>`;
+}
+function openFinClose(){
+  const fy=S.finance.finYear,sm=finCloseSummary(),rs=_fcTotalStreams(),again=(S.finance.closedYears||[]).some(c=>c.fy===fy),m=n=>_finMoney(Math.round(n));
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:440px;" id="fin-close-modal">
+<div class="mo-hd"><span class="mo-title">Close ${getFYLabel(fy)}</span><button class="mo-close" onclick="closeModal()">×</button></div>
+<div class="mo-body">
+  <div class="fb-hint" style="margin:0 0 10px">This saves a summary of the year so you can look back, then starts ${getFYLabel(fy+1)}. You can undo it straight afterwards.</div>
+  <div class="fc-sum"><div><span>Revenue</span><b>${m(sm.rev)}</b></div><div><span>Costs</span><b>${m(sm.costs)}</b></div><div><span>Profit</span><b>${m(sm.profit)}</b></div><div><span>Cash at close</span><b>${sm.cash==null?'n/a':m(sm.cash)}</b></div></div>
+  <div class="fc-h">What will change</div>
+  <ul class="fc-list"><li>${getFYLabel(fy)} summary is saved${again?' (replaces the earlier summary)':''}</li>
+  <li>${rs.length?'Running-total revenue streams reset to £0: '+rs.map(s=>escHtml(s.name||'Unnamed')+' ('+m(parseFloat(s.amount))+')').join(', '):'No running-total revenue streams to reset'}</li>
+  <li>The selected year moves to ${getFYLabel(fy+1)}</li></ul>
+  <div class="fc-h">What stays</div>
+  <div class="fb-hint" style="margin:0">Budgets, revenue targets, recurring costs, savings rate, team pay rates, and everything dated (one-off costs, events, sponsors, bank balances).</div>
+</div>
+<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="confirmFinClose()">Close ${getFYLabel(fy)}</button></div></div></div>`;
+}
+function confirmFinClose(){
+  const fy=S.finance.finYear,sm=finCloseSummary();
+  saveWithUndo('Close '+getFYLabel(fy));
+  if(!Array.isArray(S.finance.closedYears))S.finance.closedYears=[];
+  S.finance.closedYears=S.finance.closedYears.filter(c=>c.fy!==fy);
+  S.finance.closedYears.push(Object.assign({id:'fy'+fy,closedOn:_localToday()},sm));
+  (S.finance.revenueStreams||[]).forEach(s=>{if(finStreamKind(s)==='total')s.amount=0;});
+  S.finance.finYear=fy+1;
+  saveNow();closeModal();render();
+}
+function _finClosedHtml(){
+  const L=finClosedYears();if(!L.length)return'';
+  const m=n=>_finMoney(Math.round(n));
+  return `<details class="fb-more fy-fold card" id="fin-closed"><summary>Closed years<span class="meta">${L.length} saved</span></summary><div class="fy-in">${L.map(c=>`<div class="fc-row"><div class="fc-top"><b>${getFYLabel(c.fy)}</b><span class="mut">closed ${escHtml(fmtD(c.closedOn))}</span></div>
+    <div class="fr-snaps"><span class="fr-sn"><b>Revenue</b> ${m(c.rev)}</span><span class="fr-sn"><b>Costs</b> ${m(c.costs)}</span><span class="fr-sn"><b>Profit</b> ${m(c.profit)}</span><span class="fr-sn"><b>Savings</b> ${m(c.savings)}</span>${c.cash==null?'':`<span class="fr-sn"><b>Cash</b> ${m(c.cash)}</span>`}</div>
+    ${(c.streams||[]).length?`<div class="mut" style="font-size:.68rem;">${c.streams.map(s=>escHtml(s.name)+' '+m(s.amount)).join(' · ')}</div>`:''}</div>`).join('')}</div></details>`;
 }
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
@@ -10887,7 +10991,7 @@ ${_finSubHtml(tab)}
   ${_finGroupOf(tab).k==='spend'?`${_finPlanHtml()}${_finCostBudgetHtml()}<div class="fb-grid">
     <div class="card"><div class="card-hd"><span class="card-title">Recurring costs</span><span style="flex:1"></span><button class="btn btn-acc btn-xs" onclick="addFinRec()">+ Add</button></div><div class="fb-bd"><div class="fb-hint" style="margin:0 0 10px">Monthly ×12 · Quarterly ×4 · Annual ×1. Annualised totals update live. ${fmtGBP(rec/12)} / month, ${fmtGBP(rec)} / year.</div><div id="fin-rec-list"></div></div></div>
     <div class="card"><div class="card-hd"><span class="card-title">One-off costs</span><span style="flex:1"></span><span class="fb-m" id="fin-oo-total">${fmtGBP(oo)}</span><button class="btn btn-acc btn-xs" onclick="addFinOO()">+ Add</button></div><div class="fb-bd"><div class="fb-hint" style="margin:0 0 10px">Costs that are not part of an event. Event spending is added on the event page and appears under Events.</div><div id="fin-oo-list"></div></div></div>
-  </div>`:''}
+  </div>${_finClosedHtml()}`:''}
 </div>
 
 </div>`;}
