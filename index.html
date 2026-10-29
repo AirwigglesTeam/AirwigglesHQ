@@ -1604,6 +1604,24 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fin-review .pill{font-size:.6rem;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid var(--border);}
 .fin-review .pill.ok{color:var(--acc);border-color:var(--acc);}.fin-review .pill.warn{color:var(--yellow);border-color:var(--yellow);}.fin-review .pill.bad{color:var(--red);border-color:var(--red);}
 .fr-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}.fr-main{flex:1;min-width:200px;}
+
+/* Finance tasks card */
+.fin-tasks{margin-bottom:14px;}
+.ft-row{display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--border2);font-size:.78rem;}
+.ft-row:last-of-type{border-bottom:0;}
+.ft-chk{width:14px;height:14px;border-radius:3px;border:1.5px solid var(--muted);flex:none;cursor:pointer;}
+.ft-chk.done{background:var(--acc);border-color:var(--acc);}
+.ft-row.done .ft-n{text-decoration:line-through;color:var(--muted);}
+.ft-n{flex:1;min-width:0;cursor:pointer;overflow:hidden;text-overflow:ellipsis;}
+.ft-cad{font-size:.62rem;color:var(--muted);white-space:nowrap;}
+.ft-due{font-size:.64rem;font-family:'DM Mono',monospace;color:var(--muted);white-space:nowrap;}
+.ft-due.warn{color:var(--yellow);}.ft-due.bad{color:var(--red);}
+.ft-more{margin-top:6px;}.ft-more>summary{cursor:pointer;font-size:.72rem;color:var(--acc);padding:6px 0;}
+.ft-act{display:flex;gap:8px;flex-wrap:wrap;margin-top:10px;}
+.ft-grp{font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 4px;}
+.ft-set{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:.78rem;}.ft-set.have{opacity:.55;}
+.ft-date{width:140px;flex:none;}
+@media (max-width:520px){.ft-cad{display:none;}.ft-set{flex-wrap:wrap;}.ft-date{margin-left:auto;}}
 </style>
 </head>
 <body>
@@ -3158,7 +3176,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=112;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=113;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6848,6 +6866,90 @@ function saveFinanceReview(eid){
   if(rv.members.length&&!eid)setTimeout(()=>showCoworkInviteModal(rv,'Finance review'),200);
 }
 function deleteFinanceReview(id){saveWithUndo('Delete finance review');S.finance.reviews=(S.finance.reviews||[]).filter(x=>x.id!==id);saveNow();closeModal();render();}
+/* ── Finance tasks: the recurring jobs behind a healthy finance routine ──
+   They are ordinary recurring tasks in the Admin project (tick one off and the next appears), tagged with t.finKey
+   so the Finance page can list them. Monthly jobs fall due on the 5th, quarterly ones on the review due date. */
+const FIN_TASKS=[
+  {key:'bank',g:'Monthly',name:'Update Revolut balances',type:'monthly',n:1,due:{m:'next5'}},
+  {key:'receipts',g:'Monthly',name:'File receipts to Drive',type:'monthly',n:1,due:{m:'next5'}},
+  {key:'invoices',g:'Monthly',name:'Chase unpaid sponsor invoices',type:'monthly',n:1,due:{m:'next5'}},
+  {key:'budget',g:'Monthly',name:'Check budget against actual',type:'monthly',n:1,due:{m:'next5'}},
+  {key:'evspend',g:'Monthly',name:'Log event spend on the event pages',type:'monthly',n:1,due:{m:'next5'}},
+  {key:'teampay',g:'Quarterly',name:'Review team pay hours',type:'monthly',n:3,due:{m:'qdue'}},
+  {key:'subs',g:'Quarterly',name:'Review subscriptions and recurring costs',type:'monthly',n:3,due:{m:'qdue'}},
+  {key:'targets',g:'Quarterly',name:'Update revenue targets',type:'monthly',n:3,due:{m:'qdue'}},
+  {key:'savings',g:'Quarterly',name:'Savings top-up',type:'monthly',n:3,due:{m:'qdue'}},
+  {key:'nextbudget',g:'Yearly',name:"Set next year's budget",type:'yearly',n:1,due:{md:'03-01'}},
+  {key:'corptax',g:'Yearly',name:'Pay corporation tax',type:'yearly',n:1,due:{md:'01-01'}},
+  {key:'accounts',g:'Yearly',name:'File annual accounts at Companies House',type:'yearly',n:1,due:{md:'12-31'}},
+  {key:'confirm',g:'Yearly',name:'Companies House confirmation statement',type:'yearly',n:1,due:{md:'02-14'}},
+  {key:'dividends',g:'Yearly',name:'Dividend paperwork',type:'yearly',n:1,due:{md:'03-31'}}
+];
+function finTaskFirstDue(def,today){
+  today=today||_frToday();
+  if(def.due.m==='next5'){let d=today.slice(0,8)+'05';if(d<=today)d=addMonthsISO(today.slice(0,8)+'05',1);return d;}
+  if(def.due.m==='qdue'){const yr=+today.slice(0,4);const c=finQuarterEnds(yr-1,yr+2).map(finReviewDueBy).filter(d=>d>today).sort()[0];return c;}
+  let d=today.slice(0,4)+'-'+def.due.md;if(d<=today)d=(+today.slice(0,4)+1)+'-'+def.due.md;return d;
+}
+function finAdminProject(create){
+  const adm=(S.projects||[]).filter(p=>projType(p)==='admin');
+  let p=adm.find(x=>/^\s*admin\s*$/i.test(x.name||''))||adm[0];
+  if(!p&&create){
+    p={id:uid(),name:'Admin',description:PROJ_TYPES.admin.blurb,area:'',priority:'',ownerId:'',isAirCon:false,type:'admin',startDate:'',endDate:'',status:'active',color:COLORS[0],graphicsUrl:'',eventUrl:'',expenses:[],sponsors:[],okrs:[],phaseWeeks:{planning:null,prelaunch:null,postEvent:null}};
+    S.projects.push(p);
+  }
+  return p||null;
+}
+function finTasksHave(key){return (S.tasks||[]).some(t=>t.finKey===key&&(!t.done||(t.recur&&t.recur.enabled)));}
+function finTasksOpen(){return (S.tasks||[]).filter(t=>t.finKey&&!t.done).sort((a,b)=>(a.endDate||'9999').localeCompare(b.endDate||'9999')||String(a.name).localeCompare(b.name));}
+function finTasksDoneRecent(today){const from=addDays(today||_frToday(),-60);return (S.tasks||[]).filter(t=>t.finKey&&t.done&&t.doneOn&&t.doneOn>=from).sort((a,b)=>b.doneOn.localeCompare(a.doneOn));}
+function finTasksAdd(items){   // items: [{key,due}]
+  const p=finAdminProject(true);let n=0;
+  items.forEach(it=>{
+    const def=FIN_TASKS.find(d=>d.key===it.key);if(!def||!it.due||finTasksHave(def.key))return;
+    const id=uid();
+    S.tasks.unshift({id,name:def.name,description:'',projectId:p.id,parentId:null,priority:'Medium',phase:'',assignees:[],labels:[],blockedBy:[],startDate:'',endDate:it.due,kStatus:'todo',done:false,recur:{enabled:true,type:def.type,interval:def.n},slackReminder:{},recurRoot:id,recurNext:'',finKey:def.key});
+    n++;
+  });
+  return n;
+}
+function _frDue(iso,today){
+  const d=Math.round((new Date(iso+'T12:00:00Z')-new Date(today+'T12:00:00Z'))/864e5);
+  return d<0?{t:'overdue '+(-d)+'d',c:'bad'}:d===0?{t:'today',c:'warn'}:d<=7?{t:'in '+d+'d',c:'warn'}:{t:_frFmt(iso),c:''};
+}
+function _finTasksHtml(){
+  const today=_frToday(),open=finTasksOpen(),adm=finAdminProject(false);
+  const missing=FIN_TASKS.filter(d=>!finTasksHave(d.key)).length;
+  const od=open.filter(t=>t.endDate&&t.endDate<today).length;
+  const row=t=>{const d=t.endDate?_frDue(t.endDate,today):null;return `<div class="ft-row" data-ft="${t.finKey}"><div class="ti-check ft-chk" role="checkbox" aria-checked="false" tabindex="0" onclick="finTaskDone('${t.id}')" onkeydown="if(event.key===' '||event.key==='Enter'){event.preventDefault();finTaskDone('${t.id}')}"></div><div class="ft-n" onclick="openModal('task','${t.id}')">${escHtml(t.name)}</div><span class="ft-cad">${t.recur&&t.recur.enabled?recLabel(t.recur):''}</span>${d?`<span class="ft-due ${d.c}">${d.t}</span>`:''}</div>`;};
+  const LIM=8,shown=open.slice(0,LIM),rest=open.slice(LIM);
+  const done=finTasksDoneRecent(today);
+  const body=!open.length&&missing===FIN_TASKS.length
+    ?`<div class="mut" style="margin-bottom:10px;">Recurring jobs that keep the books on track: monthly balances and receipts, quarterly reviews, yearly filings. They live in your Admin project and come back by themselves when ticked off.</div><button class="btn btn-acc btn-xs" onclick="openFinTasksSetup()">Set up finance tasks</button>`
+    :`${shown.map(row).join('')}${rest.length?`<details class="ft-more"><summary>${rest.length} more</summary>${rest.map(row).join('')}</details>`:''}
+      ${done.length?`<details class="ft-more"><summary>Done recently · ${done.length}</summary>${done.map(t=>`<div class="ft-row done"><div class="ti-check done ft-chk"></div><div class="ft-n">${escHtml(t.name)}</div><span class="ft-due">${_frFmt(t.doneOn)}</span></div>`).join('')}</details>`:''}
+      <div class="ft-act">${missing?`<button class="btn btn-ghost btn-xs" onclick="openFinTasksSetup()">Add more tasks</button>`:''}${adm?`<button class="btn btn-ghost btn-xs" onclick="openDetail('${adm.id}')">Manage in ${escHtml(adm.name)}</button>`:''}</div>`;
+  const pill=open.length?(od?`<span class="pill bad">${od} overdue</span>`:`<span class="pill ok">${open.length} open</span>`):'';
+  return `<div class="card fin-review fin-tasks" id="fin-tasks"><div class="card-hd"><span class="card-title">Finance tasks</span>${pill}<span style="margin-left:auto;font-size:.68rem;color:var(--muted);">${adm?'in '+escHtml(adm.name):''}</span></div><div class="card-bd">${body}</div></div>`;
+}
+function finTaskDone(id){toggleDone(id);}
+function openFinTasksSetup(){
+  const today=_frToday(),mc=el('mc');
+  let g='';
+  const rows=FIN_TASKS.map(d=>{
+    const have=finTasksHave(d.key),hd=d.g!==g?`<div class="ft-grp">${d.g}</div>`:'';g=d.g;
+    return `${hd}<div class="ft-set${have?' have':''}"><input type="checkbox" id="fts-${d.key}" ${have?'disabled':'checked'}><label for="fts-${d.key}" class="ft-n">${escHtml(d.name)}${have?' <span class="mut">already added</span>':''}</label>${have?'':`<input class="inp ft-date" type="date" id="ftd-${d.key}" value="${finTaskFirstDue(d,today)}" aria-label="First due date">`}</div>`;
+  }).join('');
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:520px;"><div class="mo-hd"><span class="mo-title">Set up finance tasks</span><button class="mo-close" onclick="closeModal()">×</button></div><div class="mo-body"><div class="mut" style="margin-bottom:8px;">These are added to your Admin project as recurring tasks. Untick any you don't need and adjust the first due dates. Tax and filing dates are starting points, so check them with your accountant, and set the confirmation statement to your real date.</div>${rows}<div id="fts-err" style="display:none;color:var(--red);font-size:.74rem;margin-top:6px;">Choose at least one task.</div></div><div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveFinTasksSetup()">Add tasks</button></div></div></div>`;
+  mc.style.display='flex';
+}
+function saveFinTasksSetup(){
+  const items=FIN_TASKS.filter(d=>{const c=document.getElementById('fts-'+d.key);return c&&!c.disabled&&c.checked;}).map(d=>({key:d.key,due:document.getElementById('ftd-'+d.key).value}));
+  if(!items.length||items.some(i=>!i.due)){const e=document.getElementById('fts-err');if(e){e.textContent=items.length?'Every task needs a first due date.':'Choose at least one task.';e.style.display='block';}return;}
+  saveWithUndo('Add finance tasks');
+  const n=finTasksAdd(items);
+  saveNow();closeModal();render();showToast(n+' finance task'+(n===1?'':'s')+' added to '+finAdminProject(false).name);
+}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -8322,8 +8424,8 @@ function toggleDone(id){
   // Snapshot for undo ONLY if needed — defer for perf
   const prevDone=t.done;
   t.done=!t.done;
-  if(t.done){t.kStatus='done';}
-  else{syncBlockedStatus(id);}
+  if(t.done){t.kStatus='done';if(t.finKey)t.doneOn=_localToday();}
+  else{syncBlockedStatus(id);if(t.finKey)t.doneOn='';}
   const didSpawn=t.done&&t.recur?.enabled;
   if(didSpawn)spawnRecurring(t);
   // Cascade done/undone state to all children
@@ -8393,7 +8495,7 @@ function spawnRecurring(t){
   /* Dated tasks get an id made from the series and the due date, so two people ticking it off at once produce ONE next task, not two. */
   const id=(nextEnd||nextStart)?root+'_r'+(nextEnd||nextStart):uid();
   if(getTask(id)){t.recurNext=id;return;}
-  S.tasks.push({...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:t.parentId||null,recurRoot:root,recurNext:''});
+  S.tasks.push({...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:t.parentId||null,recurRoot:root,recurNext:'',doneOn:''});
   t.recurNext=id;
   /* Subtasks (and their subtasks) come along: not done, dates moved by the same amount as the parent, no recurrence of their own.
      Their ids come from the new parent's id plus the original subtask's id, so the same copy is produced however many people tick at once. */
@@ -10384,6 +10486,7 @@ function renderFinance(){
 
 ${_finLinksHtml()}
 ${_finReviewCardHtml()}
+${_finTasksHtml()}
 <div class="st-tabs fin-pills">${_finPillsHtml(tab)}
   <select class="fsel" style="margin-left:auto;font-size:.72rem;" onchange="S.finance.finYear=parseInt(this.value);save();render();">
     ${getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}</option>`).join('')}
@@ -12469,7 +12572,7 @@ function saveTask(eid,defParent,tmplId){
   // tmLbStillInherited: user opened an inheriting subtask and didn't touch labels → keep null.
   const labels=tmLbStillInherited?null:(rawTmLabels.length>0?rawTmLabels:(parentVal?null:[]));
   const task={id:eid||uid(),name,description:el('tm-desc-body')?.value.trim()||'',projectId:el('tm-proj')?.value||'',parentId:parentVal||null,priority:el('tm-prio')?.value||'Medium',phase:el('tm-phase')?.value||'',assignees,labels,blockedBy:oldTask?.blockedBy||[],startDate:el('tm-s-v')?.value||'',endDate:el('tm-e-v')?.value||'',kStatus:oldTask?.kStatus||'todo',done:false,recur:{enabled:recurOn,type:el('recur-type')?.value||'weekly',interval:parseInt(el('recur-n')?.value||1)||1},slackReminder:{},...(el('tm-cw')?{coworkDayId:el('tm-cw').value}:{})};
-  if(eid&&oldTask){['lane','recurRoot','recurNext'].forEach(k=>{if(oldTask[k]!==undefined)task[k]=oldTask[k];});task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
+  if(eid&&oldTask){['lane','recurRoot','recurNext','finKey','doneOn'].forEach(k=>{if(oldTask[k]!==undefined)task[k]=oldTask[k];});task.done=oldTask.done;task.slackReminder=oldTask.slackReminder||{};task.kStatus=oldTask.kStatus||'todo';}
   saveWithUndo(eid?'Edit task':'Add task');
   if(eid){_pfApplyEdit('tasks',eid,task);}else S.tasks.push(task);
   saveNow();
