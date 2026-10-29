@@ -1548,6 +1548,11 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fp-s{text-align:right;}
 .fp-tag{font-size:.6rem;font-weight:700;padding:2px 8px;border:1px solid;border-radius:99px;white-space:nowrap;}
 @media (max-width:640px){.fp-hd,.fp-row{grid-template-columns:minmax(0,1fr) auto auto;}.fp-hd.fp-c,.fp-row.fp-c{grid-template-columns:minmax(0,1fr) auto auto;}.fp-f,.fp-hd .fp-f{display:none}.fp-s{grid-column:1/-1;text-align:left}.fp-hd .fp-s{display:none}}
+
+/* Event income */
+.ev-inc-tick{all:unset;cursor:pointer;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);display:grid;place-items:center;font-size:.7rem;font-weight:800;color:#0d1f19;flex:none;}
+.ev-inc-tick.on{background:var(--green);border-color:var(--green);}
+.ev-inc-tick:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
 </style>
 </head>
 <body>
@@ -3102,7 +3107,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=105;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=106;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6454,6 +6459,71 @@ function _finPlanHtml(){
   <p class="fp-help" style="margin:10px 0 0;">Spent so far counts recurring costs as they fall due (yearly bills on the month you choose), one-off costs by date, and event expenses from each event page. Edit category budgets below.</p>
   </div></div>`;
 }
+/* ── Event money: sponsor fees + event income, next to the expenses already logged on the event page ──
+   Counting rules (one place, used by the event page and Finance):
+   - A cash sponsor's fee counts as revenue once the sponsor is confirmed (or later). A fee still "in discussion" is projected only.
+   - Event income items count as revenue once ticked received; unticked ones are projected only.
+   - "Paid" is the sponsor's existing invoice-paid tick, shown for information. */
+function _evFeeSponsors(p){return (p.sponsors||[]).filter(sp=>{const t=sp.type;return(t==='cash'||t==='both')&&(parseFloat(sp.fee)||0)>0;});}
+function evMoney(p){
+  const fees={confirmed:0,prospect:0,paid:0},inc={received:0,expected:0};
+  _evFeeSponsors(p).forEach(sp=>{
+    const f=parseFloat(sp.fee)||0,ci=SP_STAGES.findIndex(x=>x.id===_spStage(sp));
+    if(ci>=3){fees.confirmed+=f;if(sp.invoicePaid)fees.paid+=f;}else if(ci===2)fees.prospect+=f;
+  });
+  (p.income||[]).forEach(i=>{const a=parseFloat(i.amount)||0;if(i.received)inc.received+=a;else inc.expected+=a;});
+  const spent=(p.expenses||[]).reduce((a,e)=>a+(parseFloat(e.amount)||0),0),budget=parseFloat(p.budget)||0;
+  const revenue=fees.confirmed+inc.received,projected=revenue+fees.prospect+inc.expected;
+  return{fees,inc,spent,budget,revenue,projected,result:revenue-spent,projectedResult:projected-spent};
+}
+function setSponsorFee(pid,sid,v){const sp=getProject(pid)?.sponsors?.find(x=>x.id===sid);if(!sp)return;const n=parseFloat(v);sp.fee=isFinite(n)&&n>0?Math.round(n*100)/100:0;save();setTimeout(render,0);}   // render after the field's blur/change has finished, so the focused input is not removed mid-event
+function _evIncomeCardHtml(p){
+  const m=evMoney(p),L=p.income||[],money=_finMoney;
+  const feeLines=_evFeeSponsors(p).map(sp=>{const s=getSponsor(sp.id);if(!s)return'';const ci=SP_STAGES.findIndex(x=>x.id===_spStage(sp)),st=ci>=3?'confirmed':'in talks';
+    if(ci<2)return'';   // earlier stages are not counted or projected yet, so they are not listed
+    return `<div class="ev-row" style="display:flex;align-items:center;gap:8px;padding:7px 14px;"><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem;font-weight:600;">${escHtml(s.name)} <small style="font-weight:400;color:var(--muted);">sponsorship fee</small></span><span class="ev-pill">${st}</span><span style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:600;color:${ci>=3?'var(--green)':'var(--muted)'};white-space:nowrap;">${_finMoney(sp.fee)}</span></div>`;}).join('');
+  const rows=L.map(i=>`<div class="ev-row" style="display:flex;align-items:center;gap:8px;padding:7px 14px;">
+      <button type="button" class="ev-inc-tick${i.received?' on':''}" role="checkbox" aria-checked="${!!i.received}" title="${i.received?'Received':'Expected: tick when received'}" onclick="toggleEvIncome('${p.id}','${i.id}')">${i.received?'✓':''}</button>
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem;font-weight:600;" title="${escHtml(i.name)}">${escHtml(i.name)}</span>
+      <span style="color:var(--muted);font-size:.64rem;white-space:nowrap;">${i.date?escHtml(fmtD(i.date)):''}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:.75rem;font-weight:600;white-space:nowrap;color:${i.received?'var(--green)':'var(--muted)'};">${money(i.amount)}</span>
+      <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;" aria-label="Edit income" onclick="editEvIncome('${p.id}','${i.id}')" title="Edit">✎</button></div>`).join('');
+  const any=L.length||feeLines.trim();
+  return `<div class="ev-card" data-ev-income>
+  <div class="ev-card-hd"><span class="ev-card-t">Income</span>
+    ${m.revenue>0||m.projected>0?`<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:.74rem;font-weight:600;color:var(--green);">${money(m.revenue)}${m.projected>m.revenue?' <span style="color:var(--muted);font-weight:400;">of '+money(m.projected)+' projected</span>':''}</span>`:''}</div>
+  ${any?feeLines+rows:`<div style="color:var(--muted);font-size:.73rem;padding:10px 14px;">No income yet. Sponsor fees appear here once you enter them on a sponsor.</div>`}
+  <div style="padding:8px 14px;border-top:1px solid var(--border);display:flex;align-items:center;gap:10px;flex-wrap:wrap;"><button class="btn btn-ghost btn-xs" onclick="editEvIncome('${p.id}','')">+ Add income</button>
+    ${(m.revenue>0||m.spent>0)?`<span style="margin-left:auto;font-size:.72rem;color:var(--muted);">Result so far <b style="font-family:'DM Mono',monospace;color:${m.result>=0?'var(--green)':'var(--red)'};">${m.result<0?'-':''}${money(Math.abs(m.result))}</b></span>`:''}</div>
+</div>`;
+}
+function evIncomeModalHtml(pid,id){
+  const p=getProject(pid);if(!p)return'';const i=id?(p.income||[]).find(x=>x.id===id):null;
+  return`<div class="mo-box" style="max-width:380px;">
+<div class="mo-hd"><span class="mo-title">${i?'Edit income':'Add income'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
+<div class="mo-body">
+  <p style="font-size:.78rem;color:var(--text2);margin-bottom:13px;">${i?'Editing income in':'Adding income to'}: <strong style="color:var(--white);">${escHtml(p.name)}</strong></p>
+  <div class="field"><label class="flbl">Name *</label><input class="inp" id="ei-name" value="${escHtml(i?.name||'')}" placeholder="e.g. Ticket sales, Booth hire"></div>
+  <div class="inp-row"><div class="field"><label class="flbl">Amount (£) *</label><input class="inp" id="ei-amt" type="number" step="0.01" min="0" inputmode="decimal" value="${i?i.amount:''}" placeholder="0.00"></div>
+  <div class="field"><label class="flbl">Date</label><input class="inp" id="ei-date" type="date" value="${i?.date||''}"></div></div>
+  <label style="display:flex;align-items:center;gap:8px;font-size:.8rem;margin-top:4px;cursor:pointer;"><input type="checkbox" id="ei-recv" ${i?.received?'checked':''}> Received (counts as revenue; unticked is projected only)</label>
+  <div id="ei-err" style="color:var(--red);font-size:.72rem;display:none;margin-top:8px;">Enter a name and an amount</div>
+</div>
+<div class="mo-ft">${i?`<button class="btn btn-ghost" style="margin-right:auto;color:var(--red);" onclick="deleteEvIncome('${pid}','${i.id}')">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveEvIncome('${pid}','${id||''}')">${i?'Save changes':'Add income'}</button></div>
+</div>`;}
+function editEvIncome(pid,id){const mc=el('mc');mc.style.display='flex';mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${evIncomeModalHtml(pid,id)}</div>`;{const n=el('ei-name');if(n)n.focus();}}
+function saveEvIncome(pid,id){
+  const p=getProject(pid);if(!p)return;
+  const name=(el('ei-name')?.value||'').trim(),ar=(el('ei-amt')?.value||'').trim(),amount=Number(ar),date=el('ei-date')?.value||'',received=!!el('ei-recv')?.checked;
+  if(!name||ar===''||!isFinite(amount)||amount<0){const e=el('ei-err');if(e)e.style.display='block';return;}
+  saveWithUndo(id?'Edit income':'Add income');
+  if(!Array.isArray(p.income))p.income=[];
+  const rec={name,amount:Math.round(amount*100)/100,date,received};
+  if(id){const k=p.income.findIndex(x=>x.id===id);if(k>=0)p.income[k]={...p.income[k],...rec};}else p.income.push({id:uid(),...rec});
+  saveNow();closeModal();render();
+}
+function deleteEvIncome(pid,id){const p=getProject(pid);if(!p)return;saveWithUndo('Delete income');p.income=(p.income||[]).filter(x=>x.id!==id);saveNow();closeModal();render();}
+function toggleEvIncome(pid,id){const p=getProject(pid);const i=p&&(p.income||[]).find(x=>x.id===id);if(!i)return;i.received=!i.received;save();render();}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -6856,7 +6926,7 @@ function _spRowHtml(p,sp){
    +'<div class="sp-cell sp-name"><button type="button" class="sp-nm" onclick="spToggleDetail('+q+')" aria-label="Show details for '+escHtml(s.name)+'"><span id="sp-chev-'+p.id+'-'+sp.id+'" class="mut" aria-hidden="true">'+(open?'▾':'▸')+'</span>'
    +'<span class="sp-avatar" style="width:28px;height:28px;font-size:.58rem;flex-shrink:0;" onclick="event.stopPropagation();_spSelectedId=\''+s.id+'\';nav(\'sponsors\');" title="View '+escHtml(s.name)+' profile">'+(s.logoDataUrl?'<img src="'+escHtml(s.logoDataUrl)+'" alt="">':escHtml(s.name.substring(0,2).toUpperCase()))+'</span>'
    +'<span class="sp-nmt">'+escHtml(s.name)+'</span></button></div>'
-   +'<div class="sp-cell sp-type" data-l="Type"><span class="ev-pill" style="background:'+t.color+'22;color:'+t.color+';">'+escHtml(t.label)+'</span></div>'
+   +'<div class="sp-cell sp-type" data-l="Type"><span class="ev-pill" style="background:'+t.color+'22;color:'+t.color+';">'+escHtml(t.label)+'</span>'+(cash&&parseFloat(sp.fee)>0?'<div class="sp-sub">'+_finMoney(sp.fee)+' fee</div>':'')+'</div>'
    +'<div class="sp-cell sp-stage" data-l="Stage"><div class="sp-stp">'+seg+'</div><div style="font-size:.72rem;font-weight:700;color:'+def.color+';">'+escHtml(def.name)+'</div>'+(sub?'<div class="sp-sub"'+(stale?' style="color:var(--yellow);"':'')+'>'+sub+'</div>':'')+'</div>'
    +'<div class="sp-cell" data-l="Prizes">'+(pi.val>0?'<span class="sp-val">£'+pi.val.toFixed(2)+'</span>':'<span class="mut">—</span>')+'</div>'
    +'<div class="sp-cell" data-l="Delivered">'+(pi.total>0?'<div style="display:flex;flex-direction:column;gap:3px;min-width:70px;"><span style="font-size:.72rem;font-family:\'DM Mono\',monospace;color:'+(pi.done===pi.total?'var(--green)':'var(--text2)')+';">'+pi.done+'/'+pi.total+'</span><div style="height:3px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:'+Math.round(pi.done/pi.total*100)+'%;background:'+(pi.done===pi.total?'var(--green)':'var(--acc)')+';"></div></div></div>':'<span class="mut">—</span>')+'</div>'
@@ -6869,7 +6939,8 @@ function _spRowHtml(p,sp){
   const note=String(sp.outreachNote||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
   let c1='<h4 class="sp-h">Stage</h4><div style="display:flex;gap:4px;flex-wrap:wrap;">'+stageBtns+'</div>'
     +(dt?'<div class="sp-sub" style="margin-top:6px;'+(stale?'color:var(--yellow);':'')+'">'+escHtml(def.name)+' since '+fmtD(dt)+' · '+(days===0?'today':days+' day'+(days!==1?'s':'')+' ago')+(stale?' · no reply yet?':'')+'</div>':'')
-    +'<h4 class="sp-h" style="margin-top:12px;">Notes</h4><input class="inp" style="font-size:.72rem;padding:5px 9px;" placeholder="Notes: who you spoke to, next step…" value="'+note+'" onchange="setSponsorNote('+q+',this.value)">';
+    +'<h4 class="sp-h" style="margin-top:12px;">Notes</h4><input class="inp" style="font-size:.72rem;padding:5px 9px;" placeholder="Notes: who you spoke to, next step…" value="'+note+'" onchange="setSponsorNote('+q+',this.value)">'
+    +(cash?'<h4 class="sp-h" style="margin-top:12px;">Sponsorship fee</h4><div style="display:flex;align-items:center;gap:6px;"><span class="mut">\u00a3</span><input class="inp" type="number" min="0" step="0.01" inputmode="decimal" aria-label="Sponsorship fee" style="font-size:.72rem;padding:5px 9px;max-width:130px;" placeholder="0.00" value="'+(parseFloat(sp.fee)>0?sp.fee:'')+'" onchange="setSponsorFee('+q+',this.value)"><span class="sp-sub">'+(pre?(cur==='discussion'?'counts as projected':'counts once confirmed'):'counts as revenue')+'</span></div>':'');
   let c2='',c3='';
   if(!pre){
     c2='<h4 class="sp-h">Sponsorship</h4><div style="display:flex;flex-direction:column;gap:4px;">'
@@ -8687,7 +8758,7 @@ ${_adm?'':`<!-- EXPENSES -->
     </div>`).join('')+(all.length>5?`<div style="padding:6px 14px;"><button class="btn btn-ghost btn-xs" onclick="toggleExpAll('${p.id}')">${showAll?'Show fewer':'Show all '+all.length}</button></div>`:'');
   })()}
   <div style="padding:8px 14px;border-top:1px solid var(--border);"><button class="btn btn-ghost btn-xs" onclick="openModal('projExp','${p.id}')">+ Add Expense</button></div>
-</div>`}
+</div>${isEvt(p)?_evIncomeCardHtml(p):''}`}
 </div>
 
 <!-- SPONSORS IN PROJECT -->
