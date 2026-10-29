@@ -1410,6 +1410,34 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .ev-row:last-child{border-bottom:0;}
 .ev-pill{display:inline-flex;align-items:center;border-radius:99px;padding:1px 8px;font-size:.62rem;font-weight:600;background:var(--surface3);color:var(--text2);white-space:nowrap;flex-shrink:0;}
 .ev-pill.ok{background:rgba(31,186,122,.14);color:var(--green);}
+
+/* ── Event page: sponsor pipeline table ── */
+.sp-wrap{overflow-x:auto;}
+.sp-table{min-width:980px;}
+.sp-head,.sp-row{display:grid;grid-template-columns:minmax(200px,1.4fr) 104px minmax(220px,1.6fr) 92px 100px 132px 120px;gap:12px;align-items:center;padding:8px 14px;}
+.sp-head{font-size:.6rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);border-bottom:1px solid var(--border);}
+.sp-row{border-bottom:1px solid var(--border);font-size:.78rem;}
+.sp-tier{padding:6px 14px;background:var(--surface2);font-size:.62rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--text2);border-bottom:1px solid var(--border);}
+.sp-cell{min-width:0;}
+.sp-nm{display:flex;align-items:center;gap:9px;background:none;border:0;color:inherit;font:inherit;cursor:pointer;min-width:0;text-align:left;padding:0;min-height:36px;width:100%;}
+.sp-nmt{font-weight:700;font-size:.84rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.sp-stp{display:flex;gap:3px;margin-bottom:2px;}
+.sp-seg{flex:1;height:16px;border:0;background:none;padding:0;cursor:pointer;position:relative;}
+.sp-seg::after{content:"";position:absolute;left:0;right:0;top:5px;height:6px;border-radius:3px;background:var(--surface3);}
+.sp-seg.on::after{background:var(--c);}
+.sp-sub{font-size:.62rem;color:var(--muted);}
+.sp-val{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--yellow);white-space:nowrap;}
+.sp-det{background:var(--surface);border-bottom:1px solid var(--border);padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px 28px;}
+.sp-h{margin:0 0 8px;font-size:.62rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);}
+.sp-n{font-weight:500;text-transform:none;letter-spacing:0;}
+.sp-sb{border:1px solid var(--border);font-size:.62rem;font-weight:700;padding:3px 9px;border-radius:20px;cursor:pointer;background:transparent;color:var(--muted);min-height:26px;white-space:nowrap;}
+.sp-table .mut,.sp-det .mut{color:var(--muted);}
+.ev-tk{display:inline-flex;align-items:center;gap:6px;background:none;border:0;color:var(--text2);font-size:.74rem;cursor:pointer;min-height:28px;padding:0;text-align:left;}
+.ev-tk::before{content:"";width:15px;height:15px;border-radius:4px;border:1.5px solid rgba(255,255,255,.22);box-sizing:border-box;display:inline-flex;align-items:center;justify-content:center;font-size:10px;font-weight:700;color:#0f1115;flex:none;}
+.ev-tk.on{color:var(--acc);}
+.ev-tk.on::before{content:"\2713";background:var(--acc);border-color:var(--acc);}
+.ev-tk.g.on{color:var(--green);}
+.ev-tk.g.on::before{background:var(--green);border-color:var(--green);}
 </style>
 </head>
 <body>
@@ -2926,7 +2954,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=91;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=92;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6449,6 +6477,111 @@ function _pfNudgeLater(){try{localStorage.setItem('pf_backup_snooze',String(Date
 async function _pfNudgeDownload(){await downloadFullBackup();_pfBackupNudgeCheck(true);}
 setTimeout(()=>{_pfStorageCheck();_pfBackupNudgeCheck(false);},25000);
 setInterval(()=>{_pfStorageCheck();_pfBackupNudgeCheck(false);},6*60*60*1000);
+/* ════ EVENT PAGE: sponsor pipeline table ════
+   One row per sponsor, grouped by tier: stage tracker, prizes, delivery, invoice ticks. Click a row to open its detail
+   (stage buttons, notes, fulfilment ticks, AirCon checklist, product deliveries). All ticks reuse the existing handlers
+   (setSponsorStage, toggleSponsorFlag, toggleProdDelivered, setSponsorNote), so no sponsor data changes shape. */
+const _SP_TIERS=[{key:'headline',label:'★ Headline sponsors'},{key:'event',label:'Event sponsors'},{key:'product',label:'Product sponsors'},{key:'',label:'Sponsors'}];
+function _spProdInfo(sp,s){
+  const list=(sp.products||[]).filter(prod=>Object.values(prod.quantities||{}).some(q=>parseInt(q)>0));
+  const catalog=s.products||[];let val=0;
+  list.forEach(prod=>{const pp=catalog.find(x=>x.name===prod.name);const cost=(pp&&pp.cost)||0;Object.values(prod.quantities||{}).forEach(q=>{val+=cost*(parseInt(q)||0);});});
+  return{list,catalog,val,total:list.length,done:list.filter(x=>x.delivered).length};
+}
+function _spTick(on,label,onclick,green){
+  return '<button type="button" class="ev-tk'+(green?' g':'')+(on?' on':'')+'" aria-pressed="'+(!!on)+'" onclick="event.stopPropagation();'+onclick+'">'+label+'</button>';
+}
+function spToggleDetail(pid,sid){
+  window._spOpen=window._spOpen||{};const k=pid+'|'+sid;window._spOpen[k]=!window._spOpen[k];
+  const d=el('sp-det-'+pid+'-'+sid),c=el('sp-chev-'+pid+'-'+sid),r=el('sp-row-'+pid+'-'+sid);
+  if(d)d.style.display=window._spOpen[k]?'':'none';
+  if(c)c.textContent=window._spOpen[k]?'▾':'▸';
+  if(r)r.setAttribute('aria-expanded',!!window._spOpen[k]);
+}
+function _spRowHtml(p,sp){
+  const s=getSponsor(sp.id);if(!s)return'';
+  const t=SP_TYPES[sp.type]||SP_TYPES.product;
+  const cur=_spStage(sp),ci=SP_STAGES.findIndex(x=>x.id===cur),def=SP_STAGES[ci];
+  const pre=ci<3,cash=sp.type==='cash'||sp.type==='both';
+  const pi=_spProdInfo(sp,s);
+  const open=!!(window._spOpen||{})[p.id+'|'+sp.id];
+  const tmpl=S.taskTemplates.find(x=>x.sponsorType===sp.type);
+  const dt=(sp.stageDates||{})[cur];const days=_spDaysSince(dt);const stale=cur==='contacted'&&days>=7;
+  const q="'"+p.id+"','"+sp.id+"'";
+  const seg=SP_STAGES.map((x,i)=>'<button type="button" class="sp-seg'+(i<=ci?' on':'')+'" style="--c:'+x.color+';" title="Move to '+escHtml(x.name)+'" aria-label="Move to '+escHtml(x.name)+'" onclick="event.stopPropagation();setSponsorStage('+q+',\''+x.id+'\')"></button>').join('');
+  const sub=(dt?'since '+fmtD(dt)+' · '+(days===0?'today':days+'d ago')+(stale?' · no reply yet?':''):'');
+  const inv=pre?'<span class="mut">—</span>':(cash?'<span style="display:flex;gap:8px;flex-wrap:wrap;">'+_spTick(sp.invoiceSent,'Sent',"toggleSponsorFlag("+q+",'invoiceSent')")+_spTick(sp.invoicePaid,'Paid',"toggleSponsorFlag("+q+",'invoicePaid')",true)+'</span>':'<span class="mut">n/a</span>');
+  let h='<div class="sp-row" id="sp-row-'+p.id+'-'+sp.id+'" aria-expanded="'+open+'" style="border-left:3px solid '+def.color+';">'
+   +'<div class="sp-cell sp-name"><button type="button" class="sp-nm" onclick="spToggleDetail('+q+')" aria-label="Show details for '+escHtml(s.name)+'"><span id="sp-chev-'+p.id+'-'+sp.id+'" class="mut" aria-hidden="true">'+(open?'▾':'▸')+'</span>'
+   +'<span class="sp-avatar" style="width:28px;height:28px;font-size:.58rem;flex-shrink:0;" onclick="event.stopPropagation();_spSelectedId=\''+s.id+'\';nav(\'sponsors\');" title="View '+escHtml(s.name)+' profile">'+(s.logoDataUrl?'<img src="'+escHtml(s.logoDataUrl)+'" alt="">':escHtml(s.name.substring(0,2).toUpperCase()))+'</span>'
+   +'<span class="sp-nmt">'+escHtml(s.name)+'</span></button></div>'
+   +'<div class="sp-cell sp-type" data-l="Type"><span class="ev-pill" style="background:'+t.color+'22;color:'+t.color+';">'+escHtml(t.label)+'</span></div>'
+   +'<div class="sp-cell sp-stage" data-l="Stage"><div class="sp-stp">'+seg+'</div><div style="font-size:.72rem;font-weight:700;color:'+def.color+';">'+escHtml(def.name)+'</div>'+(sub?'<div class="sp-sub"'+(stale?' style="color:var(--yellow);"':'')+'>'+sub+'</div>':'')+'</div>'
+   +'<div class="sp-cell" data-l="Prizes">'+(pi.val>0?'<span class="sp-val">£'+pi.val.toFixed(2)+'</span>':'<span class="mut">—</span>')+'</div>'
+   +'<div class="sp-cell" data-l="Delivered">'+(pi.total>0?'<div style="display:flex;flex-direction:column;gap:3px;min-width:70px;"><span style="font-size:.72rem;font-family:\'DM Mono\',monospace;color:'+(pi.done===pi.total?'var(--green)':'var(--text2)')+';">'+pi.done+'/'+pi.total+'</span><div style="height:3px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:'+Math.round(pi.done/pi.total*100)+'%;background:'+(pi.done===pi.total?'var(--green)':'var(--acc)')+';"></div></div></div>':'<span class="mut">—</span>')+'</div>'
+   +'<div class="sp-cell" data-l="Invoice">'+inv+'</div>'
+   +'<div class="sp-cell sp-act">'+(pre?'':'<button class="btn btn-acc btn-xs" onclick="event.stopPropagation();openPrizeDelivery('+q+')">Deliver prizes</button>')+'</div>'
+   +'</div>';
+  // ── detail panel ──
+  const stageBtns=SP_STAGES.map((x,i)=>{const on=i===ci,past=i<ci;return '<button type="button" class="sp-sb" onclick="setSponsorStage('+q+',\''+x.id+'\')" style="border-color:'+(on||past?x.color:'var(--border)')+';background:'+(on?x.color:past?x.color+'22':'transparent')+';color:'+(on?'#fff':past?x.color:'var(--muted)')+';">'+escHtml(x.name)+'</button>';}).join('')
+    +'<button type="button" class="sp-sb" onclick="setSponsorStage('+q+',\'declined\')" title="Declined: removes the sponsor from this event" style="margin-left:auto;">Declined</button>';
+  const note=String(sp.outreachNote||'').replace(/&/g,'&amp;').replace(/"/g,'&quot;').replace(/</g,'&lt;');
+  let c1='<h4 class="sp-h">Stage</h4><div style="display:flex;gap:4px;flex-wrap:wrap;">'+stageBtns+'</div>'
+    +(dt?'<div class="sp-sub" style="margin-top:6px;'+(stale?'color:var(--yellow);':'')+'">'+escHtml(def.name)+' since '+fmtD(dt)+' · '+(days===0?'today':days+' day'+(days!==1?'s':'')+' ago')+(stale?' · no reply yet?':'')+'</div>':'')
+    +'<h4 class="sp-h" style="margin-top:12px;">Notes</h4><input class="inp" style="font-size:.72rem;padding:5px 9px;" placeholder="Notes: who you spoke to, next step…" value="'+note+'" onchange="setSponsorNote('+q+',this.value)">';
+  let c2='',c3='';
+  if(!pre){
+    c2='<h4 class="sp-h">Sponsorship</h4><div style="display:flex;flex-direction:column;gap:4px;">'
+      +(cash?_spTick(sp.invoiceSent,'Invoice sent',"toggleSponsorFlag("+q+",'invoiceSent')")+_spTick(sp.invoicePaid,'Invoice paid',"toggleSponsorFlag("+q+",'invoicePaid')",true):'')
+      +(sp.type==='venue'?_spTick(sp.logisticsAgreed,'Logistics agreed',"toggleSponsorFlag("+q+",'logisticsAgreed')"):'')
+      +_spTick(sp.fulfilled,'Sponsorship fulfilled',"toggleSponsorFlag("+q+",'fulfilled')",true)+'</div>';
+    if(p.isAirCon){const its=_airconItems(sp);if(its.length){const n=its.filter(it=>sp[it.id]).length;
+      c2+='<h4 class="sp-h" style="margin-top:12px;">AirCon checklist <span class="sp-n">'+n+'/'+its.length+'</span></h4><div style="display:flex;flex-direction:column;gap:4px;">'+its.map(it=>_spTick(sp[it.id],escHtml(it.label),"toggleSponsorFlag("+q+",'"+it.id+"')")).join('')+'</div>';}}
+    c3='<h4 class="sp-h">Product allocations'+(pi.total?' <span class="sp-n">'+pi.done+'/'+pi.total+' delivered</span>':'')+'</h4>';
+    if(pi.list.length){
+      c3+=pi.list.map((prod,k)=>{
+        const pp=pi.catalog.find(x=>x.name===prod.name)||{};
+        const cats=Object.keys(prod.quantities||{}).filter(cn=>parseInt(prod.quantities[cn])>0);
+        if((prod.categories||[]).length>0&&cats.length===0)cats.push(...(prod.categories||[]));
+        const qty=cats.reduce((a,cn)=>a+(parseInt((prod.quantities||{})[cn])||1),0)||1;
+        const line=(pp.cost||0)*qty;
+        return '<div style="display:flex;align-items:center;gap:8px;">'+_spTick(prod.delivered,escHtml(prod.name)+(cats.length?' <span class="mut" style="font-size:.62rem;">'+escHtml(cats.map(cn=>cn+(parseInt((prod.quantities||{})[cn])>1?' ×'+parseInt(prod.quantities[cn]):'')).join(' · '))+'</span>':''),"toggleProdDelivered("+q+","+k+")",true)+(line>0?'<span class="sp-val" style="margin-left:auto;'+(prod.delivered?'color:var(--muted);':'')+'">£'+line.toFixed(2)+'</span>':'')+'</div>';
+      }).join('');
+    }else if(pi.catalog.length>0){
+      c3+='<div class="mut" style="font-size:.7rem;">No products allocated yet. <button class="btn btn-ghost btn-xs" onclick="openModal(\'project\',\''+p.id+'\')">Assign products →</button></div>';
+    }else c3+='<div class="mut" style="font-size:.7rem;">No products on this sponsor.</div>';
+  }
+  const acts='<div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:12px;">'
+    +'<button class="btn btn-ghost btn-xs" onclick="'+(tmpl?"openModal('taskTmpl','"+tmpl.id+"')":"_createSponsorTemplate('"+sp.type+"')")+'">'+(tmpl?'Edit template':'Create template')+'</button>'
+    +'<button class="btn btn-ghost btn-xs" style="color:var(--muted);" onclick="removeProjSponsor('+q+')" title="Remove sponsor from this event">× Remove</button></div>';
+  if(c3)c3+=acts;else if(c2)c2+=acts;else c1+=acts;
+  h+='<div class="sp-det" id="sp-det-'+p.id+'-'+sp.id+'" style="display:'+(open?'':'none')+';border-left:3px solid '+def.color+';"><div>'+c1+'</div>'+(c2?'<div>'+c2+'</div>':'')+(c3?'<div>'+c3+'</div>':'')+'</div>';
+  return h;
+}
+function renderEventSponsors(p){
+  const all=p.sponsors||[];const exp=(window._spExpanded||{})[p.id]!==false;
+  const cashN=all.filter(sp=>sp.type==='cash'||sp.type==='both').length;
+  let pool=0;all.forEach(sp=>{const s=getSponsor(sp.id);if(s)pool+=_spProdInfo(sp,s).val;});
+  const rank={headline:0,event:1,product:2,'':3};
+  const order=sp=>-SP_STAGES.findIndex(x=>x.id===_spStage(sp));
+  const groups=_SP_TIERS.map(tr=>({tr,list:all.filter(sp=>(sp.category||'')===tr.key&&getSponsor(sp.id)).sort((a,b)=>order(a)-order(b))})).filter(g=>g.list.length);
+  // sponsors whose category is something unexpected still show, under the plain group
+  const known=new Set(_SP_TIERS.map(x=>x.key));const odd=all.filter(sp=>!known.has(sp.category||'')&&getSponsor(sp.id));
+  if(odd.length){const g=groups.find(x=>x.tr.key==='');if(g)g.list.push(...odd);else groups.push({tr:_SP_TIERS[3],list:odd});}
+  return '<div class="ev-card" id="sp-card-'+p.id+'" style="margin-bottom:18px;">'
+   +'<div class="ev-card-hd" style="cursor:pointer;flex-wrap:wrap;" onclick="toggleSponsorsExpanded(\''+p.id+'\')">'
+   +'<svg id="sp-toggle-ico-'+p.id+'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;flex-shrink:0;transform:'+(exp?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg>'
+   +'<span class="ev-card-t">Sponsors</span>'+(all.length?'<span class="ev-card-n">'+all.length+(cashN?' · '+cashN+' cash':'')+'</span>':'')
+   +(pool>0?'<span class="ev-pill" style="background:var(--teal-dim);color:var(--acc);">Prize pool £'+pool.toFixed(2)+'</span>':'')
+   +'<span style="margin-left:auto;display:flex;gap:6px;" onclick="event.stopPropagation()"><button class="btn btn-acc btn-xs" onclick="openAddSponsorToEvent(\''+p.id+'\')">+ Add sponsor</button><button class="btn btn-ghost btn-xs" onclick="openModal(\'project\',\''+p.id+'\')">Edit sponsors</button></span></div>'
+   +'<div id="sp-body-'+p.id+'" style="display:'+(exp?'block':'none')+';">'
+   +(all.length===0?'<div style="font-size:.75rem;color:var(--muted);padding:12px 14px;">No sponsors on this event yet. Use <b>+ Add sponsor</b> to start your shortlist.</div>'
+     :'<div style="padding:12px 14px 4px;">'+_spPipelineBar(all)+'</div>'
+      +'<div class="sp-wrap"><div class="sp-table"><div class="sp-head"><span>Sponsor</span><span>Type</span><span>Pipeline stage</span><span>Prizes</span><span>Delivered</span><span>Invoice</span><span></span></div>'
+      +groups.map(g=>'<div class="sp-tier">'+escHtml(g.tr.label)+' <span class="mut" style="font-weight:500;">'+g.list.length+'</span></div>'+g.list.map(sp=>_spRowHtml(p,sp)).join('')).join('')
+      +'</div></div>')
+   +'</div></div>';
+}
 /* ════ ONE-TIME REPAIR: recurring tasks created before subtasks were carried over get their subtasks back ════
    For every OPEN recurring occurrence that has no subtasks, find the nearest earlier occurrence in its series that does,
    and copy that checklist (not done, dates shifted, no recurrence of its own), using the same ids the live copy logic uses,
@@ -8216,158 +8349,7 @@ ${_adm?'':`<!-- EXPENSES -->
 </div>
 
 <!-- SPONSORS IN PROJECT -->
-${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;cursor:pointer;" onclick="toggleSponsorsExpanded('${p.id}')">
-    <div style="display:flex;align-items:center;gap:10px;flex:1;">
-      <svg id="sp-toggle-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._spExpanded||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
-      <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Sponsors</span>
-      ${(()=>{
-        const pool=(p.sponsors||[]).reduce((tot,sp)=>{
-          const s=getSponsor(sp.id);
-          if(!s)return tot;
-          return tot+(sp.products||[]).reduce((subtot,allocProd)=>{
-            const profileProd=(s.products||[]).find(pp=>pp.name===allocProd.name);
-            const cost=profileProd?.cost||0;
-            const qty=Object.values(allocProd.quantities||{}).reduce((a,q)=>a+(parseInt(q)||0),0)
-              +(allocProd.categories||[]).length;
-            return subtot+cost*qty;
-          },0);
-        },0);
-        return pool>0?`<span style="font-family:'DM Mono',monospace;font-size:.7rem;color:var(--acc);background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:5px;padding:1px 8px;">Prize pool: £${pool.toFixed(2)}</span>`:'';
-      })()}
-    </div>
-    <div style="display:flex;gap:6px;align-items:center;" onclick="event.stopPropagation()">
-      <button class="btn btn-acc btn-xs" onclick="openAddSponsorToEvent('${p.id}')" style="font-size:.65rem;">+ Add sponsor</button>
-      <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')" style="font-size:.65rem;">Edit sponsors</button>
-    </div>
-  </div>
-  <div id="sp-body-${p.id}" style="display:${(window._spExpanded||{})[p.id]!==false?'block':'none'};">
-  ${(p.sponsors||[]).length===0?'<div style="font-size:.75rem;color:var(--muted);padding:4px 0 10px;">No sponsors on this event yet. Use <b>+ Add sponsor</b> to start your shortlist.</div>':''}
-  ${(()=>{
-    const allSpons=p.sponsors||[];
-    const tiers=[
-      {key:'headline',label:'★ Headline Sponsors',color:'var(--yellow)'},
-      {key:'event',   label:'Event Sponsors',     color:'var(--blue)'},
-      {key:'product', label:'Product Sponsors',   color:'var(--purple)'},
-      {key:'',        label:'Sponsors',            color:'var(--muted)'},
-    ];
-    // Only show tiers that have at least one sponsor
-    const usedTiers=tiers.filter(tier=>allSpons.some(sp=>(sp.category||'')=== tier.key));
-    const spCardHtml=(sp)=>{
-      const s=getSponsor(sp.id);if(!s)return'';
-      const t=SP_TYPES[sp.type]||SP_TYPES.product;
-      const tmpl=S.taskTemplates.find(x=>x.sponsorType===sp.type);
-      const allAllocated=sp.products||[];
-      const allocatedProducts=allAllocated.filter(prod=>Object.values(prod.quantities||{}).some(q=>parseInt(q)>0));
-      const isCashSponsor=sp.type==='cash'||sp.type==='both';
-      const s_prods=s.products||[];
-      let sponsorPrizeVal=0;
-      allocatedProducts.forEach(prod=>{
-        const profileProd=s_prods.find(pp=>pp.name===prod.name);
-        const cost=profileProd?.cost||0;
-        Object.entries(prod.quantities||{}).forEach(([cat,qty])=>{sponsorPrizeVal+=cost*(parseInt(qty)||0);});
-      });
-      const totalProds=allocatedProducts.length;
-      const deliveredProds=allocatedProducts.filter(prod=>prod.delivered).length;
-      const allDelivered=totalProds>0&&deliveredProds===totalProds;
-      const _stDef=SP_STAGES.find(x=>x.id===_spStage(sp));const _pre=SP_STAGES.indexOf(_stDef)<3;
-      return`<div style="background:var(--surface2);border:1px solid ${allDelivered?'var(--green)':'var(--border)'};border-radius:10px;overflow:hidden;display:flex;flex-direction:column;border-left:4px solid ${_stDef.color};${_pre?'background:var(--surface);':''}transition:border-color .2s;">
-        <div style="display:flex;align-items:center;gap:10px;padding:10px 14px 10px 13px;">
-          <div class="sp-avatar" style="width:30px;height:30px;font-size:.6rem;flex-shrink:0;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View ${escHtml(s.name)} profile">${s.logoDataUrl?`<img src="${escHtml(s.logoDataUrl)}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
-          <div style="flex:1;min-width:0;">
-            <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">
-              <span style="font-size:.84rem;font-weight:700;cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');" title="View profile">${escHtml(s.name)}</span>
-              ${sponsorPrizeVal>0?`<span style="font-family:'DM Mono',monospace;font-size:.65rem;color:var(--yellow);">£${sponsorPrizeVal.toFixed(2)}</span>`:''}
-              <span style="font-size:.62rem;padding:1px 7px;background:${t.color}22;color:${t.color};border-radius:3px;font-weight:600;">${escHtml(t.label)}</span>${sp.category==='headline'?'<span style="font-size:.6rem;color:var(--yellow);font-weight:700;">★ Headline</span>':sp.category==='event'?'<span style="font-size:.6rem;color:var(--blue);font-weight:700;">Event</span>':sp.category==='product'?'<span style="font-size:.6rem;color:var(--purple);font-weight:700;">Product</span>':''}
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" style="cursor:pointer;" onclick="_spSelectedId='${s.id}';nav('sponsors');"><path d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
-            </div>
-            ${totalProds>0?`<div style="display:flex;align-items:center;gap:5px;margin-top:4px;"><div style="flex:1;height:3px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${Math.round(deliveredProds/totalProds*100)}%;background:${allDelivered?'var(--green)':'var(--acc)'};border-radius:99px;transition:width .3s;"></div></div><span style="font-size:.6rem;font-family:'DM Mono',monospace;color:${allDelivered?'var(--green)':'var(--muted)'};">${deliveredProds}/${totalProds} delivered</span></div>`:''}
-          </div>
-          <div style="display:flex;flex-direction:column;gap:4px;align-items:flex-end;flex-shrink:0;">
-            <button class="btn btn-ghost btn-xs" style="font-size:.6rem;" onclick="${tmpl?`openModal('taskTmpl','${tmpl.id}')`:`_createSponsorTemplate('${sp.type}')`}">
-              <svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><path d="M11 4H4a2 2 0 00-2 2v14a2 2 0 002 2h14a2 2 0 002-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 013 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
-              ${tmpl?'Edit template':'Create template'}
-            </button>
-            <button class="btn btn-acc btn-xs" style="font-size:.6rem;" onclick="openPrizeDelivery('${p.id}','${s.id}')">
-              <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="20 12 20 22 4 22 4 12"/><rect x="2" y="7" width="20" height="5"/><line x1="12" y1="22" x2="12" y2="7"/><path d="M12 7H7.5a2.5 2.5 0 010-5C11 2 12 7 12 7z"/><path d="M12 7h4.5a2.5 2.5 0 000-5C13 2 12 7 12 7z"/></svg>
-              Deliver prizes
-            </button>
-            <button class="btn btn-ghost btn-xs" style="font-size:.6rem;color:var(--muted);" onclick="removeProjSponsor('${p.id}','${s.id}')" title="Remove sponsor from this event">× Remove</button>
-          </div>
-        </div>
-        ${_spStageBar(p.id,sp)}
-        ${_pre?'':`
-        ${isCashSponsor?`<div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-            <div class="ti-check${sp.invoiceSent?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','invoiceSent')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.invoiceSent?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp.invoiceSent?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-            <span style="color:${sp.invoiceSent?'var(--acc)':'var(--text2)'};">Invoice sent</span>
-          </label>
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-            <div class="ti-check${sp.invoicePaid?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','invoicePaid')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.invoicePaid?'var(--green)':'rgba(255,255,255,.18)'};background:${sp.invoicePaid?'var(--green)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-            <span style="color:${sp.invoicePaid?'var(--green)':'var(--text2)'};">Invoice paid</span>
-          </label>
-        </div>`:''}
-        ${sp.type==='venue'?`<div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-            <div class="ti-check${sp.logisticsAgreed?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','logisticsAgreed')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.logisticsAgreed?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp.logisticsAgreed?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-            <span style="color:${sp.logisticsAgreed?'var(--acc)':'var(--text2)'};">Logistics agreed</span>
-          </label>
-        </div>`:''}
-        <div style="padding:8px 13px;border-top:1px solid var(--border2);display:flex;gap:16px;">
-          <label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-            <div class="ti-check${sp.fulfilled?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','fulfilled')" style="width:15px;height:15px;border-radius:4px;border:1.5px solid ${sp.fulfilled?'var(--green)':'rgba(255,255,255,.18)'};background:${sp.fulfilled?'var(--green)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-            <span style="font-weight:600;color:${sp.fulfilled?'var(--green)':'var(--text2)'};">Sponsorship fulfilled</span>
-          </label>
-        </div>
-        ${p.isAirCon?(()=>{const _its=_airconItems(sp);if(!_its.length)return'';const _n=_its.filter(it=>sp[it.id]).length;return`<div style="padding:8px 13px;border-top:1px solid var(--border2);">
-          <div style="display:flex;align-items:center;gap:8px;margin-bottom:7px;"><span style="font-size:.62rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.07em;">AirCon checklist</span><span style="font-size:.62rem;color:var(--muted);font-family:'DM Mono',monospace;">${_n}/${_its.length}</span></div>
-          <div style="display:flex;flex-direction:column;gap:6px;">
-            ${_its.map(item=>`<label style="display:flex;align-items:center;gap:7px;cursor:pointer;font-size:.75rem;user-select:none;">
-              <div class="ti-check${sp[item.id]?' done':''}" onclick="toggleSponsorFlag('${p.id}','${s.id}','${item.id}')" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${sp[item.id]?'var(--acc)':'rgba(255,255,255,.18)'};background:${sp[item.id]?'var(--acc)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-              <span style="color:${sp[item.id]?'var(--acc)':'var(--text2)'};">${escHtml(item.label)}</span>
-            </label>`).join('')}
-          </div>
-        </div>`;})():''}
-        ${allocatedProducts.length>0?`<div style="border-top:1px solid var(--border2);">
-          <div style="display:flex;align-items:center;justify-content:space-between;padding:6px 13px;cursor:pointer;" onclick="var d=this.nextElementSibling;var open=d.style.display!=='none';d.style.display=open?'none':'';this.querySelector('.sp-prod-chevron').textContent=open?'\u25be':'\u25b4';">
-            <div style="font-size:.63rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">${allocatedProducts.length} Product Allocation${allocatedProducts.length!==1?'s':''}</div>
-            <span class="sp-prod-chevron" style="font-size:.65rem;color:var(--muted);">&#9662;</span>
-          </div>
-          <div style="display:none;padding:0 13px 10px;">
-          ${allocatedProducts.map((prod,pi)=>{
-            const profileProd=s_prods.find(pp=>pp.name===prod.name)||{};
-            const cats=Object.keys(prod.quantities||{}).filter(c=>parseInt(prod.quantities[c])>0);
-            if((prod.categories||[]).length>0&&cats.length===0)cats.push(...(prod.categories||[]));
-            const qty=cats.reduce((a,c)=>a+(parseInt((prod.quantities||{})[c])||1),0)||1;
-            const cost=profileProd.cost||0;
-            const lineVal=cost*qty;
-            return`<div style="display:flex;align-items:center;gap:8px;padding:4px 0;border-bottom:1px solid var(--border2);">
-              <div class="ti-check${prod.delivered?' done':''}" onclick="toggleProdDelivered('${p.id}','${s.id}',${pi})" title="${prod.delivered?'Mark undelivered':'Mark delivered'}" style="width:14px;height:14px;border-radius:3px;border:1.5px solid ${prod.delivered?'var(--green)':'rgba(255,255,255,.18)'};background:${prod.delivered?'var(--green)':'transparent'};cursor:pointer;flex-shrink:0;transition:all .15s;"></div>
-              <div style="flex:1;min-width:0;"><span style="font-size:.75rem;font-weight:${prod.delivered?'400':'600'};color:${prod.delivered?'var(--muted)':'var(--text)'};text-decoration:${prod.delivered?'line-through':'none'};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;display:block;">${escHtml(prod.name)}</span>${cats.length>0?`<span style="font-size:.62rem;color:var(--muted);">${cats.map(c=>`${c}${parseInt((prod.quantities||{})[c])>1?' ×'+parseInt((prod.quantities||{})[c]):''}` ).join(' · ')}</span>`:''}</div>
-              ${lineVal>0?`<span style="font-size:.65rem;font-family:'DM Mono',monospace;color:var(--${prod.delivered?'muted':'yellow'});flex-shrink:0;">£${lineVal.toFixed(2)}</span>`:''}
-              ${prod.delivered?`<svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--green)" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>`:''}
-            </div>`;
-          }).join('')}
-          </div>
-        </div>`:''}
-        ${allocatedProducts.length===0&&s_prods.length>0?`<div style="padding:6px 13px 9px;border-top:1px solid var(--border2);font-size:.68rem;color:var(--muted);">No products allocated yet. <button class="btn btn-ghost btn-xs" style="margin-left:4px;" onclick="openModal('project','${p.id}')">Assign products →</button></div>`:''}
-      `}
-      </div>`;
-    };
-    const _tierRank={headline:0,event:1,product:2,'':3};
-    return _spPipelineBar(allSpons)+['infosent','confirmed','discussion','contacted','shortlisted'].map(sid=>{
-      const grp=allSpons.filter(sp=>_spStage(sp)===sid).sort((a,b)=>(_tierRank[a.category||'']??3)-(_tierRank[b.category||'']??3));
-      if(!grp.length)return'';
-      const d=SP_STAGES.find(x=>x.id===sid);const key=p.id+'-'+sid;const off=!!(window._spGrpOff||{})[key];
-      return`<div style="margin-bottom:12px;">
-        <div style="display:flex;align-items:center;gap:7px;cursor:pointer;margin-bottom:8px;" onclick="toggleSpGroup('${key}',this)"><span class="sg-chev" style="font-size:.6rem;color:var(--muted);transition:transform .15s;${off?'transform:rotate(-90deg);':''}">&#9662;</span><span style="width:8px;height:8px;border-radius:50%;background:${d.color};"></span><span style="font-size:.68rem;font-weight:700;color:${d.color};text-transform:uppercase;letter-spacing:.08em;">${escHtml(d.name)}</span><span style="font-size:.66rem;color:var(--muted);">${grp.length}</span></div>
-        <div style="display:${off?'none':'grid'};grid-template-columns:repeat(auto-fill,minmax(280px,1fr));gap:10px;align-items:start;">
-          ${grp.map(sp=>spCardHtml(sp)).join('')}
-        </div>
-      </div>`;
-    }).join('');
-  })()}
-</div><hr class="div">`:''}
+${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?renderEventSponsors(p)+'<hr class="div">':''}
 
 <hr class="div">
 <div class="detail-layout">
