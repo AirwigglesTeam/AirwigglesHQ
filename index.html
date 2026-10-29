@@ -3107,7 +3107,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=106;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=107;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4333,7 +4333,7 @@ function showUndoToast(label,isRedo=false){
 
 /* ── Finance helpers ── */
 function finAnn(e){return(e.amount||0)*(FIN_MULT[e.freq]||1);}
-function totalRevenue(){return(S.finance.revenueStreams||[]).reduce((a,s)=>a+(parseFloat(s.amount)||0),0);}
+function totalRevenue(){return _finStreamsFy().filter(x=>!x.f.funding).reduce((a,x)=>a+x.f.full,0);}   // revenue for the selected financial year; funding (investment) is kept out
 function totalRec(){return(S.finance.recurring||[]).reduce((a,e)=>a+finAnn(e),0);}
 function totalOO(){return(S.finance.oneoff||[]).reduce((a,e)=>a+(e.amount||0),0);}
 function projExpTotal(){return(S.projects||[]).reduce((a,p)=>a+(p.expenses||[]).reduce((b,e)=>b+(e.amount||0),0),0);}
@@ -4667,7 +4667,7 @@ function projExpTotalFY(fy){
 }
 
 /* ════ REVENUE STREAMS ════ */
-const REV_CATS=['Sponsorship','Grants','Merchandise','Events','Consulting','Other'];
+const REV_CATS=['Sponsorship','Grants','Merchandise','Events','Consulting','Investment','Other'];
 
 function openRevenueStreams(){
   const mc=el('mc');
@@ -4676,7 +4676,7 @@ function openRevenueStreams(){
       <div class="mo-hd"><span class="mo-title">Revenue Streams</span><button class="mo-close" onclick="closeModal()">×</button></div>
       <div class="mo-body">
         <div id="rev-stream-list">${renderRevStreamList()}</div>
-        <button class="btn btn-ghost btn-sm" style="margin-top:10px;width:100%;" onclick="addRevStream()">+ Add stream</button>
+        <div style="display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;"><button class="btn btn-ghost btn-sm" style="flex:1;" onclick="addRevStream('recurring')">+ Recurring</button><button class="btn btn-ghost btn-sm" style="flex:1;" onclick="addRevStream('oneoff')">+ One-off</button><button class="btn btn-ghost btn-sm" style="flex:1;" onclick="addRevStream('total')" title="One running figure you update by hand">+ Running total</button></div>
       </div>
       <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Done</button></div>
     </div>
@@ -4687,34 +4687,51 @@ function openRevenueStreams(){
 function renderRevStreamList(){
   const streams=S.finance.revenueStreams||[];
   if(!streams.length)return'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;">No revenue streams yet.</div>';
-  return streams.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);flex-wrap:wrap;">
-    <input class="inp" value="${escHtml(s.name)}" style="flex:1;padding:5px 8px;" onchange="updateRevStream('${s.id}','name',this.value)" placeholder="Stream name">
-    <select class="sel" style="width:110px;padding:5px 7px;font-size:.75rem;" onchange="updateRevStream('${s.id}','cat',this.value)">
-      ${REV_CATS.map(cat=>`<option value="${cat}"${s.cat===cat?' selected':''}>${cat}</option>`).join('')}
-    </select>
-    <div style="display:flex;align-items:center;gap:3px;" title="Revenue so far"><span style="font-size:.72rem;color:var(--muted);">£</span>
-    <input class="amt-inp" type="number" min="0" step="100" value="${s.amount||''}" style="width:84px;" placeholder="So far" aria-label="Revenue so far" onchange="updateRevStream('${s.id}','amount',parseFloat(this.value)||0);reCalcFin();"></div>
-    <div style="display:flex;align-items:center;gap:3px;" title="Target for the year"><span style="font-size:.72rem;color:var(--muted);">\u2192</span>
-    <input class="amt-inp" type="number" min="0" step="100" value="${s.target||''}" style="width:84px;" placeholder="Target" aria-label="Revenue target" onchange="updateRevStream('${s.id}','target',parseFloat(this.value)||0);reCalcFin();"></div>
-    <button class="tb del" onclick="deleteRevStream('${s.id}')" title="Remove"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
-  </div>`).join('')
-  +`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;">
-    <span>Total</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${fmtGBP(streams.reduce((a,s)=>a+(s.amount||0),0))}</span>
-  </div>`;
+  const fy=S.finance.finYear,money=_finMoney;
+  const num=(id,f,v,ph,al,w)=>`<input class="amt-inp" type="number" min="0" step="0.01" inputmode="decimal" value="${v||''}" style="width:${w||92}px;" placeholder="${ph}" aria-label="${al}" onchange="updateRevStream('${id}','${f}',parseFloat(this.value)||0)">`;
+  const lab=t=>`<span style="font-size:.7rem;color:var(--muted);">${t}</span>`;
+  const rows=streams.map(s=>{
+    const k=finStreamKind(s),F=finStreamFigures(s,fy);
+    let det='',hint='';
+    if(k==='total'){det=`${lab('\u00a3 so far')}${num(s.id,'amount',s.amount,'0','Revenue so far')}${lab('target')}${num(s.id,'target',s.target,'optional','Revenue target')}`;}
+    else if(k==='recurring'){
+      det=`${lab('\u00a3')}${num(s.id,'amount',s.amount,'0','Amount each period',84)}${lab('every')}<select class="sel" style="width:96px;padding:5px 7px;font-size:.75rem;" aria-label="How often" onchange="updateRevStream('${s.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${(s.freq||'Monthly')===f?' selected':''}>${f}</option>`).join('')}</select>`
+        +(s.freq==='Annual'?`<select class="sel" style="width:70px;padding:5px 7px;font-size:.75rem;" aria-label="Month received" onchange="updateRevStream('${s.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(s.payMonth)||4)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:'')
+        +`${lab('target')}${num(s.id,'target',s.target,'optional','Revenue target',84)}`;
+      hint=`${money(F.full)} per year \u00b7 ${money(F.actual)} so far this year`;
+    }else{
+      det=`${lab('\u00a3')}${num(s.id,'amount',s.amount,'0','Amount',92)}${lab('on')}<input class="inp" type="date" style="width:140px;padding:5px 8px;" value="${s.date||''}" aria-label="Date received" onchange="updateRevStream('${s.id}','date',this.value)">`;
+      hint=F.full>0?(F.actual>0?'Received this year':'Expected this year'):'Not in the selected financial year';
+    }
+    return `<div class="rs-row" style="padding:9px 0;border-bottom:1px solid var(--border2);">
+    <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;flex-wrap:wrap;">
+      <input class="inp" value="${escHtml(s.name)}" style="flex:1;min-width:90px;padding:5px 8px;" onchange="updateRevStream('${s.id}','name',this.value)" placeholder="Stream name" aria-label="Stream name">
+      <select class="sel" style="width:104px;padding:5px 5px;font-size:.75rem;" aria-label="Category" onchange="updateRevStream('${s.id}','cat',this.value)">${REV_CATS.map(cat=>`<option value="${cat}"${s.cat===cat?' selected':''}>${cat}</option>`).join('')}</select>
+      <select class="sel" style="width:104px;padding:5px 5px;font-size:.75rem;" aria-label="Type" onchange="updateRevStream('${s.id}','kind',this.value)">${Object.keys(FIN_REV_KINDS).map(x=>`<option value="${x}"${k===x?' selected':''}>${FIN_REV_KINDS[x]}</option>`).join('')}</select>
+      <button class="tb del" onclick="deleteRevStream('${s.id}')" title="Remove" aria-label="Remove stream"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button></div>
+    <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">${det}</div>
+    ${hint||F.funding?`<div style="font-size:.66rem;color:var(--muted);margin-top:4px;">${hint}${F.funding?(hint?' \u00b7 ':'')+'Investment: not counted as revenue or taxed':''}</div>`:''}
+  </div>`;}).join('');
+  return rows+`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;">
+    <span>Revenue, ${getFYLabel(fy)}</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${money(totalRevenue())}</span></div>`
+    +(totalFunding()>0?`<div style="display:flex;justify-content:space-between;padding:4px 0 0;font-size:.76rem;color:var(--text2);"><span>Investment (funding, not revenue)</span><span style="font-family:'DM Mono',monospace;">${money(totalFunding())}</span></div>`:'');
 }
 
 function updateRevStream(id,field,val){
   const s=(S.finance.revenueStreams||[]).find(x=>x.id===id);
   if(!s)return;
   s[field]=val;
+  if(field==='kind'&&val==='recurring'&&!s.freq)s.freq='Monthly';
   save();
+  if(typeof V!=='undefined'&&V==='finance')reCalcFin();
   const list=document.getElementById('rev-stream-list');
   if(list)list.innerHTML=renderRevStreamList();
 }
 
-function addRevStream(){
+function addRevStream(kind){
   if(!S.finance.revenueStreams)S.finance.revenueStreams=[];
-  S.finance.revenueStreams.push({id:uid(),name:'New stream',amount:0,cat:'Other'});
+  const k=kind==='recurring'||kind==='oneoff'?kind:'total';
+  S.finance.revenueStreams.push(Object.assign({id:uid(),name:k==='recurring'?'New recurring income':k==='oneoff'?'New one-off income':'New stream',amount:0,cat:'Other',kind:k},k==='recurring'?{freq:'Monthly'}:{}));
   save();
   const list=document.getElementById('rev-stream-list');
   if(list)list.innerHTML=renderRevStreamList();
@@ -6396,6 +6413,36 @@ function showTaskTip(e,id){
   document.addEventListener('mouseout',e=>{if(!e.relatedTarget&&cur){cur=null;hideCoworkTip();}});
   document.addEventListener('click',()=>{if(cur){cur=null;hideCoworkTip();}},true);
 })();
+/* ── Revenue streams that are not tied to events ──
+   kind 'total'     : one running figure you update by hand (the original behaviour, unchanged)
+   kind 'recurring' : an amount every month / quarter / year (e.g. shop sales, a retainer)
+   kind 'oneoff'    : a single amount on a date (e.g. a grant)
+   Streams in the "Investment" category are funding, not profit: they are kept out of revenue, profit and tax and shown separately. */
+const FIN_REV_KINDS={total:'Running total',recurring:'Recurring',oneoff:'One-off'};
+function _finFyClock(fy,todayIso){
+  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00'),st=new Date(fy,3,1),en=new Date(fy+1,2,31),DAY=864e5;
+  const total=Math.round((en-st)/DAY)+1,state=t<st?'future':t>en?'done':'now';
+  const done=state==='now'?Math.floor((t-st)/DAY)+1:state==='done'?total:0;
+  const m=state==='now'?_finFyMonthIdx(t.getMonth()+1):state==='done'?12:0;
+  return{today,state,frac:done/total,m};
+}
+function finStreamKind(s){return s&&(s.kind==='recurring'||s.kind==='oneoff')?s.kind:'total';}
+function finStreamIsFunding(s){return !!s&&s.cat==='Investment';}
+function finStreamFigures(s,fy,todayIso){
+  const k=finStreamKind(s),a=parseFloat(s.amount)||0,c=_finFyClock(fy,todayIso);
+  let actual=a,full=a;
+  if(k==='recurring'){
+    const mult=FIN_MULT[s.freq]||12;full=a*mult;
+    const periods=s.freq==='Annual'?(c.m>=_finFyMonthIdx(parseInt(s.payMonth)||4)?1:0):s.freq==='Quarterly'?Math.ceil(c.m/3):c.m;
+    actual=a*periods;
+  }else if(k==='oneoff'){
+    const inFY=isInFY(s.date,fy);full=inFY?a:0;actual=inFY&&c.state!=='future'&&(!s.date||s.date<=c.today)?a:0;
+  }
+  const t=parseFloat(s.target)||0,target=t>0?t:(k==='total'?0:full);
+  return{kind:k,actual,full,target,funding:finStreamIsFunding(s)};
+}
+function _finStreamsFy(){const fy=S.finance.finYear;return (S.finance.revenueStreams||[]).map(s=>({s,f:finStreamFigures(s,fy)}));}
+function totalFunding(){return _finStreamsFy().filter(x=>x.f.funding).reduce((a,x)=>a+x.f.full,0);}
 /* ── Finance year plan: revenue targets and cost budget compared with what has actually happened so far ──
    Pure calculation (finPlanCalc) plus one card on the Budget tab. Reads existing data only:
    revenue streams (+ their new "target"), recurring and one-off costs, event expenses and the category budgets. */
@@ -6429,12 +6476,14 @@ function finPlanCalc(fy,todayIso){
   const costState=r=>{if(!(r.budget>0))return'';if(r.spent>r.budget)return'over';if(frac<1&&r.spent>r.budget*frac*1.15)return'watch';return'ok';};
   rows.forEach(r=>r.state=costState(r));
   const ev={cat:'Events',budget:evBud,spent:evSpent,full:evFull,events:true};ev.state=costState(ev);
-  const streams=(S.finance.revenueStreams||[]).map(s=>{
-    const actual=parseFloat(s.amount)||0,target=parseFloat(s.target)||0,exp=target*frac;
-    return{id:s.id,name:s.name,cat:s.cat,actual,target,state:target>0?(actual>=exp?'ahead':actual>=exp*.85?'watch':'behind'):''};});
+  const all=(S.finance.revenueStreams||[]).map(s=>{
+    const F=finStreamFigures(s,fy,today),exp=F.target*frac;
+    return{id:s.id,name:s.name,cat:s.cat,kind:F.kind,freq:s.freq,date:s.date||'',amount:parseFloat(s.amount)||0,actual:F.actual,full:F.full,target:F.target,funding:F.funding,
+      state:(F.kind!=='oneoff'&&!F.funding&&F.target>0)?(F.actual>=exp?'ahead':F.actual>=exp*.85?'watch':'behind'):''};});
+  const streams=all.filter(x=>!x.funding),funding=all.filter(x=>x.funding);
   const revTarget=streams.reduce((a,x)=>a+x.target,0),revActual=streams.reduce((a,x)=>a+x.actual,0);
   const costBudget=rows.reduce((a,r)=>a+r.budget,0)+evBud,costSpent=rows.reduce((a,r)=>a+r.spent,0)+evSpent;
-  return{fy,state,frac,months:m,streams,rows,ev,revTarget,revActual,costBudget,costSpent,planned:revTarget-costBudget};
+  return{fy,state,frac,months:m,streams,funding,rows,ev,revTarget,revActual,costBudget,costSpent,planned:revTarget-costBudget};
 }
 function _finPlanTag(s,rev){
   if(!s)return'';
@@ -6444,7 +6493,8 @@ function _finPlanTag(s,rev){
 function _finPlanHtml(){
   const fy=S.finance.finYear,P=finPlanCalc(fy),pc=Math.round(P.frac*100);
   const money=_finMoney;
-  const revRows=P.streams.length?P.streams.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${s.target>0?money(s.target):'<em>no target</em>'}</span><span class="fp-s">${_finPlanTag(s.state,true)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No revenue streams yet.</div>';
+  const kindNote=s=>s.kind==='recurring'?' <small>'+money(s.amount)+' '+({Monthly:'monthly',Quarterly:'quarterly',Annual:'yearly'}[s.freq]||'monthly')+'</small>':s.kind==='oneoff'?' <small>one-off'+(s.date?', '+escHtml(fmtD(s.date)):'')+'</small>':'';
+  const revRows=P.streams.length?P.streams.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${s.target>0?money(s.target):'<em>no target</em>'}</span><span class="fp-s">${_finPlanTag(s.state,true)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No revenue streams yet.</div>';
   const allCost=P.rows.concat(P.ev.budget>0||P.ev.spent>0||P.ev.full>0?[P.ev]:[]);
   const costRows=allCost.length?allCost.map(r=>`<div class="fp-row fp-c"><span class="fp-n">${escHtml(r.cat)}${r.events?' <small>from event pages</small>':''}</span><span class="fp-v">${money(r.spent)}</span><span class="fp-v fp-t">${r.budget>0?money(r.budget):'<em>no budget</em>'}</span><span class="fp-v fp-f">${money(r.full)}</span><span class="fp-s">${_finPlanTag(r.state,false)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No costs yet.</div>';
   return `<div class="card" style="margin-bottom:14px;" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue targets</button></div><div class="card-bd">
@@ -6455,6 +6505,7 @@ function _finPlanHtml(){
     <div class="fin-metric"><div class="flbl2">Planned profit</div><div class="fval ${P.planned>=0?'green':'red'}">${money(P.planned)}</div><div class="fp-sub">target minus budget</div></div>
     <div class="fin-metric"><div class="flbl2">Year passed</div><div class="fval" style="font-size:.95rem;">${pc}%</div><div class="fin-fybar"><s style="width:${pc}%"></s></div></div></div>
   <div class="fp-grp"><div class="fp-hd"><span class="fp-n">Revenue</span><span class="fp-v">So far</span><span class="fp-v">Target</span><span class="fp-s">Pace</span></div>${revRows}</div>
+  ${P.funding.length?`<div class="fp-grp"><div class="fp-hd"><span class="fp-n">Funding <small>not revenue, not taxed</small></span><span class="fp-v">Received</span><span class="fp-v">Expected</span><span class="fp-s"></span></div>${P.funding.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${money(s.full)}</span><span class="fp-s"></span></div>`).join('')}</div>`:''}
   <div class="fp-grp"><div class="fp-hd fp-c"><span class="fp-n">Costs</span><span class="fp-v">Spent so far</span><span class="fp-v">Budget</span><span class="fp-v fp-f">Full year</span><span class="fp-s">Pace</span></div>${costRows}</div>
   <p class="fp-help" style="margin:10px 0 0;">Spent so far counts recurring costs as they fall due (yearly bills on the month you choose), one-off costs by date, and event expenses from each event page. Edit category budgets below.</p>
   </div></div>`;
