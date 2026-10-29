@@ -1622,6 +1622,10 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .ft-set{display:flex;align-items:center;gap:9px;padding:5px 0;font-size:.78rem;}.ft-set.have{opacity:.55;}
 .ft-date{width:140px;flex:none;}
 @media (max-width:520px){.ft-cad{display:none;}.ft-set{flex-wrap:wrap;}.ft-date{margin-left:auto;}}
+
+/* Dashboard finance review card */
+#dash-finreview .pill{font-size:.6rem;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid var(--border);}
+#dash-finreview .pill.ok{color:var(--acc);border-color:var(--acc);}#dash-finreview .pill.warn{color:var(--yellow);border-color:var(--yellow);}#dash-finreview .pill.bad{color:var(--red);border-color:var(--red);}
 </style>
 </head>
 <body>
@@ -3176,7 +3180,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=113;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=114;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -5907,7 +5911,7 @@ function ecShowTab(projId,tab,save=true){
 function _dKey(){return (typeof _pbUser!=='undefined'&&_pbUser&&(_pbUser.id||_pbUser.email))||'device';}
 function _dprefRead(){return (S.userPrefs&&S.userPrefs[_dKey()])||{};}
 function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=S.userPrefs[k]||{};const nx=PFSync.clone(cur);fn(nx);S.userPrefs[k]=nx;save();}
-const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['team','Team'],['calendar','Calendar']];
+const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['finreview','Next finance review'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['team','Team'],['calendar','Calendar']];
 /* Most sections are on unless hidden. Opt-in sections (new ones) stay off until someone switches them on, so nobody's dashboard changes under them. */
 /* Dashboard top row: Timeline, Calendar and Team share one panel. Opening one closes the others; clicking the open one closes it. */
 /* Dashboard top row: Timeline, Calendar, Notes and Team share one panel. Opening one closes the others; clicking the open one closes it. */
@@ -6866,6 +6870,30 @@ function saveFinanceReview(eid){
   if(rv.members.length&&!eid)setTimeout(()=>showCoworkInviteModal(rv,'Finance review'),200);
 }
 function deleteFinanceReview(id){saveWithUndo('Delete finance review');S.finance.reviews=(S.finance.reviews||[]).filter(x=>x.id!==id);saveNow();closeModal();render();}
+
+/* Dashboard card: sits beside the co-working card */
+function _finReviewDashHtml(){
+  const today=_frToday(),s=finReviewState(today),r=s.review;
+  const tag=r?(s.days===0?'Today':s.days===1?'Tomorrow':'In '+s.days+' days'):s.kind==='overdue'?'Overdue by '+s.days+' day'+(s.days===1?'':'s'):'Not booked';
+  const tcls=r?'ok':s.kind==='overdue'?'bad':'warn';
+  const hd='<div class="card-hd"><span class="card-title">Next finance review</span><span class="pill '+tcls+'" style="margin-left:auto;">'+tag+'</span></div>';
+  const limitDate=r?r.date:s.dueBy;
+  const tasks=finTasksOpen().filter(t=>t.endDate&&t.endDate<=limitDate);
+  const row=t=>{const d=_frDue(t.endDate,today);return '<div class="ft-row"><div class="ti-check ft-chk" role="checkbox" aria-checked="false" tabindex="0" onclick="finTaskDone(\''+t.id+'\')" onkeydown="if(event.key===\' \'||event.key===\'Enter\'){event.preventDefault();finTaskDone(\''+t.id+'\')}"></div><div class="ft-n" onclick="openModal(\'task\',\''+t.id+'\')">'+escHtml(t.name)+'</div><span class="ft-due '+d.c+'">'+d.t+'</span></div>';};
+  const list=tasks.length?'<div style="font-size:.62rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:12px 0 2px;">Before the review · '+tasks.length+' open</div>'+tasks.slice(0,4).map(row).join('')+(tasks.length>4?'<div style="font-size:.68rem;color:var(--muted);padding:4px 0;">+'+(tasks.length-4)+' more in Finance</div>':''):'';
+  let main;
+  if(r){
+    const mems=(r.members||[]).map(id=>avHtml(id,20)).join('');
+    main='<div style="display:flex;align-items:baseline;gap:8px;flex-wrap:wrap;"><span style="font-size:.95rem;font-weight:700;">'+_frFmt(r.date)+'</span>'+(r.startTime?'<span style="font-size:.78rem;color:var(--text2);">'+r.startTime+(r.endTime?'–'+r.endTime:'')+'</span>':'')+'</div>'
+      +'<div style="font-size:.72rem;color:var(--text2);margin-top:2px;">'+escHtml(r.title||'Finance review')+(r.notes?' · '+escHtml(r.notes):'')+'</div>'
+      +(mems?'<div style="display:flex;gap:3px;margin-top:6px;">'+mems+'</div>':'')
+      +(r.objectives?'<div style="font-size:.72rem;margin-top:8px;padding:7px 9px;background:var(--surface2);border-left:3px solid var(--acc);border-radius:6px;white-space:pre-wrap;">'+escHtml(r.objectives)+'</div>':'');
+  }else{
+    main='<div style="font-size:.95rem;font-weight:700;">'+(s.kind==='overdue'?'Review was due by ':'Due by ')+_frFmt(s.dueBy)+'</div><div style="font-size:.72rem;color:var(--text2);margin-top:2px;">'+s.qLabel+' · not booked yet. Recommended: '+_frFmt(s.recommended)+'.</div>';
+  }
+  const btns='<div style="display:flex;gap:6px;margin-top:12px;flex-wrap:wrap;">'+(r?'<button class="btn btn-ghost btn-xs" onclick="openModal(\'financeReview\',\''+r.id+'\')">Edit review</button>':'<button class="btn btn-acc btn-xs" onclick="openModal(\'financeReview\',null)">Schedule review</button>')+'<button class="btn btn-ghost btn-xs" onclick="nav(\'finance\')">Open finances</button></div>';
+  return '<div class="card" id="dash-finreview">'+hd+'<div class="card-bd">'+main+list+btns+'</div></div>';
+}
 /* ── Finance tasks: the recurring jobs behind a healthy finance routine ──
    They are ordinary recurring tasks in the Admin project (tick one off and the next appears), tagged with t.finKey
    so the Finance page can list them. Monthly jobs fall due on the 5th, quarterly ones on the review due date. */
@@ -7794,6 +7822,7 @@ ${_dashQuickHtml()}
 
     ${_dsOn('mywork')?_dashFold('mw',_myWorkCardHtml()):''}
     ${_dsOn('cowork')?_dashFold('cw',_coworkCardHtml(mf)):''}
+    ${_dsOn('finreview')?_dashFold('fr',_finReviewDashHtml()):''}
 
 
 
