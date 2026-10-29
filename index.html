@@ -3150,7 +3150,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=110;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=111;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6714,33 +6714,33 @@ function _finEventsHtml(){
   </div>`;
 }
 /* ── Finance: one pay calculation shared by Overview, Savings, Team payout and the PDF report ──
-   revenue − costs = profit → corporation tax → net profit → savings → TEAM PAY → dividend pool.
+   revenue − costs (team pay counts as a cost) = profit → corporation tax → net profit → savings → dividend pool.
    Team pay = contracted pay of non-director members. Anything already entered as a 'Team Pay' cost is not taken twice. */
 function finTeamPayTotal(){
   const g=parseFloat(S.finance.globalRate)||0,tr=S.finance.teamRates||{};
   return (S.members||[]).filter(m=>!m.isDirector).reduce((a,m)=>a+memberHoursTotal(m)*(g>0?g:(parseFloat(tr[m.id])||0)),0);
 }
+function finTeamPayCost(){
+  const inCosts=[].concat(S.finance.recurring||[],S.finance.oneoff||[]).filter(e=>e.cat==='Team Pay').reduce((a,e)=>a+(e.freq&&typeof finAnn==='function'?finAnn(e):(parseFloat(e.amount)||0)),0);
+  return Math.max(0,finTeamPayTotal()-inCosts);
+}
 function finPayCalc(){
   const sv=S.finance.savings||{rate:20},rev=totalRevenue();
-  const rec=totalRec(),oo=totalOO(),pe=projExpTotal(),costs=rec+oo+pe;
+  const rec=totalRec(),oo=totalOO(),pe=projExpTotal(),teamPay=finTeamPayCost(),costs=rec+oo+pe+teamPay;
   const profit=rev-costs,ct=corpTax(Math.max(0,profit)),net=profit-ct.tax;
   const savings=Math.max(0,net)*((parseFloat(sv.rate)||0)/100);
-  const afterSavings=Math.max(0,net)-savings;
-  const inCosts=[].concat(S.finance.recurring||[],S.finance.oneoff||[]).filter(e=>e.cat==='Team Pay').reduce((a,e)=>a+(typeof finAnn==='function'&&e.freq?finAnn(e):(parseFloat(e.amount)||0)),0);
-  const contracted=finTeamPayTotal();
-  const teamPay=Math.min(afterSavings,Math.max(0,contracted-inCosts));
-  const pool=afterSavings-teamPay;
-  return{rev,rec,oo,pe,costs,profit,ct,net,savings,afterSavings,contracted,inCosts,teamPay,short:Math.max(0,contracted-inCosts-afterSavings),pool};
+  const pool=Math.max(0,net)-savings;
+  return{rev,rec,oo,pe,teamPay,costs,profit,ct,net,savings,afterSavings:pool,pool,contracted:finTeamPayTotal()};
 }
 /* Where the money goes: one stacked bar from revenue */
 function _finFlowHtml(){
   const P=finPayCalc(),money=_finMoney;
   if(!(P.rev>0))return'';
-  const seg=[['Costs',Math.min(P.costs,P.rev),'var(--red)'],['Tax',P.ct.tax,'var(--yellow)'],['Savings',P.savings,'var(--blue)'],['Team pay',P.teamPay,'#ec4899'],['Dividends',P.pool,'var(--green)']];
+  const seg=[['Costs',Math.min(P.costs-P.teamPay,P.rev),'var(--red)'],['Team pay',P.teamPay,'#ec4899'],['Tax',P.ct.tax,'var(--yellow)'],['Savings',P.savings,'var(--blue)'],['Dividends',P.pool,'var(--green)']];
   const tot=seg.reduce((a,s)=>a+s[1],0)||1;
   const bar=seg.filter(s=>s[1]>0).map(s=>`<i style="width:${(s[1]/tot*100).toFixed(2)}%;background:${s[2]}" title="${s[0]} ${money(s[1])}"></i>`).join('');
   const leg=seg.map(s=>`<span class="ff-k"><b style="background:${s[2]}"></b>${s[0]} <em>${money(s[1])}</em></span>`).join('');
-  return`<div class="card fin-flow" id="fin-flow"><div class="card-hd"><span class="card-title">Where the money goes</span><span style="font-size:.7rem;color:var(--muted);">${getFYLabel(S.finance.finYear)} · of ${money(P.rev)} revenue</span></div><div class="card-bd"><div class="ff-bar">${bar}</div><div class="ff-leg">${leg}</div>${P.short>0?`<div class="ff-warn">Team pay is ${money(P.short)} more than the profit left after savings, so dividends are £0.</div>`:''}</div></div>`;
+  return`<div class="card fin-flow" id="fin-flow"><div class="card-hd"><span class="card-title">Where the money goes</span><span style="font-size:.7rem;color:var(--muted);">${getFYLabel(S.finance.finYear)} · of ${money(P.rev)} revenue</span></div><div class="card-bd"><div class="ff-bar">${bar}</div><div class="ff-leg">${leg}</div>${P.profit<0?`<div class="ff-warn">Costs including team pay are higher than revenue, so there is nothing for tax, savings or dividends.</div>`:''}</div></div>`;
 }
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
@@ -10259,7 +10259,7 @@ function deleteFinLink(id){saveWithUndo('Delete finance link');S.finance.links=(
 function renderFinance(){
   const tab=S.finance.finTab||'overview';
   const rev=totalRevenue();
-  const rec=totalRec(),oo=totalOO(),projExp=projExpTotal(),allExp=rec+oo+projExp;
+  const rec=totalRec(),oo=totalOO(),projExp=projExpTotal(),allExp=rec+oo+projExp+finTeamPayCost();
   const profit=rev-allExp,ct=corpTax(Math.max(0,profit)),net=profit-ct.tax;
   const pct=n=>rev>0?(n/rev*100).toFixed(1):'0.0';
 
@@ -10375,10 +10375,10 @@ ${_finSubHtml(tab)}
   ${(()=>{
     const sv=S.finance.savings||{rate:20};
     const rev2=totalRevenue();
-    const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE;
+    const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE+finTeamPayCost();
     const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
     const savingsAmt=Math.max(0,net2)*(sv.rate/100);
-    const profitForPayout=finPayCalc().pool,teamPayAmt=finPayCalc().teamPay;
+    const profitForPayout=finPayCalc().pool;
     return`<div style="max-width:780px;">${_finBankCardHtml()}<div class="fin-grid4" style="margin-bottom:14px;">
       <div class="fin-metric"><div class="flbl2">Net Profit</div><div class="fval green">${fmtS(net2)}</div></div>
       <div class="fin-metric"><div class="flbl2">Savings Rate</div><div class="fval amber">${sv.rate}%</div></div>
@@ -10398,7 +10398,6 @@ ${_finSubHtml(tab)}
           <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">Breakdown</div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Net profit</span><span style="font-family:Inter,sans-serif;color:var(--green);">${fmtS(net2)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Savings (${sv.rate}%)</span><span style="font-family:Inter,sans-serif;color:var(--blue);">- ${fmtGBP(savingsAmt)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Team pay (before dividends)</span><span style="font-family:Inter,sans-serif;color:#ec4899;">- ${fmtGBP(teamPayAmt)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:.88rem;font-weight:700;"><span>Dividend pool</span><span style="font-family:Inter,sans-serif;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
         </div>
       </div>
@@ -10410,7 +10409,7 @@ ${_finSubHtml(tab)}
   ${(()=>{
     const sv=S.finance.savings||{rate:20};
     const rev2=totalRevenue();
-    const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE;
+    const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE+finTeamPayCost();
     const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
     const savingsAmt=Math.max(0,net2)*(sv.rate/100);
     const PC=finPayCalc(),profitForPayout=PC.pool;
@@ -10475,7 +10474,7 @@ ${_finSubHtml(tab)}
             const totalNDPay=nonDirectors.reduce((a,m)=>{const h=memberHoursTotal(m);return a+h*effRate(m);},0);
             const totalNDHours=nonDirectors.reduce((a,m)=>a+memberHoursTotal(m),0);
             const teamPayBudget=parseFloat((S.finance.budgets||{})["Team Pay"])||0;
-            const availFunds=teamPayBudget>0?teamPayBudget:PC.afterSavings;
+            const availFunds=teamPayBudget>0?teamPayBudget:Math.max(0,PC.profit+PC.teamPay);
             return`
             ${S.members.length===0?'<div style="color:var(--muted);font-size:.78rem;">No team members added yet.</div>':''}            ${directors.length>0?`<div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 0 6px;">Directors — paid via dividends</div>
             ${directors.map(m=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);opacity:.6;min-width:0;">
@@ -10516,7 +10515,7 @@ ${_finSubHtml(tab)}
         <div class="card">
           <div class="card-hd"><span class="card-title">Dividend Pool</span><span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
           <div class="card-bd">
-            <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;">Profit after tax, savings and team pay, available for dividends</div>
+            <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;">Profit after team pay, tax and savings, available for dividends</div>
             <!-- Phase 1 progress -->
             <div style="margin-bottom:10px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
@@ -10834,7 +10833,7 @@ function checkFinAuth(){
 function generateFinanceReport(){
   // ── Compute all figures ──
   const sv=S.finance.savings||{rate:20};
-  const rec=totalRec(),oo=totalOO(),projE=projExpTotal(),allE=rec+oo+projE;
+  const rec=totalRec(),oo=totalOO(),projE=projExpTotal(),allE=rec+oo+projE+finTeamPayCost();
   const rev=totalRevenue();
   const profit=rev-allE;
   const ct=corpTax(Math.max(0,profit));
@@ -10975,11 +10974,11 @@ function generateFinanceReport(){
         <tr><td>Recurring Expenses</td><td class="right red">${fmtGBP(rec)}</td><td>${bar(rec,rev,'#e05c3a')}</td></tr>
         <tr><td>One-off Expenses</td><td class="right red">${fmtGBP(oo)}</td><td>${bar(oo,rev,'#f59e0b')}</td></tr>
         <tr><td>Project Expenses</td><td class="right red">${fmtGBP(projE)}</td><td>${bar(projE,rev,'#3d82f0')}</td></tr>
+        <tr><td>Team Pay (non-director)</td><td class="right red">${fmtGBP(finTeamPayCost())}</td><td>${bar(finTeamPayCost(),rev,'#ec4899')}</td></tr>
         <tr class="tr-total"><td>Gross Profit</td><td class="right ${profit>=0?'green':'red'}">${fmtS(profit)}</td><td>${bar(Math.abs(profit),rev,profit>=0?'#62D0AA':'#e05c3a')}</td></tr>
         <tr><td class="muted">Corporation Tax (${escHtml(ct.label)})</td><td class="right amber">- ${fmtGBP(ct.tax)}</td><td>${bar(ct.tax,rev,'#f59e0b')}</td></tr>
         <tr class="tr-total"><td>Net Profit</td><td class="right ${net>=0?'green':'red'}">${fmtS(net)}</td><td>${bar(Math.abs(net),rev,net>=0?'#62D0AA':'#e05c3a')}</td></tr>
         <tr><td class="muted">Savings Reserve (${sv.rate}%)</td><td class="right blue">- ${fmtGBP(savAmt)}</td><td>${bar(savAmt,rev,'#3d82f0')}</td></tr>
-        <tr><td class="muted">Team Pay (before dividends)</td><td class="right" style="color:#ec4899;">- ${fmtGBP(PCR.teamPay)}</td><td>${bar(PCR.teamPay,rev,'#ec4899')}</td></tr>
         <tr class="tr-total"><td style="color:#62D0AA;">Dividend Pool</td><td class="right green">${fmtGBP(pfp)}</td><td>${bar(pfp,rev,'#62D0AA')}</td></tr>
       </table>
     </div>
@@ -11040,7 +11039,7 @@ function generateFinanceReport(){
   const totalNDPay=nondirs.reduce((a,m)=>a+memberHoursTotal(m)*effR(m),0);
   const totalNDHours=nondirs.reduce((a,m)=>a+memberHoursTotal(m),0);
   const teamBudget=parseFloat(budgets['Team Pay'])||0;
-  const availFunds=teamBudget>0?teamBudget:PCR.afterSavings;
+  const availFunds=teamBudget>0?teamBudget:Math.max(0,PCR.profit+PCR.teamPay);
   const taxPage=`<div class="page">
     <h2>6 — Corporation Tax</h2>
     <div class="grid3" style="margin-bottom:14px;">
@@ -11170,12 +11169,12 @@ function lockFinance(){S.finance.finAuth=false;save();nav('finance');}
 function reCalcFin(){const c=el('content');if(c&&V==='finance'){c.innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);}}
 
 function renderFinCharts(){
-  const rev=totalRevenue(),rec=totalRec(),oo=totalOO(),proj=projExpTotal(),allExp=rec+oo+proj;
+  const rev=totalRevenue(),rec=totalRec(),oo=totalOO(),proj=projExpTotal(),tpay=finTeamPayCost(),allExp=rec+oo+proj+tpay;
   const profit=rev-allExp,ct=corpTax(Math.max(0,profit)),net=profit-ct.tax;
   const tab=S.finance.finTab||'overview';
 
   // Waterfall
-  const wf=[{l:'Revenue',v:rev,c:'#1fba7a',b:false},{l:'Recurring',v:-rec,c:'#e06060',b:false},{l:'One-off',v:-oo,c:'#f0a500',b:false},{l:'Project Exp',v:-proj,c:'#f59e0b',b:false},{l:'Pre-tax profit',v:profit,c:profit>=0?'#3d82f0':'#e06060',b:true},{l:'Corp tax',v:-ct.tax,c:'#8b5cf6',b:false},{l:'Net profit',v:net,c:net>=0?'#1fba7a':'#e06060',b:true}];
+  const wf=[{l:'Revenue',v:rev,c:'#1fba7a',b:false},{l:'Recurring',v:-rec,c:'#e06060',b:false},{l:'One-off',v:-oo,c:'#f0a500',b:false},{l:'Project Exp',v:-proj,c:'#f59e0b',b:false},{l:'Team pay',v:-tpay,c:'#ec4899',b:false},{l:'Pre-tax profit',v:profit,c:profit>=0?'#3d82f0':'#e06060',b:true},{l:'Corp tax',v:-ct.tax,c:'#8b5cf6',b:false},{l:'Net profit',v:net,c:net>=0?'#1fba7a':'#e06060',b:true}];
   const wm=Math.max(...wf.map(d=>Math.abs(d.v)),1);
   const wfEl=el('fin-waterfall');
   if(wfEl)wfEl.innerHTML=wf.map(d=>`<div class="wf-row"><div class="wf-lbl${d.b?' bold':''}">${d.l}</div><div class="wf-track"><div class="wf-fill" style="width:${Math.round(Math.abs(d.v)/wm*100)}%;background:${d.c}"></div></div><div class="wf-val" style="color:${d.c}">${d.v<0?'-':''}${fmtGBP(d.v)}</div></div>`).join('');
@@ -11186,7 +11185,7 @@ function renderFinCharts(){
   const catKeys=Object.keys(catTotals),catVals=catKeys.map(k=>catTotals[k]),catColors=catKeys.map(k=>(FIN_CATS[k]||{c:'#888'}).c);
 
   if(tab==='overview'||tab==='categories'){
-    mkDonut('fin-donut-main',['Recurring','One-off','Project Exp','Net profit','Corp tax'],[rec,oo,proj,Math.max(0,net),ct.tax],['#e06060','#f0a500','#f59e0b','#1fba7a','#8b5cf6'],'fin-leg-main');
+    mkDonut('fin-donut-main',['Recurring','One-off','Project Exp','Team pay','Net profit','Corp tax'],[rec,oo,proj,tpay,Math.max(0,net),ct.tax],['#e06060','#f0a500','#f59e0b','#ec4899','#1fba7a','#8b5cf6'],'fin-leg-main');
     mkDonut('fin-donut-cat',catKeys,catVals,catColors,'fin-leg-cat');
     mkDonut('fin-donut-cat-ov',catKeys,catVals,catColors,'fin-leg-cat-ov');
     const recCat={};S.finance.recurring.forEach(e=>{recCat[e.cat||'Other']=(recCat[e.cat||'Other']||0)+finAnn(e);});
