@@ -1516,6 +1516,24 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fin-sub{margin:-2px 0 16px;}
 @media (max-width:640px){.fin-sub{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}.fin-tab{white-space:nowrap;padding:9px 14px;}}
 @media(max-width:760px){.fin-pills{flex-wrap:wrap;overflow:visible;}.fin-pills .fsel{margin-left:0;}}
+
+/* Bank balances */
+.fin-bank{margin-bottom:14px;}
+.fin-bank .fin-grid4{margin-bottom:8px;}
+.fin-bank-meta{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.7rem;color:var(--muted);}
+.fin-bank-empty{grid-column:span 1;}
+.fin-bank:has(.fin-bank-empty){display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;}
+.fin-fybar{height:5px;border-radius:99px;background:var(--surface3);overflow:hidden;margin-top:7px;}
+.fin-fybar s{display:block;height:100%;border-radius:99px;background:var(--blue);}
+.fin-spark{display:block;}
+.fin-bank-hist{max-height:260px;overflow:auto;}
+.fbh-row{display:grid;grid-template-columns:84px minmax(0,1fr) auto auto;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);font-size:.76rem;}
+.fbh-row:last-child{border-bottom:0;}
+.fbh-d{color:var(--text2);}.fbh-n{color:var(--muted);font-size:.7rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.fbh-vals{display:flex;gap:16px;justify-content:flex-end;}
+.fbh-v{font-family:'DM Mono',monospace;text-align:right;white-space:nowrap;}.fbh-v small{color:var(--muted);font-family:inherit;font-size:.6rem;}
+.fbh-x{border-left:0;padding:4px 8px;}
+@media (max-width:640px){.fbh-row{grid-template-columns:76px minmax(0,1fr) auto;}.fbh-n{display:none}.fbh-vals{flex-direction:column;gap:1px;align-items:flex-end}}
 </style>
 </head>
 <body>
@@ -3070,7 +3088,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=103;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=104;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4074,6 +4092,7 @@ function _applyDefaults(){
   if(!S.finance.finAuth)S.finance.finAuth=false;
   if(!S.finance.assets)S.finance.assets=[];
   if(!Array.isArray(S.finance.links))S.finance.links=[];
+  if(!Array.isArray(S.finance.bank))S.finance.bank=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
   if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
   if(!S.taskSort)S.taskSort='default';
@@ -9771,6 +9790,74 @@ function _finPillsHtml(tab){const cur=_finGroupOf(tab);return FIN_GROUPS.map(g=>
 function _finSubHtml(tab){const g=_finGroupOf(tab);if(g.t.length<2)return'';return '<div class="fin-sub-nav fin-sub">'+g.t.map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${FIN_TAB_LABEL[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')+'</div>';}
 function finGo(k){const g=FIN_GROUPS.find(x=>x.k===k);if(!g)return;if(!g.t.includes(S.finance.finTab))S.finance.finTab=g.t[0];save();render();}
 
+/* ── Bank balances: dated updates, latest one is "now" ── */
+function _finMoney(n){n=Number(n)||0;const neg=n<0,a=Math.abs(n);return(neg?'-':'')+'£'+a.toLocaleString('en-GB',{minimumFractionDigits:a%1?2:0,maximumFractionDigits:2});}
+function finBankSorted(){return (S.finance.bank||[]).map((e,i)=>({e,i})).sort((x,y)=>(x.e.date||'').localeCompare(y.e.date||'')||x.i-y.i).map(x=>x.e);}
+function finBankLatest(){const l=finBankSorted();return l.length?l[l.length-1]:null;}
+function _finFYInfo(fy){
+  const t=new Date(_localToday()+'T00:00:00'),st=new Date(fy,3,1),en=new Date(fy+1,2,31),DAY=864e5;
+  const total=Math.round((en-st)/DAY)+1;
+  if(t<st)return{state:'future',days:Math.ceil((st-t)/DAY),pct:0};
+  if(t>en)return{state:'done',days:0,pct:100};
+  const done=Math.floor((t-st)/DAY)+1;return{state:'now',pct:Math.round(done/total*100),days:total-done,done,total};
+}
+function _finCover(total,fy){
+  const info=_finFYInfo(fy),months=info.state==='now'?Math.min(12,Math.max(1,info.done/30.4)):12;
+  const burn=totalRecFY(fy)/12+(totalOOFY(fy)+projExpTotalFY(fy))/months;
+  return burn>0?total/burn:null;
+}
+function _finSpark(list){
+  if(list.length<2)return'';const v=list.map(e=>(Number(e.cash)||0)+(Number(e.savings)||0)),mn=Math.min(...v),mx=Math.max(...v),W=120,H=28;
+  const pts=v.map((y,i)=>((i/(v.length-1))*W).toFixed(1)+','+(mx===mn?H/2:(H-3-((y-mn)/(mx-mn))*(H-6))).toFixed(1)).join(' ');
+  return `<svg class="fin-spark" viewBox="0 0 ${W} ${H}" width="${W}" height="${H}" role="img" aria-label="Total cash over time"><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/></svg>`;
+}
+function _finBankHtml(){
+  const L=finBankLatest(),fy=S.finance.finYear,info=_finFYInfo(fy);
+  const fyTxt=info.state==='now'?`${info.pct}% through · ${info.days} days left`:info.state==='done'?'Year complete':`Starts in ${info.days} days`;
+  const fyBar=`<div class="fin-fybar"><s style="width:${info.pct}%"></s></div>`;
+  if(!L)return `<div class="fin-bank" id="fin-bank"><div class="fin-metric fin-bank-empty"><div class="flbl2">Money in the bank</div><div style="font-size:.8rem;color:var(--text2);margin:4px 0 10px;">Add today’s balances to see cash, savings and how many months of costs they cover.</div><button class="btn btn-acc btn-xs" onclick="editFinBank('')">+ Add balances</button></div><div class="fin-metric"><div class="flbl2">${getFYLabel(fy)} ends 31 Mar</div><div class="fval" style="font-size:.95rem;">${fyTxt}</div>${fyBar}</div></div>`;
+  const cash=Number(L.cash)||0,sav=Number(L.savings)||0,tot=cash+sav,cv=_finCover(tot,fy);
+  return `<div class="fin-bank" id="fin-bank"><div class="fin-grid4" style="margin-bottom:8px;">
+    <div class="fin-metric"><div class="flbl2">Cash in bank</div><div class="fval blue">${_finMoney(cash)}</div></div>
+    <div class="fin-metric"><div class="flbl2">Current savings</div><div class="fval green">${_finMoney(sav)}</div></div>
+    <div class="fin-metric"><div class="flbl2">Total cash</div><div class="fval">${_finMoney(tot)}</div><div style="font-size:.66rem;color:var(--muted);margin-top:2px;">${cv===null?'':'≈ '+(cv>=100?'100+':cv.toFixed(1))+' months of costs'}</div></div>
+    <div class="fin-metric"><div class="flbl2">${getFYLabel(fy)} · ends 31 Mar</div><div class="fval" style="font-size:.95rem;">${fyTxt}</div>${fyBar}</div></div>
+    <div class="fin-bank-meta"><span>Updated ${escHtml(fmtD(L.date))}${L.note?' · '+escHtml(L.note):''}</span><button class="btn btn-ghost btn-xs" onclick="editFinBank('')">Update balances</button></div></div>`;
+}
+function _finBankCardHtml(){
+  const sorted=finBankSorted(),rev=sorted.slice().reverse();
+  return `<div class="card" style="margin-bottom:14px;" id="fin-bank-card"><div class="card-hd"><span class="card-title">Money in the bank</span><button class="btn btn-acc btn-xs" onclick="editFinBank('')">Update balances</button></div><div class="card-bd">
+  ${rev.length?`<div style="display:flex;align-items:center;gap:14px;margin-bottom:8px;flex-wrap:wrap;"><span style="font-size:.74rem;color:var(--muted);">Total cash over time</span>${_finSpark(sorted)}</div>
+  <div class="fin-bank-hist">${rev.map(e=>`<div class="fbh-row"><span class="fbh-d">${escHtml(fmtD(e.date))}</span><span class="fbh-n">${e.note?escHtml(e.note):''}</span><span class="fbh-vals"><span class="fbh-v">${_finMoney(e.cash)} <small>cash</small></span><span class="fbh-v">${_finMoney(e.savings)} <small>savings</small></span></span><button class="fl-x fbh-x" title="Edit" aria-label="Edit balance entry" onclick="editFinBank('${e.id}')">✎</button></div>`).join('')}</div>`:'<div style="font-size:.78rem;color:var(--muted);">No balances yet. Add today’s balances to start the history.</div>'}
+  </div></div>`;
+}
+function finBankModalHtml(id){
+  const e=id?(S.finance.bank||[]).find(x=>x.id===id):null,L=finBankLatest();
+  return`<div class="mo-box" style="max-width:370px;">
+<div class="mo-hd"><span class="mo-title">${e?'Edit balances':'Update balances'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
+<div class="mo-body">
+  <div class="field"><label class="flbl">Date *</label><input class="inp" id="fb-date" type="date" value="${e?e.date:_localToday()}"></div>
+  <div class="field"><label class="flbl">Cash in bank (£) *</label><input class="inp" id="fb-cash" type="number" step="0.01" inputmode="decimal" value="${e?e.cash:(L?L.cash:'')}" placeholder="0.00"></div>
+  <div class="field"><label class="flbl">Current savings (£) *</label><input class="inp" id="fb-sav" type="number" step="0.01" inputmode="decimal" value="${e?e.savings:(L?L.savings:'')}" placeholder="0.00"></div>
+  <div class="field"><label class="flbl">Note</label><input class="inp" id="fb-note" value="${escHtml(e?.note||'')}" placeholder="e.g. after invoice paid (optional)"></div>
+  <div id="fb-err" style="color:var(--red);font-size:.72rem;display:none;">Enter a date and both balances as numbers</div>
+</div>
+<div class="mo-ft">${e?`<button class="btn btn-ghost" style="margin-right:auto;color:var(--red);" onclick="deleteFinBank('${e.id}')">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveFinBank('${id||''}')">${e?'Save changes':'Save balances'}</button></div>
+</div>`;}
+function editFinBank(id){const mc=el('mc');mc.style.display='flex';mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${finBankModalHtml(id)}</div>`;{const i=el('fb-cash');if(i){i.focus();i.select();}}}
+function saveFinBank(id){
+  const date=el('fb-date')?.value||'',cr=(el('fb-cash')?.value||'').trim(),sr=(el('fb-sav')?.value||'').trim();
+  const cash=Number(cr),savings=Number(sr),note=(el('fb-note')?.value||'').trim();
+  if(!/^\d{4}-\d{2}-\d{2}$/.test(date)||cr===''||sr===''||!isFinite(cash)||!isFinite(savings)){const e=el('fb-err');if(e)e.style.display='block';return;}
+  saveWithUndo(id?'Edit bank balances':'Update bank balances');
+  if(!Array.isArray(S.finance.bank))S.finance.bank=[];
+  const r2=n=>Math.round(n*100)/100;
+  if(id){const i=S.finance.bank.findIndex(x=>x.id===id);if(i>=0)S.finance.bank[i]={...S.finance.bank[i],date,cash:r2(cash),savings:r2(savings),note};}
+  else S.finance.bank.push({id:uid(),date,cash:r2(cash),savings:r2(savings),note});
+  saveNow();closeModal();render();
+}
+function deleteFinBank(id){saveWithUndo('Delete bank balances');S.finance.bank=(S.finance.bank||[]).filter(x=>x.id!==id);saveNow();closeModal();render();}
+
 /* ── Finance links (shared with the team; same look as quick links) ── */
 function _finSafeUrl(u){u=(u||'').trim();if(!u)return'';if(!/^[a-z][a-z0-9+.-]*:/i.test(u))u='https://'+u;return /^https?:\/\//i.test(u)?u:'';}
 function _finLinksHtml(){
@@ -9832,6 +9919,7 @@ ${_finLinksHtml()}
 ${_finSubHtml(tab)}
 
 <div class="fin-view${tab==='overview'?' active':''}" id="fin-overview">
+  ${_finBankHtml()}
   <div class="fin-grid4">
     <div class="fin-metric"><div class="flbl2">Revenue</div><div class="fval blue">${fmtGBP(rev)}</div></div>
     <div class="fin-metric"><div class="flbl2">Total Expenses</div><div class="fval red">${fmtGBP(allExp)}</div></div>
@@ -9971,7 +10059,7 @@ ${_finSubHtml(tab)}
     const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
     const savingsAmt=Math.max(0,net2)*(sv.rate/100);
     const profitForPayout=Math.max(0,net2)-savingsAmt;
-    return`<div style="max-width:780px;"><div class="fin-grid4" style="margin-bottom:14px;">
+    return`<div style="max-width:780px;">${_finBankCardHtml()}<div class="fin-grid4" style="margin-bottom:14px;">
       <div class="fin-metric"><div class="flbl2">Net Profit</div><div class="fval green">${fmtS(net2)}</div></div>
       <div class="fin-metric"><div class="flbl2">Savings Rate</div><div class="fval amber">${sv.rate}%</div></div>
       <div class="fin-metric"><div class="flbl2">Savings (${sv.rate}%)</div><div class="fval blue">${fmtGBP(savingsAmt)}</div></div>
