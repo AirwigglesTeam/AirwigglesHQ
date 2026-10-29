@@ -3007,7 +3007,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=95;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=96;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -10770,6 +10770,7 @@ function renderSettings(){
     <button class="btn btn-ghost btn-sm" onclick="exportData()">Export this device's data (.json)</button>
     <button class="btn btn-ghost btn-sm" onclick="triggerImport()">⬆ Import data</button>
     <button class="btn btn-ghost btn-sm" onclick="_saveLocalBackup();showToast('Backup saved ✓');render()">💾 Save backup now</button>
+    <a class="btn btn-ghost btn-sm" href="https://drive.google.com/drive/folders/1IU17dl7BGzI1fizvsG1IFOfC4vfQV29x?usp=drive_link" target="_blank" rel="noopener" style="text-decoration:none;" title="Shared Google Drive folder that holds the manual backup copies">📁 Backup folder (Google Drive)</a>
   </div>
   <div style="font-size:.74rem;margin:-6px 0 14px;line-height:1.5;"><div id="bk-age" style="color:var(--text2);">${_bkAgeHtml()}</div><div id="bk-st" style="color:var(--muted);"></div></div>
   <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importData(this)">
