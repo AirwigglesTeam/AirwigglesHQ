@@ -2045,6 +2045,7 @@ function create(env){
   const T=env.transport;
   const DEBOUNCE=env.debounceMs===undefined?500:env.debounceMs;
   const LINEAGE_CAP=60,HORIZON=40,HMAX=12;
+  const VERIFY_MS=env.verifyMs===undefined?1500:env.verifyMs;   // pause before re-checking that a write was not clobbered (tests shorten it)
 
   let H=[];                 // ancestor history [{wid,seq,proj}], newest first
   let rc=null;              // remote cache {token,proj,meta,str}
@@ -2358,8 +2359,8 @@ function create(env){
       let n=0;
       do{again=false;await cycle();n++;}while(again&&n<6);
       backoff=0;lastErr=null;
-      if(again)schedule(1500);
-      else if(wrote){wrote=false;schedule(1500);}   // verify the write wasn't clobbered by a concurrent writer
+      if(again)schedule(VERIFY_MS);
+      else if(wrote){wrote=false;schedule(VERIFY_MS);}   // verify the write wasn't clobbered by a concurrent writer
     }catch(e){
       lastErr=e;
       if(e&&e.retry){schedule(e.conflict?40+Math.floor(Math.random()*260):30);}   // record changed/created elsewhere meanwhile: fetch, merge, try again
@@ -2683,6 +2684,7 @@ function _pfSafeRender(){
 
 const PF=PFSync.create({
   getState:()=>S,
+  verifyMs:window.__PF_VERIFY_MS||undefined,        // test hook only: shortens the post-write re-check pause
   replaceState:o=>{const old=S;if(old)for(const k of PF_LOCAL_KEYS)if(!(k in o)&&k in old)o[k]=old[k];S=o;},
   normalize:o=>{const prev=S;S=o;try{_applyDefaults();}finally{S=prev;}},
   prepare:()=>_applyDefaults(),
@@ -3035,7 +3037,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=98;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=99;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
