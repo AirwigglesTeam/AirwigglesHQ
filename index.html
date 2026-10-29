@@ -1588,6 +1588,14 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fin-evo .meta{margin-left:auto;font-size:.68rem;color:var(--muted);font-weight:400;}
 .fp-lk{font-size:.55rem;font-weight:700;color:var(--acc);border:1px solid var(--acc);border-radius:99px;padding:1px 6px;vertical-align:1px;}
 @media (max-width:640px){.fe-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.fe-dates{margin-left:0;flex-basis:100%;}.fe-body{grid-template-columns:minmax(0,1fr);gap:0;}}
+
+/* Where the money goes */
+.fin-flow{margin-bottom:14px;}
+.ff-bar{display:flex;height:16px;border-radius:99px;overflow:hidden;background:var(--surface3);}
+.ff-bar i{display:block;height:100%;min-width:2px;}
+.ff-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:11px;font-size:.72rem;color:var(--text2);}
+.ff-k{display:inline-flex;align-items:center;gap:6px;}.ff-k b{width:8px;height:8px;border-radius:50%;}.ff-k em{font-style:normal;font-family:'DM Mono',monospace;color:var(--text);}
+.ff-warn{margin-top:10px;font-size:.72rem;color:var(--red);}
 </style>
 </head>
 <body>
@@ -3142,7 +3150,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=109;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=110;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6705,6 +6713,35 @@ function _finEventsHtml(){
   ${oth.length?`<details class="card fold fin-evo"><summary>Other years and events without a start date <span class="meta">${oth.length}${noDate?' · '+noDate+' undated, not counted in the totals':''}</span></summary><div style="padding:0 12px 12px;">${oth.map(card).join('')}</div></details>`:''}
   </div>`;
 }
+/* ── Finance: one pay calculation shared by Overview, Savings, Team payout and the PDF report ──
+   revenue − costs = profit → corporation tax → net profit → savings → TEAM PAY → dividend pool.
+   Team pay = contracted pay of non-director members. Anything already entered as a 'Team Pay' cost is not taken twice. */
+function finTeamPayTotal(){
+  const g=parseFloat(S.finance.globalRate)||0,tr=S.finance.teamRates||{};
+  return (S.members||[]).filter(m=>!m.isDirector).reduce((a,m)=>a+memberHoursTotal(m)*(g>0?g:(parseFloat(tr[m.id])||0)),0);
+}
+function finPayCalc(){
+  const sv=S.finance.savings||{rate:20},rev=totalRevenue();
+  const rec=totalRec(),oo=totalOO(),pe=projExpTotal(),costs=rec+oo+pe;
+  const profit=rev-costs,ct=corpTax(Math.max(0,profit)),net=profit-ct.tax;
+  const savings=Math.max(0,net)*((parseFloat(sv.rate)||0)/100);
+  const afterSavings=Math.max(0,net)-savings;
+  const inCosts=[].concat(S.finance.recurring||[],S.finance.oneoff||[]).filter(e=>e.cat==='Team Pay').reduce((a,e)=>a+(typeof finAnn==='function'&&e.freq?finAnn(e):(parseFloat(e.amount)||0)),0);
+  const contracted=finTeamPayTotal();
+  const teamPay=Math.min(afterSavings,Math.max(0,contracted-inCosts));
+  const pool=afterSavings-teamPay;
+  return{rev,rec,oo,pe,costs,profit,ct,net,savings,afterSavings,contracted,inCosts,teamPay,short:Math.max(0,contracted-inCosts-afterSavings),pool};
+}
+/* Where the money goes: one stacked bar from revenue */
+function _finFlowHtml(){
+  const P=finPayCalc(),money=_finMoney;
+  if(!(P.rev>0))return'';
+  const seg=[['Costs',Math.min(P.costs,P.rev),'var(--red)'],['Tax',P.ct.tax,'var(--yellow)'],['Savings',P.savings,'var(--blue)'],['Team pay',P.teamPay,'#ec4899'],['Dividends',P.pool,'var(--green)']];
+  const tot=seg.reduce((a,s)=>a+s[1],0)||1;
+  const bar=seg.filter(s=>s[1]>0).map(s=>`<i style="width:${(s[1]/tot*100).toFixed(2)}%;background:${s[2]}" title="${s[0]} ${money(s[1])}"></i>`).join('');
+  const leg=seg.map(s=>`<span class="ff-k"><b style="background:${s[2]}"></b>${s[0]} <em>${money(s[1])}</em></span>`).join('');
+  return`<div class="card fin-flow" id="fin-flow"><div class="card-hd"><span class="card-title">Where the money goes</span><span style="font-size:.7rem;color:var(--muted);">${getFYLabel(S.finance.finYear)} · of ${money(P.rev)} revenue</span></div><div class="card-bd"><div class="ff-bar">${bar}</div><div class="ff-leg">${leg}</div>${P.short>0?`<div class="ff-warn">Team pay is ${money(P.short)} more than the profit left after savings, so dividends are £0.</div>`:''}</div></div>`;
+}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -10251,6 +10288,7 @@ ${_finSubHtml(tab)}
 
 <div class="fin-view${tab==='overview'?' active':''}" id="fin-overview">
   ${_finBankHtml()}
+  ${_finFlowHtml()}
   <div class="fin-grid4">
     <div class="fin-metric"><div class="flbl2">Revenue</div><div class="fval blue">${fmtGBP(rev)}</div>${_finFundNote()}</div>
     <div class="fin-metric"><div class="flbl2">Total Expenses</div><div class="fval red">${fmtGBP(allExp)}</div></div>
@@ -10340,7 +10378,7 @@ ${_finSubHtml(tab)}
     const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE;
     const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
     const savingsAmt=Math.max(0,net2)*(sv.rate/100);
-    const profitForPayout=Math.max(0,net2)-savingsAmt;
+    const profitForPayout=finPayCalc().pool,teamPayAmt=finPayCalc().teamPay;
     return`<div style="max-width:780px;">${_finBankCardHtml()}<div class="fin-grid4" style="margin-bottom:14px;">
       <div class="fin-metric"><div class="flbl2">Net Profit</div><div class="fval green">${fmtS(net2)}</div></div>
       <div class="fin-metric"><div class="flbl2">Savings Rate</div><div class="fval amber">${sv.rate}%</div></div>
@@ -10360,7 +10398,8 @@ ${_finSubHtml(tab)}
           <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">Breakdown</div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Net profit</span><span style="font-family:Inter,sans-serif;color:var(--green);">${fmtS(net2)}</span></div>
           <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Savings (${sv.rate}%)</span><span style="font-family:Inter,sans-serif;color:var(--blue);">- ${fmtGBP(savingsAmt)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:.88rem;font-weight:700;"><span>Profit for payout</span><span style="font-family:Inter,sans-serif;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Team pay (before dividends)</span><span style="font-family:Inter,sans-serif;color:#ec4899;">- ${fmtGBP(teamPayAmt)}</span></div>
+          <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:.88rem;font-weight:700;"><span>Dividend pool</span><span style="font-family:Inter,sans-serif;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
         </div>
       </div>
     </div></div>`;
@@ -10374,7 +10413,7 @@ ${_finSubHtml(tab)}
     const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE;
     const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
     const savingsAmt=Math.max(0,net2)*(sv.rate/100);
-    const profitForPayout=Math.max(0,net2)-savingsAmt;
+    const PC=finPayCalc(),profitForPayout=PC.pool;
     const teamRates=S.finance.teamRates||{};
     const globalRate=parseFloat(S.finance.globalRate)||0;
     const effRate=m=>globalRate>0?globalRate:(parseFloat(teamRates[m.id])||0);
@@ -10436,7 +10475,7 @@ ${_finSubHtml(tab)}
             const totalNDPay=nonDirectors.reduce((a,m)=>{const h=memberHoursTotal(m);return a+h*effRate(m);},0);
             const totalNDHours=nonDirectors.reduce((a,m)=>a+memberHoursTotal(m),0);
             const teamPayBudget=parseFloat((S.finance.budgets||{})["Team Pay"])||0;
-            const availFunds=teamPayBudget>0?teamPayBudget:profitForPayout;
+            const availFunds=teamPayBudget>0?teamPayBudget:PC.afterSavings;
             return`
             ${S.members.length===0?'<div style="color:var(--muted);font-size:.78rem;">No team members added yet.</div>':''}            ${directors.length>0?`<div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 0 6px;">Directors — paid via dividends</div>
             ${directors.map(m=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);opacity:.6;min-width:0;">
@@ -10477,7 +10516,7 @@ ${_finSubHtml(tab)}
         <div class="card">
           <div class="card-hd"><span class="card-title">Dividend Pool</span><span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
           <div class="card-bd">
-            <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;">Profit after tax and savings available for distribution</div>
+            <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;">Profit after tax, savings and team pay, available for dividends</div>
             <!-- Phase 1 progress -->
             <div style="margin-bottom:10px;">
               <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
@@ -10796,12 +10835,12 @@ function generateFinanceReport(){
   // ── Compute all figures ──
   const sv=S.finance.savings||{rate:20};
   const rec=totalRec(),oo=totalOO(),projE=projExpTotal(),allE=rec+oo+projE;
-  const rev=S.finance.revenue||0;
+  const rev=totalRevenue();
   const profit=rev-allE;
   const ct=corpTax(Math.max(0,profit));
   const net=profit-ct.tax;
   const savAmt=Math.max(0,net)*(sv.rate/100);
-  const pfp=Math.max(0,net)-savAmt;
+  const PCR=finPayCalc(),pfp=PCR.pool;
   const globalRate=parseFloat(S.finance.globalRate)||0;
   const effR=m=>globalRate>0?globalRate:(parseFloat((S.finance.teamRates||{})[m.id])||0);
   const THRESHOLD=81000;
@@ -10940,7 +10979,8 @@ function generateFinanceReport(){
         <tr><td class="muted">Corporation Tax (${escHtml(ct.label)})</td><td class="right amber">- ${fmtGBP(ct.tax)}</td><td>${bar(ct.tax,rev,'#f59e0b')}</td></tr>
         <tr class="tr-total"><td>Net Profit</td><td class="right ${net>=0?'green':'red'}">${fmtS(net)}</td><td>${bar(Math.abs(net),rev,net>=0?'#62D0AA':'#e05c3a')}</td></tr>
         <tr><td class="muted">Savings Reserve (${sv.rate}%)</td><td class="right blue">- ${fmtGBP(savAmt)}</td><td>${bar(savAmt,rev,'#3d82f0')}</td></tr>
-        <tr class="tr-total"><td style="color:#62D0AA;">Profit for Payout</td><td class="right green">${fmtGBP(pfp)}</td><td>${bar(pfp,rev,'#62D0AA')}</td></tr>
+        <tr><td class="muted">Team Pay (before dividends)</td><td class="right" style="color:#ec4899;">- ${fmtGBP(PCR.teamPay)}</td><td>${bar(PCR.teamPay,rev,'#ec4899')}</td></tr>
+        <tr class="tr-total"><td style="color:#62D0AA;">Dividend Pool</td><td class="right green">${fmtGBP(pfp)}</td><td>${bar(pfp,rev,'#62D0AA')}</td></tr>
       </table>
     </div>
   </div>`;
@@ -11000,7 +11040,7 @@ function generateFinanceReport(){
   const totalNDPay=nondirs.reduce((a,m)=>a+memberHoursTotal(m)*effR(m),0);
   const totalNDHours=nondirs.reduce((a,m)=>a+memberHoursTotal(m),0);
   const teamBudget=parseFloat(budgets['Team Pay'])||0;
-  const availFunds=teamBudget>0?teamBudget:pfp;
+  const availFunds=teamBudget>0?teamBudget:PCR.afterSavings;
   const taxPage=`<div class="page">
     <h2>6 — Corporation Tax</h2>
     <div class="grid3" style="margin-bottom:14px;">
@@ -11130,7 +11170,7 @@ function lockFinance(){S.finance.finAuth=false;save();nav('finance');}
 function reCalcFin(){const c=el('content');if(c&&V==='finance'){c.innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);}}
 
 function renderFinCharts(){
-  const rev=S.finance.revenue||0,rec=totalRec(),oo=totalOO(),proj=projExpTotal(),allExp=rec+oo+proj;
+  const rev=totalRevenue(),rec=totalRec(),oo=totalOO(),proj=projExpTotal(),allExp=rec+oo+proj;
   const profit=rev-allExp,ct=corpTax(Math.max(0,profit)),net=profit-ct.tax;
   const tab=S.finance.finTab||'overview';
 
