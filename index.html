@@ -1756,6 +1756,97 @@ body.mcal-dragging *{cursor:grabbing !important;}
   #fin-budget .exp-row>input:first-child{flex:1 1 100%}
   #fin-budget .exp-row .amt-inp{flex:1 1 28%;width:auto;min-width:0;text-align:left}
 }
+
+/* ── Sponsors page (mockup C) ── */
+.spx-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:14px;overflow:hidden}
+.spx-strip>div{padding:12px 16px;border-right:1px solid var(--border);min-width:0}.spx-strip>div:last-child{border-right:0}
+.spx-strip b{display:block;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spx-strip span{font-family:'DM Mono',monospace;font-size:1.15rem;font-weight:600}.spx-strip small{display:block;font-size:.66rem;color:var(--muted);margin-top:1px}
+.spx-strip .warn{color:var(--yellow)}.spx-strip .ok{color:var(--acc)}.spx-strip .click{cursor:pointer}.spx-strip .click:hover{background:var(--surface2)}.spx-strip .click.on{box-shadow:inset 0 0 0 2px var(--yellow)}
+.spx-strip .click:focus-visible{outline:2px solid var(--acc);outline-offset:-2px}
+.spx-pool{margin-bottom:14px;overflow:hidden}.spx-pool summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:11px 16px;font-size:.8rem;font-weight:600}
+.spx-pool summary::-webkit-details-marker{display:none}
+.spx-pool summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--acc);border-bottom:2px solid var(--acc);transform:rotate(-45deg);transition:transform .15s}
+.spx-pool[open] summary::before{transform:rotate(45deg)}.spx-pool .meta{font-size:.68rem;color:var(--muted);font-weight:400;margin-left:auto}
+.spx-pool .in{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(260px,100%),1fr));gap:18px;padding:2px 16px 16px}
+.spx-lh{font-size:.62rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:0 0 8px}
+.spx-bar{margin-bottom:8px}.spx-bar .r{display:flex;justify-content:space-between;font-size:.72rem;margin-bottom:3px}.spx-bar .r span:last-child{font-family:'DM Mono',monospace}
+.spx-bar i{display:block;height:4px;border-radius:99px;background:var(--surface3);overflow:hidden}.spx-bar i s{display:block;height:100%;border-radius:99px}
+.spx-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid var(--border);font-size:.76rem}.spx-row:last-child{border-bottom:0}.spx-row .l{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.spx-tools{display:flex;gap:10px;align-items:center;flex-wrap:wrap;margin-bottom:12px}.spx-tools .inp{max-width:260px;min-width:160px;flex:1}
+.spx-chips{display:flex;flex-wrap:wrap;gap:5px}
+.spx-chip{all:unset;cursor:pointer;font-size:.66rem;font-weight:600;padding:5px 11px;border-radius:99px;background:var(--surface2);border:1px solid var(--border);color:var(--text2)}
+.spx-chip.on{background:var(--teal-dim,rgba(98,208,170,.12));border-color:var(--acc);color:var(--acc)}.spx-chip:focus-visible{outline:2px solid var(--acc)}
+.spx-grp{margin:4px 0 8px;display:flex;align-items:baseline;gap:10px;flex-wrap:wrap}.spx-grp h3{margin:0;font-size:.95rem}.spx-grp small{color:var(--muted);font-size:.72rem}
+.spx-grp+.spx-grid{margin-bottom:18px}
+.spx-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(340px,100%),1fr));gap:12px}
+.spx-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;display:flex;flex-direction:column;cursor:pointer;text-align:left;min-width:0}
+.spx-card:hover{border-color:var(--acc)}.spx-card:focus-visible{outline:2px solid var(--acc)}
+.spx-card .top2{display:flex;gap:11px;align-items:center;padding:14px 14px 10px}
+.spx-card .nm{font-weight:700;font-size:.88rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.spx-card .evl{font-size:.68rem;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.spx-card .sec{padding:9px 14px;border-top:1px solid var(--border);display:flex;flex-direction:column;gap:6px}.spx-card .sec.nb{border-top:0;padding-top:0}
+.spx-card .lab{font-size:.55rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700}
+.spx-card .ln{display:flex;align-items:center;gap:8px;font-size:.72rem;min-width:0}.spx-card .ln .l{flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}.spx-card .ln .m{color:var(--muted);font-size:.66rem;white-space:nowrap}.spx-card .mono{font-family:'DM Mono',monospace}
+.spx-card .who{display:flex;align-items:center;gap:7px;font-size:.72rem}.spx-card .who .a{width:20px;height:20px;border-radius:50%;background:var(--surface3);display:grid;place-items:center;font-size:.5rem;font-weight:700;flex:none}
+.spx-card .who.no2{color:var(--yellow)}
+.spx-card .tagrow{display:flex;gap:4px;flex-wrap:wrap}
+.spx-card .note{font-size:.68rem;color:var(--text2);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.spx-card .foot{display:flex;justify-content:space-between;align-items:center;gap:8px;padding:8px 14px;border-top:1px solid var(--border);background:var(--surface2);font-size:.64rem;color:var(--muted);margin-top:auto}
+.spx-av{width:34px;height:34px;border-radius:8px;display:grid;place-items:center;font-size:.7rem;font-weight:700;color:#fff;flex:none;overflow:hidden}.spx-av img{width:100%;height:100%;object-fit:cover}
+.spx-tag{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface2);border:1px solid var(--border)}.spx-tag.dash{border-style:dashed}
+.spx-badge{font-size:.58rem;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid var(--border);white-space:nowrap}
+.spx-badge.b-reg{color:var(--purple);border-color:var(--purple)}.spx-badge.b-paid{color:var(--green);border-color:var(--green);background:var(--teal-dim,rgba(98,208,170,.12))}.spx-badge.b-prize{color:var(--yellow);border-color:var(--yellow)}
+.spx-stage{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid var(--border);white-space:nowrap}
+.spx-s-conf{color:var(--green);border-color:var(--green)}.spx-s-talk{color:var(--blue);border-color:var(--blue)}.spx-s-lead{color:var(--yellow);border-color:var(--yellow)}
+.spx-ticks{display:flex;gap:8px;flex-wrap:wrap;font-size:.62rem;color:var(--muted)}.spx-ticks i{font-style:normal}.spx-ticks .y{color:var(--green)}
+.spx-warn{font-size:.58rem;font-weight:700;color:var(--yellow);border:1px solid color-mix(in srgb,var(--yellow) 45%,transparent);border-radius:99px;padding:1px 6px;flex:none}
+.spx-scrim{position:fixed;inset:0;background:rgba(0,0,0,.45);display:none;z-index:590}.spx-scrim.on{display:block}
+.spx-drawer{position:fixed;top:0;right:0;bottom:0;width:min(980px,100%);background:var(--bg);border-left:1px solid var(--border);z-index:600;overflow:auto;transform:translateX(102%);transition:transform .18s;padding:16px max(16px,env(safe-area-inset-right,0px)) 24px 16px;padding-top:calc(16px + env(safe-area-inset-top,0px));visibility:hidden}
+.spx-drawer.on{transform:none;visibility:visible}
+@media (prefers-reduced-motion:reduce){.spx-drawer{transition:none}}
+.spx-dh{display:flex;justify-content:flex-end;gap:6px;margin-bottom:10px}
+@media(max-width:640px){.spx-strip>div{border-right:0;border-bottom:1px solid var(--border)}.spx-strip>div:last-child{border-bottom:0}}
+/* Sponsors profile drawer */
+.spx-ph{margin-bottom:0;overflow:hidden}.spx-phd{display:flex;gap:14px;align-items:flex-start;padding:16px;flex-wrap:wrap}
+.spx-av.big{width:54px;height:54px;border-radius:11px;font-size:1rem}
+.spx-phd h2{margin:0 0 3px;font-size:1.1rem}.spx-phd a{font-size:.74rem;color:var(--muted);text-decoration:none}
+.spx-desc{margin:8px 0 0;font-size:.76rem;color:var(--text2);line-height:1.5;max-width:70ch}
+.spx-facts{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));border-top:1px solid var(--border)}
+.spx-facts>div{padding:10px 16px;border-right:1px solid var(--border)}.spx-facts>div:last-child{border-right:0}
+.spx-facts b{display:block;font-size:.58rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}.spx-facts span{font-family:'DM Mono',monospace;font-size:.9rem;font-weight:600}
+.spx-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(280px,100%),1fr));gap:12px;align-items:start;margin-top:12px}
+.spx-pc{overflow:hidden;min-width:0}.spx-pc.wide{grid-column:1/-1}
+.spx-hd{padding:9px 14px;border-bottom:1px solid var(--border);font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;font-weight:700;display:flex;align-items:center;gap:8px;color:var(--acc)}.spx-hd .sp{flex:1}
+.spx-bd{padding:11px 14px;font-size:.78rem;line-height:1.55}
+.spx-kv{display:flex;gap:10px;padding:5px 0;border-bottom:1px solid var(--border)}.spx-kv:last-child{border-bottom:0}.spx-kv span:first-child{width:78px;color:var(--muted);font-size:.7rem;flex:none}.spx-kv span:last-child{min-width:0;overflow-wrap:anywhere}
+.spx-mini{display:flex;gap:8px;align-items:center;padding:5px 0;border-bottom:1px solid var(--border);font-size:.74rem;flex-wrap:wrap}.spx-mini:last-child{border-bottom:0}.spx-mini .l{flex:1;min-width:0;font-weight:600}.spx-mini .m{color:var(--muted);font-size:.66rem}
+.spx-evr{cursor:pointer}.spx-evr:hover .l{color:var(--acc)}.spx-dot{width:8px;height:8px;border-radius:50%;background:var(--acc);flex:none}
+.spx-hist{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:0 24px}
+.spx-prod{display:flex;gap:9px;align-items:flex-start;padding:7px 0;border-bottom:1px solid var(--border)}.spx-prod:last-child{border-bottom:0}.spx-prod img{width:36px;height:36px;border-radius:6px;object-fit:cover;flex:none}
+.spx-pn{font-weight:600;font-size:.78rem}.spx-pd{font-size:.68rem;color:var(--text2);line-height:1.4;margin:1px 0 3px}.spx-prod .tagrow{display:flex;gap:4px;flex-wrap:wrap}
+.spx-note{margin:8px 0 0;color:var(--text2)}.spx-pc .mut{color:var(--muted)}
+.spx-ticks .late{color:var(--yellow)}.spx-ticks .due{color:var(--yellow);font-family:'DM Mono',monospace}
+/* sponsors: pills + ideas board */
+.spx-pills{display:flex;gap:6px;margin:0 0 14px;flex-wrap:wrap}
+.spx-pill{all:unset;cursor:pointer;font-size:.74rem;font-weight:700;padding:7px 14px;border-radius:99px;background:var(--surface2);border:1px solid var(--border);color:var(--text2)}
+.spx-pill b{font-weight:700;opacity:.7;margin-left:3px}
+.spx-pill.on{background:var(--teal-dim,rgba(98,208,170,.12));border-color:var(--acc);color:var(--acc)}.spx-pill:focus-visible{outline:2px solid var(--acc)}
+.spx-add{display:flex;gap:8px;margin-bottom:14px}.spx-add .inp{flex:1;min-width:0}
+.spx-board{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;align-items:start}
+.spx-col{background:var(--surface2);border:1px solid var(--border);border-radius:12px;padding:10px;display:flex;flex-direction:column;gap:8px;min-width:0}
+.spx-col h4{display:flex;justify-content:space-between;margin:0 0 2px;font-size:.62rem;text-transform:uppercase;letter-spacing:.08em;color:var(--muted)}
+.spx-idea{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:10px;display:flex;flex-direction:column;gap:6px;min-width:0}
+.spx-idea .spx-it{font-size:.78rem;cursor:pointer;overflow-wrap:anywhere}.spx-idea p{margin:0;font-size:.7rem;color:var(--text2);overflow-wrap:anywhere}
+.spx-idea .tagrow{display:flex;flex-wrap:wrap;gap:4px}
+.spx-idea .mv{display:flex;justify-content:space-between;align-items:center;font-size:.6rem;color:var(--muted);gap:6px}
+.spx-idea .mv button{all:unset;cursor:pointer;width:26px;height:26px;text-align:center;line-height:26px;border-radius:7px;border:1px solid var(--border);color:var(--text2)}
+.spx-idea .mv button:disabled{opacity:.3;cursor:default}
+.spx-empty{font-size:.68rem;color:var(--muted);padding:6px 2px}
+.spx-mini{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border);font-size:.74rem}.spx-mini .l{flex:1;min-width:0;overflow-wrap:anywhere}
+.spx-x{all:unset;cursor:pointer;width:24px;height:24px;text-align:center;line-height:24px;color:var(--muted)}
+.spx-linkrow{all:unset;cursor:pointer;display:flex;justify-content:space-between;gap:8px;align-items:center;width:100%;box-sizing:border-box;padding:10px;border:1px solid var(--border);border-radius:9px;margin-bottom:6px;font-size:.76rem}
+@media(max-width:900px){.spx-board{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:560px){.spx-board{grid-template-columns:minmax(0,1fr)}.spx-add{flex-direction:column}}
 </style>
 </head>
 <body>
@@ -3310,7 +3401,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=125;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=129;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4289,7 +4380,7 @@ async function load(){
 }
 
 function _applyDefaults(){
-  ['labels','areas','sponsors','projectTemplates'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];});
+  ['labels','areas','sponsors','projectTemplates','sponsorIdeas'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];});
   if(S.slackWebhook===undefined)S.slackWebhook='';
   if(S.detailId===undefined)S.detailId=null;
   if(S.activeMember===undefined)S.activeMember=null;
@@ -4458,7 +4549,7 @@ let S={
   expandedTasks:[],expandedGantt:[],
   settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',navVisible:{dashboard:true,kanban:true,campaign:true,templates:true,finance:true,sponsors:true,settings:true},bookmarks:[]},
   projectTemplates:[],
-  sponsors:[],
+  sponsors:[],sponsorIdeas:[],
   finance:{revenue:0,recurring:[],oneoff:[],finTab:'overview'},
   dashFilters:{project:'',member:'',label:''},
   campaignFilter:{project:'',phase:'',member:''}
@@ -5903,6 +5994,7 @@ function nav(view){
   if(guarded.includes(view)&&!canAccess(view)){
     view='dashboard';
   }
+  if(view!=='sponsors')_spOpenId=null;
   V=view;S.detailId=null;
   document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('active',b.dataset.v===view));
   document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',i.dataset.v===view));
@@ -6854,13 +6946,16 @@ function toggleEvIncome(pid,id){const p=getProject(pid);const i=p&&(p.income||[]
    events without a start date are listed but kept out of the year totals. */
 function _finEvFyOf(p){return p.startDate?isInFY(p.startDate,S.finance.finYear):null;}   // true / false / null (no date)
 function finLinked(fy){
-  const o={sponsor:{actual:0,extra:0},events:{actual:0,extra:0}};
+  const o={sponsor:{actual:0,extra:0,paid:0},events:{actual:0,extra:0}};
   (S.projects||[]).forEach(p=>{
     if(!isEvt(p)||!p.startDate||!isInFY(p.startDate,fy))return;
-    const m=evMoney(p);o.sponsor.actual+=m.fees.confirmed;o.sponsor.extra+=m.fees.prospect;o.events.actual+=m.inc.received;o.events.extra+=m.inc.expected;
+    const m=evMoney(p);o.sponsor.actual+=m.fees.confirmed;o.sponsor.paid+=m.fees.paid;o.sponsor.extra+=m.fees.prospect;o.events.actual+=m.inc.received;o.events.extra+=m.inc.expected;
   });
   return o;
 }
+/* sponsor fees that are confirmed but not yet marked paid, this financial year */
+function finSponsorAwaiting(){const L=finLinked(S.finance.finYear);return Math.max(0,L.sponsor.actual-L.sponsor.paid);}
+function _finAwaitingTxt(){const a=finSponsorAwaiting();return a>0?_finMoney(a)+' sponsor fees awaiting payment':'';}
 function finLinkTarget(k){return parseFloat((S.finance.linkTargets||{})[k])||0;}
 function setLinkTarget(k,v){if(!S.finance.linkTargets)S.finance.linkTargets={};S.finance.linkTargets[k]=parseFloat(v)||0;save();if(typeof V!=='undefined'&&V==='finance')reCalcFin();const l=document.getElementById('rev-stream-list');if(l)l.innerHTML=renderRevStreamList();}
 function finLinkedTotal(){const L=finLinked(S.finance.finYear);return L.sponsor.actual+L.events.actual;}
@@ -6883,7 +6978,7 @@ function _finEventsHtml(){
     const p=r.p,m=r.m,pct=m.budget>0?Math.min(100,Math.round(m.spent/m.budget*100)):0,isOver=m.budget>0&&m.spent>m.budget,res=m.revenue-m.spent;
     const dates=p.startDate?escHtml(fmtD(p.startDate))+(p.endDate&&p.endDate!==p.startDate?' → '+escHtml(fmtD(p.endDate)):''):'No start date';
     const ex=(p.expenses||[]).map(e=>`<div class="fe-line"><span class="fe-n">${escHtml(e.name)}</span><span class="fe-m">${escHtml(e.category||'')}${e.date?' · '+escHtml(fmtD(e.date)):''}</span><span class="fe-v">${money(e.amount)}</span></div>`).join('')||'<div class="fe-none">No expenses yet.</div>';
-    const fees=isEvt(p)?_evFeeSponsors(p).map(sp=>{const s=getSponsor(sp.id);const ci=SP_STAGES.findIndex(x=>x.id===_spStage(sp));if(!s||ci<2)return'';return `<div class="fe-line"><span class="fe-n">${escHtml(s.name)} <small>fee</small></span><span class="fe-m">${ci>=3?'confirmed':'in talks'}</span><span class="fe-v" style="color:${ci>=3?'var(--green)':'var(--muted)'}">${money(sp.fee)}</span></div>`;}).join(''):'';
+    const fees=isEvt(p)?_evFeeSponsors(p).map(sp=>{const s=getSponsor(sp.id);const ci=SP_STAGES.findIndex(x=>x.id===_spStage(sp));if(!s||ci<2)return'';return `<div class="fe-line"><span class="fe-n">${escHtml(s.name)} <small>fee</small></span><span class="fe-m">${ci>=3?'confirmed'+(spPayInfo(sp)?' · '+(spPayInfo(sp).k==='none'?'not invoiced':spPayInfo(sp).text.toLowerCase()):''):'in talks'}</span><span class="fe-v" style="color:${ci>=3?'var(--green)':'var(--muted)'}">${money(sp.fee)}</span></div>`;}).join(''):'';
     const inc=(p.income||[]).map(i=>`<div class="fe-line"><span class="fe-n">${escHtml(i.name)}</span><span class="fe-m">${i.received?'received':'expected'}${i.date?' · '+escHtml(fmtD(i.date)):''}</span><span class="fe-v" style="color:${i.received?'var(--green)':'var(--muted)'}">${money(i.amount)}</span></div>`).join('');
     return `<details class="card fin-evc"><summary>
       <div class="fe-top"><span class="fe-dot" style="background:${escHtml(p.color||'var(--acc)')}"></span><span class="fe-name">${escHtml(p.name)}</span>${p.status&&p.status!=='active'?`<span class="fe-tag">${escHtml(p.status)}</span>`:''}${isOver?'<span class="fe-tag" style="color:var(--red);border-color:var(--red);">Over budget</span>':''}<span class="fe-dates">${dates}</span></div>
@@ -6899,7 +6994,7 @@ function _finEventsHtml(){
   <div class="fin-grid4" style="margin-bottom:12px;">
     <div class="fin-metric"><div class="flbl2">Budgeted</div><div class="fval blue">${money(bud)}</div><div class="fp-sub">${getFYLabel(fy)}</div></div>
     <div class="fin-metric"><div class="flbl2">Spent</div><div class="fval ${bud>0&&sp>bud?'red':'yellow'}">${money(sp)}</div><div class="fp-sub">${over?over+' event'+(over===1?'':'s')+' over budget':'none over budget'}</div></div>
-    <div class="fin-metric"><div class="flbl2">Income</div><div class="fval green">${money(rev)}</div><div class="fp-sub">${proj>rev?money(proj)+' projected':'confirmed and received'}</div></div>
+    <div class="fin-metric"><div class="flbl2">Income</div><div class="fval green">${money(rev)}</div><div class="fp-sub">${proj>rev?money(proj)+' projected':'confirmed and received'}${_finAwaitingTxt()?' · '+_finAwaitingTxt():''}</div></div>
     <div class="fin-metric"><div class="flbl2">Result so far</div><div class="fval ${res>=0?'green':'red'}">${res<0?'-':''}${money(Math.abs(res))}</div><div class="fp-sub">income minus spent</div></div></div>
   <p class="fp-help">Spending, sponsor fees and income are read from each event page. Open an event to change them. An event belongs to the year it starts in.</p>
   ${cur.length?cur.map(card).join(''):'<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.78rem;">No events with a budget, expenses or income in this financial year yet.</div></div>'}
@@ -7198,7 +7293,7 @@ function _finOverviewHtml(){
   const m=n=>_finMoney(Math.round(n)),fy=S.finance.finYear,P=finPayCalc(),L=finPlanCalc(fy),frac=L.frac,pc=Math.round(frac*100);
   const revT=L.revTarget,revP=revT>0?_foPace(L.revActual,revT,frac,true):null;
   const strip=`<div class="card fo-strip">
-    <div><b>Revenue</b><span>${m(P.rev)}</span><small>${revT>0?'target '+m(revT)+' · '+revP[0].toLowerCase():'no target set yet'}</small>${_finFundNote()}</div>
+    <div><b>Revenue</b><span>${m(P.rev)}</span><small>${revT>0?'target '+m(revT)+' · '+revP[0].toLowerCase():'no target set yet'}</small>${_finFundNote()}${finSponsorAwaiting()>0?`<div style="font-size:.66rem;color:var(--yellow);margin-top:3px;line-height:1.4;">${_finMoney(finSponsorAwaiting())} sponsor fees awaiting payment</div>`:''}</div>
     <div><b>Costs</b><span>${m(P.costs)}</span><small>${m(P.rec/12)}/mo recurring${P.teamPay>0?' · incl. team pay':''}</small></div>
     <div><b>Profit</b><span class="${P.profit>=0?'ok':'bad'}">${m(P.profit)}</span><small>before tax</small></div>
     <div><b>Net after tax</b><span class="${P.net>=0?'ok':'bad'}">${m(P.net)}</span><small>tax ${m(P.ct.tax)}</small></div>
@@ -7811,6 +7906,15 @@ function _spProdInfo(sp,s){
   list.forEach(prod=>{const pp=catalog.find(x=>x.name===prod.name);const cost=(pp&&pp.cost)||0;Object.values(prod.quantities||{}).forEach(q=>{val+=cost*(parseInt(q)||0);});});
   return{list,catalog,val,total:list.length,done:list.filter(x=>x.delivered).length};
 }
+/* Payment status text for a cash sponsor: "Paid 20 Oct", "Invoiced 12 Oct · 34 days" (amber once it passes 30 days), or '' */
+function spPayInfo(sp){
+  if(!(sp.type==='cash'||sp.type==='both'))return null;
+  if(sp.invoicePaid)return{k:'paid',text:'Paid'+(sp.paidOn?' '+fmtD(sp.paidOn):'')};
+  if(sp.invoiceSent){const d=sp.invoicedOn?_spDaysSince(sp.invoicedOn):null;return{k:'sent',late:d!==null&&d>=30,text:'Invoiced'+(sp.invoicedOn?' '+fmtD(sp.invoicedOn):'')+(d!==null&&d>=30?' · '+d+' days':'')};}
+  return{k:'none',text:'Not invoiced'};
+}
+/* confirmed sponsor fees on an event that have not been marked paid yet */
+function spAwaiting(p){const m=evMoney(p);return Math.max(0,m.fees.confirmed-m.fees.paid);}
 function _spTick(on,label,onclick,green){
   return '<button type="button" class="ev-tk'+(green?' g':'')+(on?' on':'')+'" aria-pressed="'+(!!on)+'" onclick="event.stopPropagation();'+onclick+'">'+label+'</button>';
 }
@@ -7833,7 +7937,7 @@ function _spRowHtml(p,sp){
   const q="'"+p.id+"','"+sp.id+"'";
   const seg=SP_STAGES.map((x,i)=>'<button type="button" class="sp-seg'+(i<=ci?' on':'')+'" style="--c:'+x.color+';" title="Move to '+escHtml(x.name)+'" aria-label="Move to '+escHtml(x.name)+'" onclick="event.stopPropagation();setSponsorStage('+q+',\''+x.id+'\')"></button>').join('');
   const sub=(dt?'since '+fmtD(dt)+' · '+(days===0?'today':days+'d ago')+(stale?' · no reply yet?':''):'');
-  const inv=pre?'<span class="mut">—</span>':(cash?'<span style="display:flex;gap:8px;flex-wrap:wrap;">'+_spTick(sp.invoiceSent,'Sent',"toggleSponsorFlag("+q+",'invoiceSent')")+_spTick(sp.invoicePaid,'Paid',"toggleSponsorFlag("+q+",'invoicePaid')",true)+'</span>':'<span class="mut">n/a</span>');
+  const inv=pre?'<span class="mut">—</span>':(cash?'<span style="display:flex;gap:8px;flex-wrap:wrap;">'+_spTick(sp.invoiceSent,'Sent',"toggleSponsorFlag("+q+",'invoiceSent')")+_spTick(sp.invoicePaid,'Paid',"toggleSponsorFlag("+q+",'invoicePaid')",true)+'</span>'+(()=>{const pi2=spPayInfo(sp);return pi2&&pi2.k!=='none'?'<div class="sp-sub"'+(pi2.late?' style="color:var(--yellow);"':'')+'>'+escHtml(pi2.text)+'</div>':'';})():'<span class="mut">n/a</span>');
   let h='<div class="sp-row" id="sp-row-'+p.id+'-'+sp.id+'" aria-expanded="'+open+'" style="border-left:3px solid '+def.color+';">'
    +'<div class="sp-cell sp-name"><button type="button" class="sp-nm" onclick="spToggleDetail('+q+')" aria-label="Show details for '+escHtml(s.name)+'"><span id="sp-chev-'+p.id+'-'+sp.id+'" class="mut" aria-hidden="true">'+(open?'▾':'▸')+'</span>'
    +'<span class="sp-avatar" style="width:28px;height:28px;font-size:.58rem;flex-shrink:0;" onclick="event.stopPropagation();_spSelectedId=\''+s.id+'\';nav(\'sponsors\');" title="View '+escHtml(s.name)+' profile">'+(s.logoDataUrl?'<img src="'+escHtml(s.logoDataUrl)+'" alt="">':escHtml(s.name.substring(0,2).toUpperCase()))+'</span>'
@@ -7897,6 +8001,7 @@ function renderEventSponsors(p){
    +'<svg id="sp-toggle-ico-'+p.id+'" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;flex-shrink:0;transform:'+(exp?'rotate(0deg)':'rotate(-90deg)')+'"><polyline points="6 9 12 15 18 9"/></svg>'
    +'<span class="ev-card-t">Sponsors</span>'+(all.length?'<span class="ev-card-n">'+all.length+(cashN?' · '+cashN+' cash':'')+'</span>':'')
    +(pool>0?'<span class="ev-pill" style="background:var(--teal-dim);color:var(--acc);">Prize pool £'+pool.toFixed(2)+'</span>':'')
+   +(spAwaiting(p)>0?'<span class="ev-pill" id="sp-await-'+p.id+'" style="background:rgba(240,201,107,.12);color:var(--yellow);" title="Confirmed sponsor fees not yet marked as paid">'+_finMoney(spAwaiting(p))+' awaiting payment</span>':'')
    +'<span style="margin-left:auto;display:flex;gap:6px;" onclick="event.stopPropagation()"><button class="btn btn-acc btn-xs" onclick="openAddSponsorToEvent(\''+p.id+'\')">+ Add sponsor</button><button class="btn btn-ghost btn-xs" onclick="openModal(\'project\',\''+p.id+'\')">Edit sponsors</button></span></div>'
    +'<div id="sp-body-'+p.id+'" style="display:'+(exp?'block':'none')+';">'
    +(all.length===0?'<div style="font-size:.75rem;color:var(--muted);padding:12px 14px;">No sponsors on this event yet. Use <b>+ Add sponsor</b> to start your shortlist.</div>'
@@ -7906,6 +8011,260 @@ function renderEventSponsors(p){
       +'</div></div>')
    +'</div></div>';
 }
+/* ════ SPONSORS PAGE (mockup C): summary strip, prize pool, filters, grouped cards, profile drawer ════
+   Everything is read from data the app already holds: sponsor profiles (S.sponsors) and the sponsors added to each event
+   (project.sponsors: stage, type, fee, invoice ticks, product allocations). Nothing here changes how data is saved.
+   _spOpenId = the sponsor whose profile drawer is open. Other pages open a profile by setting _spSelectedId and calling nav('sponsors'). */
+let _spOpenId=null,_spChip='',_spAttn=false;
+function _spM2(n){return'£'+(Number(n)||0).toLocaleString('en-GB',{minimumFractionDigits:2,maximumFractionDigits:2});}
+const SPX_COLORS=['#3b82d6','#7c5cd6','#d08a3b','#1b9a78','#e06060','#0f8f9e','#6aa8f0','#c2578f'];
+function _spColor(s){let h=0;const n=s.name||'';for(let i=0;i<n.length;i++)h=(h*31+n.charCodeAt(i))>>>0;return SPX_COLORS[h%SPX_COLORS.length];}
+function _spAv(s,cls){return `<div class="spx-av ${cls||''}" style="background:${s.logoDataUrl?'var(--surface2)':_spColor(s)}">${s.logoDataUrl?`<img src="${escHtml(s.logoDataUrl)}" alt="">`:escHtml((s.name||'?').slice(0,2).toUpperCase())}</div>`;}
+function spActiveEvents(){return (S.projects||[]).filter(p=>p.status==='active'&&Array.isArray(p.sponsors));}
+function spLineupProject(){
+  const l=spActiveEvents().filter(p=>p.isAirCon&&p.sponsors.length);if(!l.length)return null;
+  const today=_localToday(),up=l.filter(p=>(p.startDate||'')>=today).sort((a,b)=>(a.startDate||'').localeCompare(b.startDate||''));
+  return up[0]||l.sort((a,b)=>(b.startDate||'').localeCompare(a.startDate||''))[0];
+}
+function _spStageGroup(st){return st==='discussion'?'talk':(st==='confirmed'||st==='infosent')?'conf':'lead';}
+const SPX_STG={conf:['Confirmed','spx-s-conf'],talk:['In talks','spx-s-talk'],lead:['Lead','spx-s-lead']};
+function spIsRegular(s){return s.regular===true||(s.regular===undefined&&(s.history||[]).length>=2);}
+function spNeedsAttention(s){return !s.contactEmail||!s.relationshipOwner;}
+/* where a sponsor sits in active events: [{p,sp,grp,pi}] */
+function spEventsOf(s){
+  return spActiveEvents().map(p=>{const sp=p.sponsors.find(x=>x.id===s.id);return sp?{p,sp,grp:_spStageGroup(_spStage(sp)),pi:_spProdInfo(sp,s)}:null;}).filter(Boolean);
+}
+function spProductValue(s){return (s.products||[]).reduce((a,p)=>a+(parseFloat(p.cost)||0),0);}
+function spGroupOf(s,lineup){
+  if(lineup&&lineup.sponsors.some(x=>x.id===s.id))return'conf';
+  if(spIsRegular(s))return'reg';
+  return spEventsOf(s).length?'other':'pros';
+}
+/* ── numbers for the strip and the pool breakdown ── */
+function spStats(){
+  const act=spActiveEvents(),lineup=spLineupProject(),m={};
+  const cat={},contrib={};let paid=0,awaiting=0;
+  act.forEach(p=>p.sponsors.forEach(sp=>{
+    const s=getSponsor(sp.id);if(!s)return;
+    const g=_spStageGroup(_spStage(sp));
+    if((sp.type==='cash'||sp.type==='both')&&g!=='lead')paid+=parseFloat(sp.fee)||0;
+    if((sp.type==='cash'||sp.type==='both')&&g==='conf'&&!sp.invoicePaid)awaiting+=parseFloat(sp.fee)||0;
+    (sp.products||[]).forEach(ap=>{
+      const cost=((s.products||[]).find(pp=>pp.name===ap.name)||{}).cost||0;
+      const add=(c,v)=>{cat[c]=(cat[c]||0)+v;contrib[s.id]=contrib[s.id]||{name:s.name,val:0};contrib[s.id].val+=v;};
+      Object.entries(ap.quantities||{}).forEach(([c,q])=>{q=parseInt(q)||0;if(q)add(c,cost*q);});
+      (ap.categories||[]).forEach(c=>add(c,cost));
+    });
+  }));
+  const all=S.sponsors||[],pool=Object.values(cat).reduce((a,b)=>a+b,0);
+  const lu=lineup?lineup.sponsors.filter(x=>getSponsor(x.id)):[];
+  return{total:all.length,regulars:all.filter(spIsRegular).length,prospects:all.filter(s=>spGroupOf(s,lineup)==='pros').length,
+    lineup,luN:lu.length,luPaid:lu.filter(x=>x.type==='cash'||x.type==='both').length,luPrize:lu.filter(x=>x.type!=='cash'&&x.type!=='both').length,
+    paid,awaiting,cat,contrib,pool,attention:all.filter(spNeedsAttention)};
+}
+function spStripHtml(st){
+  const m=n=>_finMoney(Math.round(n));
+  return `<div class="card spx-strip" id="sp-strip">
+  <div><b>Sponsors</b><span>${st.total}</span><small>${st.regulars} regular${st.regulars===1?'':'s'} · ${st.prospects} prospect${st.prospects===1?'':'s'}</small></div>
+  <div><b>${st.lineup?escHtml(st.lineup.name)+' lineup':'Conference lineup'}</b><span>${st.luN}</span><small>${st.lineup?st.luPaid+' paid · '+st.luPrize+' prize':'no AirCon event yet'}</small></div>
+  <div><b>Paid sponsorship</b><span class="${st.paid>0?'ok':''}">${m(st.paid)}</span><small>${st.awaiting>0?m(st.awaiting)+' awaiting payment':'confirmed + in talks'}</small></div>
+  <div><b>Prize pool</b><span class="${st.pool>0?'ok':''}">${st.pool>0?_spM2(st.pool):'—'}</span><small>active events</small></div>
+  <div class="click${_spAttn?' on':''}" id="sp-attn" tabindex="0" role="button" aria-pressed="${_spAttn}" title="Show only sponsors with missing info" onclick="spToggleAttn()" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();spToggleAttn();}"><b>Need attention</b><span class="${st.attention.length?'warn':''}">${st.attention.length}</span><small>no contact or no owner · tap to filter</small></div></div>`;
+}
+const SPX_CAT_COL={'Prize':'var(--yellow)','Raffle':'var(--purple)','Team Member':'var(--blue)','Airwiggles Award':'var(--acc)'};
+function spPoolHtml(st){
+  if(!(st.pool>0))return'';
+  const cats=Object.entries(st.cat).sort((a,b)=>b[1]-a[1]),top=Object.values(st.contrib).sort((a,b)=>b.val-a.val).slice(0,3);
+  return `<details class="card spx-pool" id="sp-pool"><summary>Prize pool breakdown<span class="meta">by category and top contributors</span></summary><div class="in">
+  <div><p class="spx-lh">By category</p>${cats.map(([c,v])=>{const pc=Math.round(v/st.pool*100),col=SPX_CAT_COL[c]||'var(--acc)';return `<div class="spx-bar"><div class="r"><span style="color:${col}">${escHtml(c)}</span><span>${_spM2(v)} ${pc}%</span></div><i><s style="width:${pc}%;background:${col}"></s></i></div>`;}).join('')}</div>
+  <div><p class="spx-lh">Top contributors</p>${top.map((t,i)=>`<div class="spx-row"><span class="mono mut">${i+1}</span><span class="l">${escHtml(t.name)}</span><span class="mono" style="color:var(--acc)">${_spM2(t.val)}</span></div>`).join('')}</div></div></details>`;
+}
+/* ── a sponsor card ── */
+function _spTickLine(e){
+  const sp=e.sp,out=[];
+  if(e.grp!=='conf')return'';
+  const pay=spPayInfo(sp);
+  if(pay)out.push(pay.k==='paid'?['y','✓ '+pay.text]:pay.k==='sent'?[pay.late?'late':'','○ '+pay.text]:['','○ Invoice'],...((pay.k!=='paid'&&(parseFloat(sp.fee)||0)>0)?[['due',_finMoney(sp.fee)+' due']]:[]));
+  if(sp.type==='venue')out.push(sp.logisticsAgreed?['y','✓ Logistics']:['','○ Logistics']);
+  if(e.pi.total)out.push(e.pi.done===e.pi.total?['y','✓ Prizes']:['','○ Prizes '+e.pi.done+'/'+e.pi.total]);
+  return out.length?`<span class="spx-ticks">${out.map(o=>`<i class="${o[0]}">${o[1]}</i>`).join('')}</span>`:'';
+}
+function spCardHtml(s,lineup){
+  const ev=spEventsOf(s),inLu=lineup&&lineup.sponsors.find(x=>x.id===s.id);
+  const luType=inLu?((inLu.type==='cash'||inLu.type==='both')?'paid':'prize'):'';
+  const badges=(spIsRegular(s)?'<span class="spx-badge b-reg">★ Regular</span>':'')+(luType==='paid'?`<span class="spx-badge b-paid">Paid${parseFloat(inLu.fee)>0?' · '+_finMoney(inLu.fee):''}</span>`:luType==='prize'?'<span class="spx-badge b-prize">Prize sponsor</span>':'');
+  const prods=s.products||[],pv=spProductValue(s),lastPz=(s.prizeHistory||[]).slice(-1)[0];
+  const hist=(s.history||[]).length;
+  const need=spNeedsAttention(s);
+  const initials=(s.contactName||'').split(/\s+/).map(x=>x[0]||'').slice(0,2).join('').toUpperCase();
+  return `<div class="spx-card" role="button" tabindex="0" data-sid="${s.id}" onclick="spOpenDrawer('${s.id}')" onkeydown="if(event.key==='Enter'||event.key===' '){event.preventDefault();spOpenDrawer('${s.id}');}" aria-label="Open ${escHtml(s.name)}">
+  <div class="top2">${_spAv(s)}<div style="min-width:0;flex:1"><div class="nm">${escHtml(s.name)}</div><div class="evl">${escHtml(s.website||'No website')}</div></div></div>
+  <div class="sec nb"><div class="tagrow">${badges}${(s.priorities||[]).map(p=>`<span class="spx-tag">${escHtml(SP_PRIO_LABELS[p]||p)}</span>`).join('')}</div></div>
+  <div class="sec"><div class="lab">In events</div>${ev.length?ev.map(e=>`<div class="ln"><span class="l"><b>${escHtml(e.p.name)}</b></span><span class="spx-stage ${SPX_STG[e.grp][1]}">${SPX_STG[e.grp][0]}</span></div>${_spTickLine(e)}`).join(''):'<div class="ln"><span class="m">Not in an event yet</span></div>'}</div>
+  <div class="sec"><div class="lab">Contact</div>${s.contactName?`<div class="who"><span class="a">${escHtml(initials)}</span><span>${escHtml(s.contactName)}${s.contactRole?' · '+escHtml(s.contactRole):''}</span></div>`:s.contactEmail?'':'<div class="who no2">No contact yet</div>'}${s.contactEmail?`<div class="ln"><span class="l m">${escHtml(s.contactEmail)}</span></div>`:''}<div class="ln"><span class="m">Our lead</span><span class="l" style="text-align:right;${s.relationshipOwner?'':'color:var(--yellow)'}">${escHtml(s.relationshipOwner||'Not set')}</span></div></div>
+  <div class="sec"><div class="lab">Products <span style="font-weight:400">· ${prods.length}${pv>0?' · '+_finMoney(pv)+' total':''}</span></div>${prods.length?prods.slice(0,3).map(p=>`<div class="ln"><span class="l">${escHtml(p.name)}</span>${p.category?`<span class="m">${escHtml(p.category)}</span>`:''}${(parseFloat(p.cost)||0)>0?`<span class="m mono">${_spM2(p.cost)}</span>`:''}</div>`).join('')+(prods.length>3?`<div class="ln"><span class="m">+ ${prods.length-3} more</span></div>`:''):'<div class="ln"><span class="m">No products yet</span></div>'}</div>
+  ${((s.audienceTags||[]).length||(s.integrationTypes||[]).length)?`<div class="sec"><div class="lab">Audience and ideas</div><div class="tagrow">${(s.audienceTags||[]).map(a=>`<span class="spx-tag">${escHtml(a)}</span>`).join('')}${(s.integrationTypes||[]).map(a=>`<span class="spx-tag dash">${escHtml(a)}</span>`).join('')}</div></div>`:''}
+  ${s.notes?`<div class="sec"><div class="note">${escHtml(s.notes)}</div></div>`:''}
+  <div class="foot"><span>${hist} past event${hist===1?'':'s'}${lastPz?' · Last prize: '+escHtml(lastPz.prize||'')+(lastPz.winner?' to '+escHtml(lastPz.winner):''):''}</span>${need?`<span class="spx-warn">${!s.contactEmail&&!s.relationshipOwner?'No contact or owner':!s.contactEmail?'No contact':'No owner'}</span>`:''}</div></div>`;
+}
+function spGridHtml(){
+  const lineup=spLineupProject(),q=(S._spSearch||'').toLowerCase().trim();
+  const L=(S.sponsors||[]).filter(s=>{
+    if(_spChip&&spGroupOf(s,lineup)!==_spChip)return false;
+    if(_spAttn&&!spNeedsAttention(s))return false;
+    if(!q)return true;
+    return (s.name+' '+(s.notes||'')+' '+(s.contactName||'')+' '+(s.products||[]).map(p=>p.name).join(' ')).toLowerCase().includes(q);
+  });
+  const by=k=>L.filter(s=>spGroupOf(s,lineup)===k);
+  const cf=by('conf'),rg=by('reg'),ot=by('other'),pr=by('pros');
+  const sec=(t,sub,a)=>a.length?`<div class="spx-grp"><h3>${t}</h3><small>${sub}</small></div><div class="spx-grid">${a.map(s=>spCardHtml(s,lineup)).join('')}</div>`:'';
+  const paidN=cf.filter(s=>{const x=lineup.sponsors.find(y=>y.id===s.id);return x&&(x.type==='cash'||x.type==='both');}).length;
+  const fees=lineup?lineup.sponsors.reduce((a,x)=>a+((x.type==='cash'||x.type==='both')&&_spStageGroup(_spStage(x))!=='lead'?parseFloat(x.fee)||0:0),0):0;
+  return (lineup?sec(escHtml(lineup.name)+' conference lineup',`${paidN} paid · ${cf.length-paidN} prize${fees>0?' · '+_finMoney(fees)+' sponsorship':''}`,cf):'')
+    +sec('Regulars','Smaller events, usually prizes',rg)+sec('In other events','Working with us on an event',ot)+sec('Prospects','Not in an event yet',pr)
+    ||`<div class="card" style="padding:18px;color:var(--muted);font-size:.8rem;">${(S.sponsors||[]).length?'No sponsors match.':'No sponsors yet. Use + New Sponsor to add the first one.'}</div>`;
+}
+function spRefreshGrid(){const g=el('sp-grid');if(g)g.innerHTML=spGridHtml();}
+function spSearchInput(v){S._spSearch=v;clearTimeout(window._spSdeb);window._spSdeb=setTimeout(spRefreshGrid,120);}
+function spSetChip(k){_spChip=k;document.querySelectorAll('.spx-chip').forEach(c=>{const on=(c.dataset.f||'')===k;c.classList.toggle('on',on);c.setAttribute('aria-pressed',on);});spRefreshGrid();}
+function spToggleAttn(){_spAttn=!_spAttn;const a=el('sp-attn');if(a){a.classList.toggle('on',_spAttn);a.setAttribute('aria-pressed',_spAttn);}spRefreshGrid();}
+/* ── drawer ── */
+function spDrawerHtml(){
+  const s=_spOpenId&&getSponsor(_spOpenId);if(!s)return'';
+  return `<div class="spx-dh"><button class="btn btn-ghost btn-sm" onclick="openEditSponsor('${s.id}')">Edit</button><button class="btn btn-danger btn-sm" onclick="deleteSponsor('${s.id}')">Delete</button><button class="btn btn-ghost btn-sm" id="sp-drawer-close" onclick="spCloseDrawer()" aria-label="Close profile">✕ Close</button></div>${spProfileHtml(s)}`;
+}
+function spOpenDrawer(id){
+  _spOpenId=id;const d=el('sp-drawer');if(!d){render();return;}
+  d.innerHTML=spDrawerHtml();d.classList.add('on');d.setAttribute('aria-hidden','false');d.scrollTop=0;
+  const sc=el('sp-scrim');if(sc)sc.classList.add('on');const c=el('sp-drawer-close');if(c)c.focus();
+}
+function spCloseDrawer(){
+  const id=_spOpenId;_spOpenId=null;
+  const d=el('sp-drawer');if(d){d.classList.remove('on');d.setAttribute('aria-hidden','true');}
+  const sc=el('sp-scrim');if(sc)sc.classList.remove('on');
+  if(id){const b=document.querySelector('.spx-card[data-sid="'+id+'"]');if(b)b.focus();}
+}
+document.addEventListener('keydown',e=>{if(e.key==='Escape'&&_spOpenId&&V==='sponsors'&&!document.querySelector('#mc .mo'))spCloseDrawer();});
+function renderSponsors(){
+  if(_spSelectedId){_spOpenId=_spSelectedId;_spSelectedId=null;}
+  if(_spOpenId&&!getSponsor(_spOpenId))_spOpenId=null;
+  const st=spStats(),open=!!_spOpenId;
+  const chips=[['','All'],['conf',st.lineup?'Conference lineup':'Lineup'],['reg','Regulars'],['other','In other events'],['pros','Prospects']];
+  return `<div class="fu spx" id="sp-page">
+<div class="page-hd"><div class="page-title"><em>Sponsors</em></div><div class="page-acts">
+  <button class="btn btn-ghost btn-sm" onclick="openSpMatch()"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg> Match to Event</button>
+  <button class="btn btn-acc btn-sm" onclick="openNewSponsor()">+ New Sponsor</button></div></div>
+${_spPillsHtml()}
+${_spTab==='id'?spBoardHtml():`${spStripHtml(st)}${spPoolHtml(st)}
+<div class="spx-tools"><input class="inp" id="sp-search" placeholder="Search sponsors…" aria-label="Search sponsors" value="${escHtml(S._spSearch||'')}" oninput="spSearchInput(this.value)">
+  <div class="spx-chips">${chips.map(c=>`<button class="spx-chip${(c[0]===_spChip)?' on':''}" data-f="${c[0]}" aria-pressed="${c[0]===_spChip}" onclick="spSetChip('${c[0]}')">${c[1]}</button>`).join('')}</div></div>
+<div id="sp-grid">${spGridHtml()}</div>`}
+<div id="sp-match-panel" style="display:none;margin-top:20px;"></div>
+</div>
+<div class="spx-scrim${open?' on':''}" id="sp-scrim" onclick="spCloseDrawer()"></div>
+<aside class="spx-drawer${open?' on':''}" id="sp-drawer" aria-label="Sponsor profile" aria-hidden="${!open}">${open?spDrawerHtml():''}</aside>`;
+}
+
+/* ── the profile (drawer content): header, facts strip, then one card per topic ── */
+function _spKv(l,v){return v?`<div class="spx-kv"><span>${l}</span><span>${v}</span></div>`:'';}
+function _spCardBox(title,body,btn,cls){return `<div class="card spx-pc${cls?' '+cls:''}"><div class="spx-hd">${title}<span class="sp"></span>${btn||''}</div><div class="spx-bd">${body}</div></div>`;}
+function spProfileHtml(s){
+  if(!s)return'';
+  const ev=spEventsOf(s),lineup=spLineupProject(),inLu=lineup&&lineup.sponsors.find(x=>x.id===s.id);
+  const luType=inLu?((inLu.type==='cash'||inLu.type==='both')?'paid':'prize'):'';
+  const badges=(spIsRegular(s)?'<span class="spx-badge b-reg">★ Regular</span>':'')+(luType==='paid'?`<span class="spx-badge b-paid">Paid${parseFloat(inLu.fee)>0?' · '+_finMoney(inLu.fee):''}</span>`:luType==='prize'?'<span class="spx-badge b-prize">Prize sponsor</span>':'');
+  const prods=s.products||[],pv=spProductValue(s),hist=s.history||[],ph=s.prizeHistory||[];
+  const edit=tab=>`<button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}'${tab?",'"+tab+"'":''})">Edit</button>`;
+  const head=`<div class="card spx-ph"><div class="spx-phd">${_spAv(s,'big')}<div style="flex:1;min-width:200px"><h2>${escHtml(s.name)}</h2>${s.website?`<a href="https://${escHtml(s.website.replace(/^https?:\/\//,''))}" target="_blank" rel="noopener">${escHtml(s.website)}</a>`:''}
+    <div class="spx-chips" style="margin-top:7px">${badges}${(s.priorities||[]).map(spTagHtml).join('')}${s.priceTier?`<span class="spx-tag">${escHtml(s.priceTier)}</span>`:''}</div>${s.description?`<p class="spx-desc">${escHtml(s.description)}</p>`:''}</div></div>
+    <div class="spx-facts"><div><b>Events</b><span>${hist.length}</span></div><div><b>Products</b><span>${prods.length}</span></div><div><b>Product value</b><span>${pv>0?_finMoney(pv):'£0'}</span></div><div><b>Active in</b><span>${ev.length}</span></div><div><b>Prizes sent</b><span>${ph.length}</span></div></div></div>`;
+  const contact=_spCardBox('Contact',
+    (s.contactName?_spKv('Primary','<b>'+escHtml(s.contactName)+'</b>'+(s.contactRole?' · '+escHtml(s.contactRole):'')):'')
+    +(s.contactEmail?_spKv('Email',`<a href="mailto:${escHtml(s.contactEmail)}" style="color:var(--acc)">${escHtml(s.contactEmail)}</a>`):'')
+    +(s.backupContact?_spKv('Backup',escHtml(s.backupContact)):'')+(s.bestContact?_spKv('Best way',escHtml(s.bestContact)):'')
+    +_spKv('Our lead',s.relationshipOwner?escHtml(s.relationshipOwner):'<em style="color:var(--yellow)">Not set</em>')
+    +(s.budgetCycle?_spKv('Budget',escHtml(s.budgetCycle)):'')
+    +(!s.contactName&&!s.contactEmail?'<div style="color:var(--yellow);margin-top:6px">No contact info yet</div>':''),edit());
+  const prodRows=prods.map(p=>{const pay=(PRODUCT_PAYMENT_TYPES.find(x=>x.value===p.paymentType)||{}).label||'';
+    return `<div class="spx-prod">${p.imageUrl?`<img src="${escHtml(p.imageUrl)}" alt="" onerror="this.style.display='none'">`:''}<div style="flex:1;min-width:0"><div class="spx-pn">${escHtml(p.name)}</div>${p.desc?`<div class="spx-pd">${escHtml(p.desc)}</div>`:''}<div class="tagrow">${p.category?`<span class="spx-tag">${escHtml(p.category)}</span>`:''}${pay?`<span class="spx-tag">${escHtml(pay)}</span>`:''}</div></div>${(parseFloat(p.cost)||0)>0?`<span class="mono">${_spM2(p.cost)}</span>`:''}</div>`;}).join('');
+  const products=_spCardBox('Products',prods.length?prodRows:'<span class="mut">No products catalogued yet.</span>',edit('products'));
+  const evRows=ev.map(e=>`<div class="spx-mini spx-evr" onclick="closePanel();openDetail('${e.p.id}')" title="Open ${escHtml(e.p.name)}"><span class="spx-dot"></span><span class="l">${escHtml(e.p.name)}</span><span class="spx-stage ${SPX_STG[e.grp][1]}">${SPX_STG[e.grp][0]}</span></div>${_spTickLine(e)?`<div style="padding:0 0 4px 16px">${_spTickLine(e)}</div>`:''}`).join('');
+  const events=_spCardBox('In events',ev.length?evRows:'<span class="mut">Not added to an event yet.</span>');
+  const audience=_spCardBox('Audience',`<div class="spx-chips">${(s.audienceTags||[]).map(a=>`<span class="spx-tag">${escHtml(a)}</span>`).join('')||'<span class="mut">No audience tags yet</span>'}</div>${s.audienceNotes?`<p class="spx-note">${escHtml(s.audienceNotes)}</p>`:''}`,edit('audience'));
+  const linked=spIdeasFor(s.id);
+  const linkedHtml=linked.map(i=>`<div class="spx-mini"><span class="l">${escHtml(i.title)}</span><span class="spx-tag">${escHtml((SPX_IDEA_STAGES.find(x=>x[0]===(i.stage||'inbox'))||[])[1]||'')}</span><button class="spx-x" aria-label="Unlink idea" title="Unlink" onclick="spUnlinkIdea('${s.id}','${i.id}')">×</button></div>`).join('');
+  const ideas=_spCardBox('Ideas',linkedHtml+`<div class="spx-chips" style="margin-top:${linked.length?'8px':'0'}">${(s.integrationTypes||[]).map(a=>`<span class="spx-tag dash">${escHtml(a)}</span>`).join('')||(linked.length?'':'<span class="mut">No ideas linked yet. Link one from the Ideas board.</span>')}</div>${s.integrationNotes?`<p class="spx-note">${escHtml(s.integrationNotes)}</p>`:''}`,`<button class="btn btn-ghost btn-xs" onclick="spLinkIdeaOpen('${s.id}')">+ Link idea</button>${edit('integrations')}`);
+  const assets=(s.assetsUrl||s.assets)?_spCardBox('Assets',(s.assetsUrl?`<a href="${escHtml(s.assetsUrl)}" target="_blank" rel="noopener" class="ql-btn" style="margin-bottom:8px;display:inline-flex;">Open assets folder</a>`:'')+(s.assets?`<div>${escHtml(s.assets)}</div>`:'')):'';
+  const notes=s.notes?_spCardBox('Notes',escHtml(s.notes).replace(/\n/g,'<br>')):'';
+  const histCard=`<div class="card spx-pc wide"><div class="spx-hd">History</div><div class="spx-bd spx-hist"><div><p class="spx-lh">Events (${hist.length})</p>${hist.length?hist.map(h=>`<div class="spx-mini"><span class="l">${escHtml(h.event||'')}</span><span class="m">${escHtml(h.prizeDesc||'—')}</span><span class="spx-tag">${escHtml(h.type||'sponsor')}</span></div>`).join(''):'<span class="mut">None yet.</span>'}</div>
+    <div><p class="spx-lh">Prize deliveries (${ph.length})</p>${ph.length?ph.map(h=>`<div class="spx-mini"><span class="l">${escHtml(h.prize||'')}</span><span class="m">${escHtml(h.winner||'')} · ${escHtml(h.eventName||'')}</span><span class="spx-tag">${h.type==='code'?'Code sent':escHtml(h.type||'Sent')}</span><span class="m mono">${escHtml(fmtD(h.date))}</span></div>`).join(''):'<span class="mut">None yet.</span>'}</div></div></div>`;
+  return head+`<div class="spx-cols">${contact}${products}${events}${audience}${ideas}${assets}${notes}${histCard}</div>`;
+}
+function renderSpProfile(s){return spProfileHtml(s);}
+
+/* ── Ideas board: things we could offer sponsors, moved through four stages ──
+   S.sponsorIdeas = [{id,title,body,stage,sponsorIds:[],by,on}] ; an idea with no sponsors is "any sponsor". */
+const SPX_IDEA_STAGES=[['inbox','Inbox'],['pitch','Worth pitching'],['trial','Trying it'],['done','Done']];
+let _spTab='sp';
+function spIdeas(){return S.sponsorIdeas||[];}
+function spIdeasFor(sid){return spIdeas().filter(i=>(i.sponsorIds||[]).includes(sid));}
+function spSetTab(k){_spTab=k;_spOpenId=null;render();}
+function _spPillsHtml(){
+  const tabs=[['sp','Sponsors',(S.sponsors||[]).length],['id','Ideas',spIdeas().length]];
+  return `<div class="spx-pills" role="tablist" id="sp-tabs">${tabs.map(t=>`<button class="spx-pill${t[0]===_spTab?' on':''}" role="tab" aria-selected="${t[0]===_spTab}" data-t="${t[0]}" onclick="spSetTab('${t[0]}')">${t[1]} <b>${t[2]}</b></button>`).join('')}</div>`;
+}
+function _spWho(){const m=typeof getMyMember==='function'?getMyMember():null;return m?m.name:'';}
+function spBoardHtml(){
+  const L=spIdeas();
+  const nm=id=>{const s=getSponsor(id);return s?escHtml(s.name):'';};
+  return `<div class="spx-add"><input class="inp" id="sp-newidea" placeholder="Capture an idea, e.g. “Sponsor picks a prize live on stream”" aria-label="New idea" onkeydown="if(event.key==='Enter')spAddIdea()"><button class="btn btn-acc btn-sm" onclick="spAddIdea()">+ Add idea</button></div>
+  <div class="spx-board" id="sp-board">${SPX_IDEA_STAGES.map(([k,lbl],x)=>{const col=L.filter(i=>(i.stage||'inbox')===k);
+    return `<div class="spx-col" data-stage="${k}"><h4><span>${lbl}</span><span>${col.length}</span></h4>${col.map(i=>{
+      const names=(i.sponsorIds||[]).map(nm).filter(Boolean);
+      return `<div class="spx-idea" data-iid="${i.id}"><b class="spx-it" role="button" tabindex="0" onclick="spEditIdea('${i.id}')" onkeydown="if(event.key==='Enter')spEditIdea('${i.id}')" title="Edit idea">${escHtml(i.title)}</b>${i.body?`<p>${escHtml(i.body)}</p>`:''}
+        <div class="tagrow">${names.length?names.map(n=>`<span class="spx-tag">${n}</span>`).join(''):'<span class="spx-tag dash mut">Any sponsor</span>'}</div>
+        <div class="mv"><span>${escHtml(i.by||'')}${i.by&&i.on?' · ':''}${i.on?escHtml(fmtD(i.on)):''}</span><span style="display:flex;gap:4px"><button aria-label="Move back" ${x?'':'disabled'} onclick="spMoveIdea('${i.id}',-1)">←</button><button aria-label="Move forward" ${x<3?'':'disabled'} onclick="spMoveIdea('${i.id}',1)">→</button></span></div></div>`;}).join('')||'<div class="spx-empty">Nothing here yet.</div>'}</div>`;}).join('')}</div>`;
+}
+function spAddIdea(){
+  const i=el('sp-newidea');const v=i&&i.value.trim();if(!v)return;
+  saveWithUndo('Add idea');S.sponsorIdeas.unshift({id:'si'+uid(),title:v,body:'',stage:'inbox',sponsorIds:[],by:_spWho(),on:_localToday()});
+  save();render();const n=el('sp-newidea');if(n)n.focus();
+}
+function spMoveIdea(id,d){
+  const i=spIdeas().find(x=>x.id===id);if(!i)return;const o=SPX_IDEA_STAGES.map(x=>x[0]),n=o.indexOf(i.stage||'inbox')+d;
+  if(n<0||n>=o.length)return;i.stage=o[n];save();render();
+}
+function spIdeaModalHtml(id,presetSid){
+  const i=id?spIdeas().find(x=>x.id===id):null,sel=i?(i.sponsorIds||[]):(presetSid?[presetSid]:[]);
+  return `<div class="mo-box" style="max-width:440px;" id="sp-idea-modal"><div class="mo-hd"><span class="mo-title">${i?'Edit idea':'New idea'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
+  <div class="mo-body"><div class="field"><label class="flbl">Idea *</label><input class="inp" id="si-title" value="${escHtml(i?i.title:'')}" placeholder="What could we offer?"></div>
+  <div class="field"><label class="flbl">Details</label><textarea class="txta" id="si-body" style="min-height:70px;resize:vertical;" placeholder="Why it works, what it needs…">${escHtml(i?i.body||'':'')}</textarea></div>
+  <div class="field"><label class="flbl">Stage</label><select class="inp" id="si-stage">${SPX_IDEA_STAGES.map(([k,l])=>`<option value="${k}"${(i?i.stage||'inbox':'inbox')===k?' selected':''}>${l}</option>`).join('')}</select></div>
+  <div class="field"><label class="flbl">Sponsors <span style="text-transform:none;letter-spacing:0;font-weight:400;color:var(--muted)">(none = any sponsor)</span></label><div class="spx-chips" id="si-sponsors">${(S.sponsors||[]).map(s=>`<button type="button" class="spx-chip${sel.includes(s.id)?' on':''}" data-sid="${s.id}" aria-pressed="${sel.includes(s.id)}" onclick="this.classList.toggle('on');this.setAttribute('aria-pressed',this.classList.contains('on'))">${escHtml(s.name)}</button>`).join('')||'<span class="mut">No sponsors yet</span>'}</div></div>
+  <div id="si-err" style="display:none;color:var(--red);font-size:.74rem;">Please describe the idea.</div></div>
+  <div class="mo-ft">${i?`<button class="btn btn-danger btn-sm" onclick="spDeleteIdea('${i.id}')">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="spSaveIdea('${i?i.id:''}')">${i?'Save':'Add idea'}</button></div></div>`;
+}
+function _spOpenIdeaModal(h){const mc=el('mc');mc.style.display='flex';mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">${h}</div>`;const t=el('si-title');if(t)t.focus();}
+function spEditIdea(id){_spOpenIdeaModal(spIdeaModalHtml(id));}
+function spNewIdeaFor(sid){_spOpenIdeaModal(spIdeaModalHtml(null,sid));}
+function spSaveIdea(id){
+  const title=(el('si-title').value||'').trim();if(!title){el('si-err').style.display='block';return;}
+  const sponsorIds=[...document.querySelectorAll('#si-sponsors .spx-chip.on')].map(b=>b.dataset.sid);
+  saveWithUndo(id?'Edit idea':'Add idea');
+  const rec={title,body:el('si-body').value.trim(),stage:el('si-stage').value,sponsorIds};
+  if(id){const i=S.sponsorIdeas.find(x=>x.id===id);if(i)Object.assign(i,rec);}else S.sponsorIdeas.unshift(Object.assign({id:'si'+uid(),by:_spWho(),on:_localToday()},rec));
+  save();closeModal();render();
+}
+function spDeleteIdea(id){saveWithUndo('Delete idea');S.sponsorIdeas=S.sponsorIdeas.filter(x=>x.id!==id);saveNow();closeModal();render();}
+function spLinkIdeaOpen(sid){
+  const free=spIdeas().filter(i=>!(i.sponsorIds||[]).includes(sid));
+  _spOpenIdeaModal(`<div class="mo-box" style="max-width:420px;" id="sp-link-modal"><div class="mo-hd"><span class="mo-title">Link an idea</span><button class="mo-close" onclick="closeModal()">×</button></div><div class="mo-body">${free.length?free.map(i=>`<button type="button" class="spx-linkrow" data-iid="${i.id}" onclick="spLinkIdea('${sid}','${i.id}')"><b>${escHtml(i.title)}</b><span class="spx-tag">${escHtml((SPX_IDEA_STAGES.find(x=>x[0]===(i.stage||'inbox'))||[])[1]||'')}</span></button>`).join(''):'<div class="mut">All ideas are already linked, or there are none yet.</div>'}</div><div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Close</button><button class="btn btn-acc" onclick="spNewIdeaFor('${sid}')">+ New idea</button></div></div>`);
+}
+function spLinkIdea(sid,iid){
+  const i=spIdeas().find(x=>x.id===iid);if(!i)return;saveWithUndo('Link idea');
+  i.sponsorIds=Array.from(new Set([...(i.sponsorIds||[]),sid]));save();closeModal();render();
+}
+function spUnlinkIdea(sid,iid){const i=spIdeas().find(x=>x.id===iid);if(!i)return;saveWithUndo('Unlink idea');i.sponsorIds=(i.sponsorIds||[]).filter(x=>x!==sid);save();render();}
 /* ════ ONE-TIME REPAIR: recurring tasks created before subtasks were carried over get their subtasks back ════
    For every OPEN recurring occurrence that has no subtasks, find the nearest earlier occurrence in its series that does,
    and copy that checklist (not done, dates shifted, no recurrence of its own), using the same ids the live copy logic uses,
@@ -14129,6 +14488,10 @@ function toggleSponsorFlag(projectId,sponsorId,flag){
   const sp=p?.sponsors?.find(x=>x.id===sponsorId);
   if(!sp)return;
   sp[flag]=!sp[flag];
+  // invoice dates: stamped when ticked, cleared when unticked. Paid implies sent; un-sending also clears paid.
+  const today=_localToday();
+  if(flag==='invoiceSent'){if(sp.invoiceSent)sp.invoicedOn=today;else{sp.invoicedOn='';sp.invoicePaid=false;sp.paidOn='';}}
+  if(flag==='invoicePaid'){if(sp.invoicePaid){sp.paidOn=today;if(!sp.invoiceSent){sp.invoiceSent=true;sp.invoicedOn=today;}}else sp.paidOn='';}
   save();render();
 }
 
@@ -14567,373 +14930,7 @@ function histTypeCls(t){return t==='prize'?'sp-type-prize':t==='cash'||t==='cash
 let _spSelectedId=null;
 
 
-function selectSponsor(id){
-  _spSelectedId=id;
-  // Update active class on list rows without touching the search input
-  document.querySelectorAll('.sp-list-row').forEach(row=>{
-    row.classList.toggle('active', row.dataset.spId===id);
-  });
-  // Re-render only the right profile panel — leaves the left list + search intact
-  const panel=document.getElementById('sp-profile-panel');
-  if(panel){
-    const sel=getSponsor(id);
-    panel.innerHTML=sel?renderSpProfile(sel):`<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--muted);font-size:.82rem;">Select a sponsor</div>`;
-  } else {
-    render(); // fallback if panel not found
-  }
-}
-
-function renderSponsors(){
-  // Ensure _spSelectedId is valid
-  if(_spSelectedId&&!getSponsor(_spSelectedId))_spSelectedId=null;
-  if(!_spSelectedId&&S.sponsors.length>0)_spSelectedId=S.sponsors[0].id;
-
-  const q=S._spSearch||'';
-  const pFilter=(el('sp-prio-filter')||{}).value||'';
-  let list=S.sponsors.filter(s=>{
-    const search=(s.name+' '+(s.notes||'')+' '+(s.products||[]).map(p=>p.name).join(' ')).toLowerCase();
-    if(q&&!search.includes(q.toLowerCase()))return false;
-    if(pFilter&&!(s.priorities||[]).includes(pFilter))return false;
-    return true;
-  });
-
-  const sel=_spSelectedId?getSponsor(_spSelectedId):null;
-
-  return`<div class="fu">
-<div class="page-hd">
-  <div class="page-title"><em>Sponsors</em></div>
-  <div class="page-acts">
-    <button class="btn btn-ghost btn-sm" onclick="openSpMatch()">
-      <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-      Match to Event
-    </button>
-    <button class="btn btn-acc btn-sm" onclick="openNewSponsor()">+ New Sponsor</button>
-  </div>
-</div>
-
-<!-- Dashboard -->
-${(()=>{
-  const activeProjs=S.projects.filter(p=>p.status==='active');
-
-  // Prize pool across all active projects, by category
-  const catTotals={};
-  const spContrib={};
-  activeProjs.forEach(p=>{
-    (p.sponsors||[]).forEach(sp=>{
-      const s=getSponsor(sp.id);if(!s)return;
-      (sp.products||[]).forEach(allocProd=>{
-        const profileProd=(s.products||[]).find(pp=>pp.name===allocProd.name);
-        const cost=profileProd?.cost||0;
-        Object.entries(allocProd.quantities||{}).forEach(([cat,qty])=>{
-          const q=parseInt(qty)||0;if(!q)return;
-          const val=cost*q;
-          catTotals[cat]=(catTotals[cat]||0)+val;
-          spContrib[s.id]=(spContrib[s.id]||{name:s.name,val:0});
-          spContrib[s.id].val+=val;
-        });
-        (allocProd.categories||[]).forEach(cat=>{
-          const val=cost;
-          catTotals[cat]=(catTotals[cat]||0)+val;
-          spContrib[s.id]=(spContrib[s.id]||{name:s.name,val:0});
-          spContrib[s.id].val+=val;
-        });
-      });
-    });
-  });
-
-  const totalPool=Object.values(catTotals).reduce((a,b)=>a+b,0);
-  const sponsorsInProjects=new Set(activeProjs.flatMap(p=>(p.sponsors||[]).map(sp=>sp.id)));
-  const needAttention=S.sponsors.filter(s=>!s.contactEmail||!s.relationshipOwner);
-  const hasBudgetWindow=S.sponsors.filter(s=>s.budgetCycle);
-  const catColors={'Prize':'var(--yellow)','Raffle':'var(--purple)','Team Member':'var(--blue)','Airwiggles Award':'var(--acc)'};
-  const topContribs=Object.values(spContrib).sort((a,b)=>b.val-a.val).slice(0,3);
-
-  return`<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:16px;">
-
-    <!-- Row 1: Key metrics -->
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-      <div class="fin-metric" style="cursor:default;">
-        <div class="flbl2">Prize Pool (active projects)</div>
-        <div class="fval" style="color:var(--acc);font-family:'DM Mono',monospace;">${totalPool>0?'£'+totalPool.toFixed(2):'—'}</div>
-      </div>
-      <div class="fin-metric" style="cursor:default;position:relative;${needAttention.length>0?'border-color:rgba(240,201,107,.25);background:rgba(240,201,107,.05);':''}"
-        onmouseenter="el('sp-attention-tip').style.display='block'"
-        onmouseleave="el('sp-attention-tip').style.display='none'">
-        <div class="flbl2">Need Attention</div>
-        <div style="display:flex;align-items:baseline;gap:6px;">
-          <div class="fval ${needAttention.length>0?'amber':''}">${needAttention.length}</div>
-          <div style="font-size:.68rem;color:var(--muted);">no contact / owner</div>
-        </div>
-        ${needAttention.length>0?`<div id="sp-attention-tip" style="display:none;position:absolute;top:calc(100% + 8px);left:0;min-width:200px;max-width:280px;background:var(--surface);border:1px solid var(--border);border-radius:9px;padding:10px 12px;z-index:500;box-shadow:0 8px 24px rgba(0,0,0,.5);">
-          <div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);margin-bottom:7px;">Missing info</div>
-          ${needAttention.map(s=>`<div style="display:flex;align-items:center;gap:7px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.04);">
-            <div style="width:20px;height:20px;border-radius:50%;background:var(--surface2);display:flex;align-items:center;justify-content:center;font-size:.5rem;font-weight:700;flex-shrink:0;">${escHtml(s.name.substring(0,2).toUpperCase())}</div>
-            <span style="flex:1;font-size:.74rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</span>
-            <div style="display:flex;gap:3px;flex-shrink:0;">
-              ${!s.contactEmail?'<span style="font-size:.58rem;color:var(--yellow);background:rgba(240,201,107,.12);padding:1px 5px;border-radius:3px;">no email</span>':''}
-              ${!s.relationshipOwner?'<span style="font-size:.58rem;color:var(--orange,#f97316);background:rgba(249,115,22,.12);padding:1px 5px;border-radius:3px;">no owner</span>':''}
-            </div>
-          </div>`).join('')}
-        </div>`:''}
-      </div>
-    </div>
-
-    <!-- Row 2: Prize breakdown + top contributors -->
-    ${totalPool>0||topContribs.length>0?`<div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
-
-      <!-- Prize by category -->
-      <div class="fin-metric" style="padding:12px 14px;">
-        <div class="flbl2" style="margin-bottom:10px;">Prize Pool by Category</div>
-        ${Object.keys(catTotals).length>0?Object.entries(catTotals).sort((a,b)=>b[1]-a[1]).map(([cat,val])=>{
-          const pct=totalPool>0?Math.round(val/totalPool*100):0;
-          return`<div style="margin-bottom:7px;">
-            <div style="display:flex;justify-content:space-between;margin-bottom:3px;">
-              <span style="font-size:.72rem;color:${catColors[cat]||'var(--text2)'};">${cat}</span>
-              <span style="font-family:'DM Mono',monospace;font-size:.72rem;">£${val.toFixed(2)} <span style="color:var(--muted);font-size:.65rem;">${pct}%</span></span>
-            </div>
-            <div style="height:3px;background:var(--surface3);border-radius:99px;overflow:hidden;">
-              <div style="width:${pct}%;height:100%;background:${catColors[cat]||'var(--acc)'};border-radius:99px;transition:width .4s;"></div>
-            </div>
-          </div>`;
-        }).join(''):`<div style="font-size:.75rem;color:var(--muted);">No prize values set yet — add costs to products in sponsor profiles.</div>`}
-      </div>
-
-      <!-- Top contributors -->
-      <div class="fin-metric" style="padding:12px 14px;">
-        <div class="flbl2" style="margin-bottom:10px;">Top Contributors</div>
-        ${topContribs.length>0?topContribs.map((sp,i)=>`<div style="display:flex;align-items:center;gap:9px;margin-bottom:8px;">
-          <div style="width:18px;height:18px;border-radius:50%;background:var(--surface3);display:flex;align-items:center;justify-content:center;font-size:.58rem;font-weight:700;color:var(--muted);flex-shrink:0;">${i+1}</div>
-          <span style="flex:1;font-size:.78rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(sp.name)}</span>
-          <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--acc);">£${sp.val.toFixed(2)}</span>
-        </div>`).join('')+`${Object.values(spContrib).length>3?`<div style="font-size:.68rem;color:var(--muted);margin-top:4px;">+${Object.values(spContrib).length-3} more sponsors contributing</div>`:''}`:`<div style="font-size:.75rem;color:var(--muted);">No sponsors allocated to active projects yet.</div>`}
-      </div>
-    </div>`:``}
-
-  </div>`;
-})()}
-
-<!-- Split layout: list on left, profile on right -->
-<div style="display:grid;grid-template-columns:280px 1fr;gap:14px;align-items:start;min-height:60vh;">
-
-  <!-- LEFT: Sponsor list -->
-  <div style="background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;">
-    <div style="padding:10px 12px;border-bottom:1px solid var(--border);display:flex;flex-direction:column;gap:7px;">
-      <input id="sp-search" class="inp" placeholder="Search sponsors…" style="font-size:.75rem;padding:6px 10px;" oninput="_spSearchInput(this.value)" value="${q}">
-      <select id="sp-prio-filter" class="fsel" style="font-size:.72rem;" onchange="render()">
-        <option value="">All priorities</option>
-        ${Object.entries(SP_PRIO_LABELS).map(([v,l])=>`<option value="${v}" ${pFilter===v?'selected':''}>${l}</option>`).join('')}
-      </select>
-    </div>
-    <div>
-      ${list.length===0?`<div style="padding:24px;text-align:center;color:var(--muted);font-size:.78rem;">No sponsors match</div>`:''}
-      ${list.map(s=>`
-      <div class="sp-list-row${s.id===_spSelectedId?' active':''}" data-sp-id="${s.id}" data-name="${(escHtml(s.name||''))}" data-tags="${(s.categories||[]).join(' ')}" onclick="selectSponsor('${s.id}')">
-        <div class="sp-avatar">${s.logoDataUrl?`<img src="${escHtml(s.logoDataUrl)}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
-        <div style="flex:1;min-width:0;">
-          <div style="font-size:.82rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(s.name)}</div>
-          <div style="font-size:.65rem;color:var(--muted);margin-top:1px;">${(s.history||[]).length} events · ${(s.products||[]).length} products</div>
-        </div>
-        ${(s.priorities||[]).slice(0,1).map(p=>`<span class="sp-tag ${SP_PRIO_CLASSES[p]||''}" style="font-size:.55rem;padding:1px 5px;">${SP_PRIO_LABELS[p]?.split(' ')[0]||p}</span>`).join('')}
-      </div>`).join('')}
-    </div>
-  </div>
-
-  <!-- RIGHT: Profile view / editor -->
-  <div id="sp-profile-panel">
-    ${sel?renderSpProfile(sel):`<div style="display:flex;align-items:center;justify-content:center;height:300px;color:var(--muted);font-size:.82rem;background:var(--surface);border:1px solid var(--border);border-radius:12px;">Select a sponsor to view their profile</div>`}
-  </div>
-
-</div>
-
-<!-- Sponsor Matching Panel (hidden by default) -->
-<div id="sp-match-panel" style="display:none;margin-top:20px;"></div>
-
-</div>`;
-}
-
-function renderSpProfile(s){
-  if(!s)return'';
-  const projectsUsing=S.projects.filter(p=>(p.sponsors||[]).some(sp=>sp.id===s.id));
-  return`<div style="display:flex;flex-direction:column;gap:12px;">
-
-  <!-- Header card -->
-  <div class="sp-section">
-    <div class="sp-section-bd" style="display:flex;align-items:flex-start;gap:14px;">
-      <div class="sp-avatar" style="width:52px;height:52px;border-radius:10px;font-size:1rem;flex-shrink:0;">${s.logoDataUrl?`<img src="${escHtml(s.logoDataUrl)}" alt="">`:(s.name.substring(0,2).toUpperCase())}</div>
-      <div style="flex:1;min-width:0;">
-        <div style="font-size:1.1rem;font-weight:800;letter-spacing:-.02em;margin-bottom:3px;">${escHtml(s.name)}</div>
-        ${s.website?`<a href="https://${escHtml(s.website.replace(/^https?:\/\//,''))}" target="_blank" style="font-size:.72rem;color:var(--muted);text-decoration:none;">${escHtml(s.website)}</a>`:''}
-        <div style="display:flex;flex-wrap:wrap;gap:4px;margin-top:6px;">${(s.priorities||[]).map(spTagHtml).join('')}</div>
-      </div>
-      <div style="display:flex;gap:6px;flex-shrink:0;padding:2px 4px 2px 0;">
-        <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}')">Edit</button>
-        <button class="btn btn-danger btn-xs" onclick="deleteSponsor('${s.id}')">Delete</button>
-      </div>
-    </div>
-  </div>
-
-  <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
-
-    <!-- Contact -->
-    <div class="sp-section">
-      <div class="sp-section-hd"><span class="sp-section-title">Contact</span></div>
-      <div class="sp-section-bd" style="font-size:.78rem;">
-        ${s.contactName?`<div style="margin-bottom:6px;"><span style="color:var(--muted);font-size:.65rem;display:block;margin-bottom:1px;">PRIMARY</span><strong>${escHtml(s.contactName)}</strong>${s.contactRole?` · ${s.contactRole}`:''}</div>`:''}
-        ${s.contactEmail?`<div style="margin-bottom:6px;"><a href="mailto:${escHtml(s.contactEmail)}" style="color:var(--acc);">${escHtml(s.contactEmail)}</a></div>`:''}
-        ${s.backupContact?`<div style="margin-bottom:4px;color:var(--text2);font-size:.7rem;"><span style="color:var(--muted);">Backup: </span>${escHtml(s.backupContact)}</div>`:''}
-        ${s.relationshipOwner?`<div style="color:var(--text2);font-size:.7rem;"><span style="color:var(--muted);">Our lead: </span>${escHtml(s.relationshipOwner)}</div>`:''}
-        ${!s.contactName&&!s.contactEmail?`<div style="color:var(--muted);font-size:.75rem;">No contact info yet</div>`:''}
-        ${s.budgetCycle?`<div style="margin-top:8px;padding:6px 9px;background:rgba(240,201,107,.08);border:1px solid rgba(240,201,107,.2);border-radius:6px;font-size:.68rem;color:var(--yellow);">${escHtml(s.budgetCycle)}</div>`:''}
-      </div>
-    </div>
-
-    <!-- Products -->
-    <div class="sp-section" style="overflow:visible;">
-      <div class="sp-section-hd" style="flex-wrap:wrap;gap:6px;">
-        <span class="sp-section-title" style="flex-shrink:0;">Products</span>
-        <div style="display:flex;align-items:center;gap:5px;flex-wrap:wrap;margin-left:auto;">
-          ${(s.products||[]).length>0?`<span style="font-size:.68rem;color:var(--muted);white-space:nowrap;">${(s.products||[]).length} in catalogue</span>`:''}
-          ${(s.products||[]).length>0?`<button class="btn btn-ghost btn-xs" style="white-space:nowrap;" onclick="var b=document.getElementById('sp-view-prods-${s.id}');var open=b.style.display!=='none';b.style.display=open?'none':'';this.textContent=open?'Show \u25be':'Hide \u25b4';">Show &#9662;</button>`:'<span style="font-size:.75rem;color:var(--muted);">No products catalogued yet</span>'}
-          <button class="btn btn-ghost btn-xs" style="white-space:nowrap;" onclick="openEditSponsor('${s.id}','products')">Edit</button>
-        </div>
-      </div>
-      ${(s.products||[]).length>0?`<div id="sp-view-prods-${s.id}" style="display:none;padding:0 14px 10px;">
-        ${(s.products||[]).map(p=>{
-          const payLabel=(PRODUCT_PAYMENT_TYPES.find(t=>t.value===p.paymentType)||{}).label||'';
-          return '<div style="padding:8px 0;border-bottom:1px solid var(--border2);display:flex;gap:8px;align-items:flex-start;">'
-            +(p.imageUrl?'<img src="'+p.imageUrl+'" alt="" style="width:36px;height:36px;border-radius:5px;object-fit:cover;flex-shrink:0;" onerror="this.style.display=\'none\'">':'')
-            +'<div style="flex:1;min-width:0;">'
-            +'<div style="font-size:.78rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">'+escHtml(p.name)+'</div>'
-            +(p.desc?'<div style="font-size:.68rem;color:var(--text2);margin-top:1px;line-height:1.4;">'+escHtml(p.desc)+'</div>':'')
-            +'<div style="display:flex;gap:5px;margin-top:3px;flex-wrap:wrap;">'
-            +(p.cost>0?'<span style="font-size:.65rem;font-family:\'DM Mono\',monospace;color:var(--yellow);">\u00a3'+parseFloat(p.cost).toFixed(2)+'</span>':'')
-            +(payLabel?'<span style="font-size:.62rem;padding:1px 6px;border-radius:3px;background:var(--surface3);color:var(--text2);">'+payLabel+'</span>':'')
-            +(p.category?'<span style="font-size:.62rem;padding:1px 6px;border-radius:3px;background:var(--surface3);color:var(--text2);">'+p.category+'</span>':'')
-            +'</div></div></div>';
-        }).join('')}
-      </div>`:''}
-    </div>
-
-  </div>
-
-  <!-- Target Audience -->
-  <div class="sp-section">
-    <div class="sp-section-hd">
-      <span class="sp-section-title">Target Audience</span>
-      <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}','audience')">Edit</button>
-    </div>
-    <div class="sp-section-bd">
-      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;">
-        ${(s.audienceTags||[]).map(t=>`<span class="sp-audience-tag">${t}</span>`).join('')}
-        ${(s.audienceTags||[]).length===0?`<span style="color:var(--muted);font-size:.75rem;">No audience tags yet</span>`:''}
-      </div>
-      ${s.audienceNotes?`<div style="font-size:.75rem;color:var(--text2);line-height:1.6;">${escHtml(s.audienceNotes)}</div>`:''}
-    </div>
-  </div>
-
-  <!-- Integration Ideas -->
-  <div class="sp-section">
-    <div class="sp-section-hd">
-      <span class="sp-section-title">Integration Ideas & Capabilities</span>
-      <button class="btn btn-ghost btn-xs" onclick="openEditSponsor('${s.id}','integrations')">Edit</button>
-    </div>
-    <div class="sp-section-bd">
-      <div style="display:flex;flex-wrap:wrap;gap:3px;margin-bottom:8px;">
-        ${(s.integrationTypes||[]).map(t=>`<span class="sp-integration-chip">${t}</span>`).join('')}
-        ${(s.integrationTypes||[]).length===0?`<span style="color:var(--muted);font-size:.75rem;">No integration types noted</span>`:''}
-      </div>
-      ${s.integrationNotes?`<div style="font-size:.75rem;color:var(--text2);line-height:1.6;margin-top:6px;">${escHtml(s.integrationNotes)}</div>`:''}
-    </div>
-  </div>
-
-  <!-- Assets -->
-  ${(s.assetsUrl||s.assets)?`<div class="sp-section">
-    <div class="sp-section-hd"><span class="sp-section-title">Assets</span></div>
-    <div class="sp-section-bd">
-      ${s.assetsUrl?`<a href="${escHtml(s.assetsUrl)}" target="_blank" rel="noopener" class="ql-btn" style="margin-bottom:8px;display:inline-flex;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M22 19a2 2 0 01-2 2H4a2 2 0 01-2-2V5a2 2 0 012-2h5l2 3h9a2 2 0 012 2z"/></svg> Open assets folder</a>`:''}
-      ${s.assets?`<div style="font-size:.75rem;color:var(--text2);">${escHtml(s.assets)}</div>`:''}
-    </div>
-  </div>`:''}
-
-  <!-- Notes -->
-  ${s.notes?`<div class="sp-section">
-    <div class="sp-section-hd"><span class="sp-section-title">Notes</span></div>
-    <div class="sp-section-bd" style="font-size:.78rem;color:var(--text2);line-height:1.6;">${escHtml(s.notes)}</div>
-  </div>`:''}
-
-  <!-- Event History -->
-  <div class="sp-section">
-    <div class="sp-section-hd"><span class="sp-section-title">Event History (${(s.history||[]).length})</span></div>
-    <div class="sp-section-bd">
-      ${(s.history||[]).length===0?`<div style="color:var(--muted);font-size:.75rem;">No events recorded yet</div>`:''}
-      ${(s.history||[]).map(h=>`<div class="sp-hist-row">
-        <span class="sp-hist-event">${h.event}</span>
-        <span class="sp-hist-prize">${h.prizeDesc||'—'}</span>
-        <span class="sp-hist-type ${histTypeCls(h.type)}">${h.type||'sponsor'}</span>
-      </div>`).join('')}
-    </div>
-  </div>
-
-  <!-- Prize Delivery History -->
-  ${(s.prizeHistory||[]).length>0?`<div class="sp-section">
-    <div class="sp-section-hd"><span class="sp-section-title">🎁 Prize Delivery History</span></div>
-    <div class="sp-section-bd">
-      ${(s.prizeHistory||[]).map(h=>`<div style="display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border2);font-size:.75rem;flex-wrap:wrap;">
-        <span style="color:var(--acc);font-weight:600;flex-shrink:0;">${h.prize}</span>
-        <span style="flex:1;min-width:80px;color:var(--text2);">${h.winner}</span>
-        <span style="color:var(--muted);font-size:.65rem;flex-shrink:0;">${h.eventName}</span>
-        <span style="background:${h.type==='code'?'rgba(98,208,170,.12)':'rgba(167,139,250,.12)'};color:${h.type==='code'?'var(--acc)':'var(--purple)'};font-size:.62rem;padding:1px 6px;border-radius:4px;flex-shrink:0;">${h.type==='code'?'Code sent':'Account requested'}</span>
-        <span style="color:var(--muted);font-family:'DM Mono',monospace;font-size:.62rem;flex-shrink:0;">${fmtD(h.date)}</span>
-      </div>`).join('')}
-    </div>
-  </div>`:''}
-
-  <!-- Projects using this sponsor -->
-  ${projectsUsing.length>0?`<div class="sp-section">
-    <div class="sp-section-hd"><span class="sp-section-title">Active in Projects</span></div>
-    <div class="sp-section-bd" style="display:flex;flex-wrap:wrap;gap:7px;">
-      ${projectsUsing.map(p=>`<div onclick="S.detailId='${p.id}';nav('dashboard');" style="display:flex;align-items:center;gap:6px;padding:5px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:7px;cursor:pointer;font-size:.75rem;transition:border-color .13s;" onmouseover="this.style.borderColor='var(--acc)'" onmouseout="this.style.borderColor='var(--border)'"><div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>${escHtml(p.name)}</div>`).join('')}
-    </div>
-  </div>`:''}
-
-</div>`;
-}
-
-function renderSponsorsInline(){render();} // now a full re-render for simplicity
-let _spSearchDebounce=null;
-function _spSearchInput(val){
-  // Store value so it survives a render
-  if(!S._spSearch)S._spSearch='';
-  S._spSearch=val;
-  // Debounce — filter after 150ms of no typing
-  clearTimeout(_spSearchDebounce);
-  _spSearchDebounce=setTimeout(()=>{
-    _filterSponsorList(val);
-  },150);
-}
-
-function _filterSponsorList(q){
-  // Filter sponsor rows in-place without re-rendering
-  const rows=document.querySelectorAll('.sp-list-row[data-sp-id]');
-  if(rows.length===0){
-    // List not rendered yet — fall back to full render
-    render();return;
-  }
-  const lq=(q||'').toLowerCase().trim();
-  rows.forEach(row=>{
-    if(!lq){row.style.display='';return;}
-    const name=(row.dataset.name||'').toLowerCase();
-    const tags=(row.dataset.tags||'').toLowerCase();
-    row.style.display=(name.includes(lq)||tags.includes(lq))?'':'none';
-  });
-  // Show/hide empty state
-  const empty=document.getElementById('sp-list-empty');
-  if(empty){
-    const visible=Array.from(rows).some(r=>r.style.display!=='none');
-    empty.style.display=visible?'none':'block';
-  }
-}
-
+function renderSponsorsInline(){render();}
 function initSponsorSearch(){}
 
 function openNewSponsor(){
@@ -15445,7 +15442,7 @@ function deleteSponsor(id){
   saveWithUndo('Delete sponsor');
   S.sponsors=S.sponsors.filter(s=>s.id!==id);
   (S.projects||[]).forEach(p=>{if(Array.isArray(p.sponsors))p.sponsors=p.sponsors.filter(x=>x.id!==id);});
-  if(_spSelectedId===id)_spSelectedId=S.sponsors.length>0?S.sponsors[0].id:null;
+  if(_spSelectedId===id)_spSelectedId=null;if(_spOpenId===id)_spOpenId=null;
   save();closeModal();
   if(V==='sponsors')render();
 }
