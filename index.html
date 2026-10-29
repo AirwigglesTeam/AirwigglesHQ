@@ -3037,7 +3037,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=99;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=100;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -5740,11 +5740,13 @@ function _dprefSet(fn){if(!S.userPrefs)S.userPrefs={};const k=_dKey();const cur=
 const DASH_SECTIONS=[['focus','Due this week'],['mywork','My work'],['cowork','Next co-working day'],['events','Events'],['notes','Quick notes'],['timeline','Timeline'],['okrs','Team objectives'],['team','Team'],['calendar','Calendar']];
 /* Most sections are on unless hidden. Opt-in sections (new ones) stay off until someone switches them on, so nobody's dashboard changes under them. */
 /* Dashboard top row: Timeline, Calendar and Team share one panel. Opening one closes the others; clicking the open one closes it. */
+/* Dashboard top row: Timeline, Calendar, Notes and Team share one panel. Opening one closes the others; clicking the open one closes it. */
 function dashTopSet(k){window._dashTop=(_dashTopCur()===k)?'none':k;render();}
 function _dashTopAvail(active){
   const av=[];
   if(active.length>0&&_dsOn('timeline'))av.push('tl');
   if(_dsOn('calendar'))av.push('cal');
+  if(_dsOn('notes'))av.push('notes');
   if(_dsOn('team')||_dsOn('okrs'))av.push('team');
   return av;
 }
@@ -5759,10 +5761,12 @@ function _dashChev(open){return '<svg width="9" height="9" viewBox="0 0 24 24" f
 function _dashTopHtml(active,counts){
   const av=_dashTopAvail(active);if(!av.length)return'';
   const cur=_dashTopCur();
-  const tab=(k,label)=>'<button class="dtab" id="dtab-'+k+'" aria-expanded="'+(cur===k)+'" aria-controls="dpanel-'+k+'" onclick="dashTopSet(\''+k+'\')">'+_dashChev(cur===k)+label+'</button>';
+  const tab=(k,label,extra)=>'<button class="dtab" id="dtab-'+k+'" aria-expanded="'+(cur===k)+'" aria-controls="dpanel-'+k+'" onclick="dashTopSet(\''+k+'\')">'+_dashChev(cur===k)+label+(extra||'')+'</button>';
+  const nn=(S.quickNotes||[]).filter(x=>!x.org).length;
   let h='<div class="dash-top" id="dash-top"><div class="dtabs">';
   if(av.includes('tl'))h+=tab('tl','Timeline');
   if(av.includes('cal'))h+=tab('cal','Calendar');
+  if(av.includes('notes'))h+=tab('notes','Notes',nn?' <b>'+nn+'</b>':'');
   h+='<div class="dteam">';
   if(_dsOn('team'))S.members.forEach(m=>{
     const sel=S.activeMember===m.id,n=counts[m.id]||0;
@@ -5774,6 +5778,7 @@ function _dashTopHtml(active,counts){
   h+='</div></div>';
   if(cur==='tl')h+='<div class="dash-panel" id="dpanel-tl"><div id="dash-timeline"><div id="dash-gantt">'+renderGantt(active,false)+'</div></div></div>';
   if(cur==='cal')h+='<div class="dash-panel" id="dpanel-cal"><div id="dash-calendar"><div class="card"><div class="card-bd" data-mcal-host="">'+renderMonthCal('')+'</div></div></div></div>';
+  if(cur==='notes')h+='<div class="dash-panel" id="dpanel-notes"><div id="dash-notes-wrap">'+_quickNotesCardHtml()+'</div></div>';
   if(cur==='team')h+='<div class="dash-panel" id="dpanel-team">'+renderTeam()+'</div>';
   return h+'</div>';
 }
@@ -5793,16 +5798,11 @@ function _dashOkrsHtml(){
 /* Quick links as one row of chips, with the shared notes behind a single toggle */
 function _qlBtn(q){return `<a href="${escHtml(q.url)}" target="_blank" rel="noopener" class="ql-btn"${q.category?` title="${escHtml(q.category)}"`:''}><img class="ql-ico" src="https://www.google.com/s2/favicons?domain=${tryDomain(q.url)}&sz=64" onerror="this.style.display='none'" alt="">${escHtml(q.name)}<span style="margin-left:4px;color:var(--muted);font-size:11px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();deleteQL('${q.id}')">×</span><span style="margin-left:2px;color:var(--muted);font-size:10px;cursor:pointer;" onclick="event.preventDefault();event.stopPropagation();editQL('${q.id}')">✎</span></a>`;}
 function _pccDate(iso){const t=fmtD(iso);return String(iso).slice(0,4)===String(_localToday()).slice(0,4)?t.replace(/\s\d{4}$/,''):t;}
-function dashNotesToggle(){window._dashNotesOpen=!window._dashNotesOpen;render();}
+function dashNotesToggle(){dashTopSet('notes');}
 function _dashQuickHtml(){
-  const links=false,notes=_dsOn('notes');   // Quick links are hidden on the dashboard for now (data and add/edit code are kept); set links=_dsOn('links') to bring them back
-  if(!links&&!notes)return'';
-  const n=(S.quickNotes||[]).filter(x=>!x.org).length,open=!!window._dashNotesOpen;
-  let h='<div class="dash-quick'+(open?' notes-open':'')+'" id="dash-quick">';
-  if(notes)h+='<div class="dq-notes"><button class="dtab dtab-sm" id="dash-notes-btn" aria-expanded="'+open+'" onclick="dashNotesToggle()">'+_dashChev(open)+'Notes'+(n?' <b>'+n+'</b>':'')+'</button></div>';
-  if(notes&&open)h+='<div id="dash-notes-wrap">'+_quickNotesCardHtml()+'</div>';
-  if(links)h+='<div class="dq-links"><div class="dq-lbl">Quick links</div><div class="ql-grid" style="margin:0;">'+(S.quickLinks||[]).map(_qlBtn).join('')+'<button class="ql-btn add-ql" onclick="openModal(\'quickLink\',null)">+ Add link</button></div></div>';
-  return h+'</div>';
+  const links=false;   // Quick links are hidden on the dashboard for now (data and add/edit code are kept); set links=_dsOn('links') to bring them back. Notes now live in the Timeline / Calendar / Notes pill row.
+  if(!links)return'';
+  return '<div class="dash-quick" id="dash-quick"><div class="dq-links"><div class="dq-lbl">Quick links</div><div class="ql-grid" style="margin:0;">'+(S.quickLinks||[]).map(_qlBtn).join('')+'<button class="ql-btn add-ql" onclick="openModal(\'quickLink\',null)">+ Add link</button></div></div></div>';
 }
 /* Rows of cards that fold from their header: My work, Due this week, Co-working */
 function dashFoldToggle(k){window._dashFoldOff=window._dashFoldOff||{};window._dashFoldOff[k]=!window._dashFoldOff[k];render();}
