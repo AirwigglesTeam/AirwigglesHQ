@@ -3288,7 +3288,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=118;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=122;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4294,7 +4294,7 @@ function _applyDefaults(){
   if(!Array.isArray(S.finance.links))S.finance.links=[];
   if(!Array.isArray(S.finance.reviews))S.finance.reviews=[];
   if(!Array.isArray(S.finance.bank))S.finance.bank=[];
-  if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
+  if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=1?n.getFullYear():n.getFullYear()-1;}
   if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
   if(!S.taskSort)S.taskSort='default';
   if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
@@ -4810,7 +4810,7 @@ function getFinYears(){
     ...S.projects.flatMap(p=>(p.expenses||[]).map(e=>e.date||''))
   ].filter(Boolean);
   const now=new Date();
-  const curFY=now.getMonth()>=3?now.getFullYear():now.getFullYear()-1;
+  const curFY=now.getMonth()>=1?now.getFullYear():now.getFullYear()-1;
   const years=new Set();
   // Always include current + 2 future FYs so you can plan ahead
   years.add(curFY);
@@ -4819,7 +4819,7 @@ function getFinYears(){
   // Add any FY that has actual data
   allDates.forEach(d=>{
     const dt=new Date(d);
-    const fy=dt.getMonth()>=3?dt.getFullYear():dt.getFullYear()-1;
+    const fy=dt.getMonth()>=1?dt.getFullYear():dt.getFullYear()-1;
     years.add(fy);
   });
   return [...years].sort((a,b)=>b-a);
@@ -4830,8 +4830,8 @@ function getFYLabel(y){return`FY ${y}/${String(y+1).slice(2)}`;}
 function isInFY(dateStr,fyYear){
   if(!dateStr)return true; // undated items always included
   const d=new Date(dateStr);
-  const start=new Date(fyYear,3,1); // Apr 1
-  const end=new Date(fyYear+1,2,31,23,59,59); // Mar 31
+  const start=new Date(fyYear,1,1); // 1 Feb
+  const end=new Date(fyYear+1,0,31,23,59,59); // 31 Jan
   return d>=start&&d<=end;
 }
 
@@ -4882,7 +4882,7 @@ function renderRevStreamList(){
     if(k==='total'){det=`${lab('\u00a3 so far')}${num(s.id,'amount',s.amount,'0','Revenue so far')}${lab('target')}${num(s.id,'target',s.target,'optional','Revenue target')}`;}
     else if(k==='recurring'){
       det=`${lab('\u00a3')}${num(s.id,'amount',s.amount,'0','Amount each period',84)}${lab('every')}<select class="sel" style="width:96px;padding:5px 7px;font-size:.75rem;" aria-label="How often" onchange="updateRevStream('${s.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${(s.freq||'Monthly')===f?' selected':''}>${f}</option>`).join('')}</select>`
-        +(s.freq==='Annual'?`<select class="sel" style="width:70px;padding:5px 7px;font-size:.75rem;" aria-label="Month received" onchange="updateRevStream('${s.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(s.payMonth)||4)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:'')
+        +(s.freq==='Annual'?`<select class="sel" style="width:70px;padding:5px 7px;font-size:.75rem;" aria-label="Month received" onchange="updateRevStream('${s.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(s.payMonth)||2)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:'')
         +`${lab('target')}${num(s.id,'target',s.target,'optional','Revenue target',84)}`
         +`<div style="flex-basis:100%;display:flex;align-items:center;gap:7px;flex-wrap:wrap;">${lab('from')}<input class="inp" type="date" style="width:140px;padding:5px 8px;" value="${s.startDate||''}" aria-label="Starts" onchange="updateRevStream('${s.id}','startDate',this.value)">${lab('until')}<input class="inp" type="date" style="width:140px;padding:5px 8px;" value="${s.endDate||''}" aria-label="Ends" onchange="updateRevStream('${s.id}','endDate',this.value)">${lab(s.endDate?'':'no end date')}</div>`;
       hint=`${money(F.full)} this financial year \u00b7 ${money(F.actual)} so far${s.endDate?' \u00b7 ends '+escHtml(fmtD(s.endDate)):''}`;
@@ -6617,7 +6617,7 @@ function showTaskTip(e,id){
    Streams in the "Investment" category are funding, not profit: they are kept out of revenue, profit and tax and shown separately. */
 const FIN_REV_KINDS={total:'Running total',recurring:'Recurring',oneoff:'One-off'};
 function _finFyClock(fy,todayIso){
-  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00'),st=new Date(fy,3,1),en=new Date(fy+1,2,31),DAY=864e5;
+  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00'),st=new Date(fy,1,1),en=new Date(fy+1,0,31),DAY=864e5;
   const total=Math.round((en-st)/DAY)+1,state=t<st?'future':t>en?'done':'now';
   const done=state==='now'?Math.floor((t-st)/DAY)+1:state==='done'?total:0;
   const m=state==='now'?_finFyMonthIdx(t.getMonth()+1):state==='done'?12:0;
@@ -6625,8 +6625,8 @@ function _finFyClock(fy,todayIso){
 }
 function finStreamKind(s){return s&&(s.kind==='recurring'||s.kind==='oneoff')?s.kind:'total';}
 function finStreamIsFunding(s){return !!s&&s.cat==='Investment';}
-function _finPayIdx(s){const f=s.freq==='Annual'?'A':s.freq==='Quarterly'?'Q':'M';return f==='M'?[1,2,3,4,5,6,7,8,9,10,11,12]:f==='Q'?[1,4,7,10]:[_finFyMonthIdx(parseInt(s.payMonth)||4)];}
-function _finIdxMonthStart(fy,i){const cm=(3+i-1)%12;return new Date(fy+(cm<3?1:0),cm,1);}
+function _finPayIdx(s){const f=s.freq==='Annual'?'A':s.freq==='Quarterly'?'Q':'M';return f==='M'?[1,2,3,4,5,6,7,8,9,10,11,12]:f==='Q'?[1,4,7,10]:[_finFyMonthIdx(parseInt(s.payMonth)||2)];}
+function _finIdxMonthStart(fy,i){const cm=i%12;return new Date(fy+(cm<1?1:0),cm,1);}   // position in the year (Feb=1 ... Jan=12) -> first day of that month
 /* A recurring stream pays in the months of its schedule that fall inside the optional From / Until dates (the whole month counts). */
 function _finRecurringPays(s,fy){
   const from=s.startDate?new Date(s.startDate+'T00:00:00'):null,until=s.endDate?new Date(s.endDate+'T00:00:00'):null;
@@ -6664,9 +6664,9 @@ function _finFundNote(){
    Pure calculation (finPlanCalc) plus one card on the Budget tab. Reads existing data only:
    revenue streams (+ their new "target"), recurring and one-off costs, event expenses and the category budgets. */
 const FIN_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
-function _finFyMonthIdx(m){return((m-4+12)%12)+1;}      // calendar month (1-12) -> position in the financial year (Apr=1 ... Mar=12)
+function _finFyMonthIdx(m){return((m-2+12)%12)+1;}      // calendar month (1-12) -> position in the financial year (Feb=1 ... Jan=12)
 function finPlanCalc(fy,todayIso){
-  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00'),st=new Date(fy,3,1),en=new Date(fy+1,2,31),DAY=864e5;
+  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00'),st=new Date(fy,1,1),en=new Date(fy+1,0,31),DAY=864e5;
   const total=Math.round((en-st)/DAY)+1;
   const state=t<st?'future':t>en?'done':'now';
   const done=state==='now'?Math.floor((t-st)/DAY)+1:state==='done'?total:0;
@@ -6680,7 +6680,7 @@ function finPlanCalc(fy,todayIso){
     const c=e.cat||'Other',a=e.amount||0,r=row(c);r.full+=finAnn(e);
     if(e.freq==='Monthly')r.spent+=a*m;
     else if(e.freq==='Quarterly')r.spent+=a*Math.ceil(m/3);
-    else if(e.freq==='Annual'){const pm=parseInt(e.payMonth)||4;if(m>=_finFyMonthIdx(pm))r.spent+=a;}
+    else if(e.freq==='Annual'){const pm=parseInt(e.payMonth)||2;if(m>=_finFyMonthIdx(pm))r.spent+=a;}
   });
   (S.finance.oneoff||[]).forEach(e=>{if(!isInFY(e.date,fy))return;const r=row(e.cat||'Other');r.full+=e.amount||0;if(upTo(e.date))r.spent+=e.amount||0;});
   // team pay: contracted hours x rate not already entered as a cost (the same figure the profit calculation uses)
@@ -6915,7 +6915,7 @@ function _finFlowHtml(){
 }
 /* ── Finance review: a scheduled meeting (like a co-working day) tied to each quarter end ──
    S.finance.reviews = [{id,title,date,startTime,endTime,notes,objectives,members}]
-   Quarters follow the financial year (ends 31 March): quarter ends are 30 Jun, 30 Sep, 31 Dec, 31 Mar.
+   Quarters follow the financial year (1 Feb to 31 Jan): quarter ends are 30 Apr, 31 Jul, 31 Oct, 31 Jan.
    A review belongs to the latest quarter end before its date. Recommended date = the first Monday after quarter end;
    due by = the Friday of that week. A review counts as held once its date has passed. */
 const FR_AGENDA='Bank balances · Budget vs actual · Events · Team pay · Savings · Next quarter forecast';
@@ -6923,10 +6923,10 @@ function _frD(iso){return new Date(iso+'T12:00:00Z');}
 function _frIso(d){return d.toISOString().slice(0,10);}
 function _frAdd(iso,n){const d=_frD(iso);d.setUTCDate(d.getUTCDate()+n);return _frIso(d);}
 function _frToday(){return typeof toISO==='function'?toISO(new Date()):_frIso(new Date());}
-function finQuarterEnds(fromYear,toYear){   // financial year Y runs 1 Apr Y to 31 Mar Y+1
-  const o=[];for(let y=fromYear;y<=toYear;y++)o.push(y+'-06-30',y+'-09-30',y+'-12-31',(y+1)+'-03-31');return o;
+function finQuarterEnds(fromYear,toYear){   // financial year Y runs 1 Feb Y to 31 Jan Y+1
+  const o=[];for(let y=fromYear;y<=toYear;y++)o.push(y+'-04-30',y+'-07-31',y+'-10-31',(y+1)+'-01-31');return o;
 }
-function _frQuarterOf(qe){const m=+qe.slice(5,7),y=+qe.slice(0,4);const fy=m===3?y-1:y;const q=m===6?1:m===9?2:m===12?3:4;return{q,fy,label:'Q'+q+' '+getFYLabel(fy)};}
+function _frQuarterOf(qe){const m=+qe.slice(5,7),y=+qe.slice(0,4);const fy=m===1?y-1:y;const q=m===4?1:m===7?2:m===10?3:4;return{q,fy,label:'Q'+q+' '+getFYLabel(fy)};}
 function finReviewRecommended(qe){const dow=_frD(qe).getUTCDay();const add=((8-dow)%7)||7;return _frAdd(qe,add);}   // first Monday after qe
 function finReviewDueBy(qe){return _frAdd(finReviewRecommended(qe),4);}
 function _frQeFor(date){let best='';finQuarterEnds(+date.slice(0,4)-2,+date.slice(0,4)+1).forEach(q=>{if(q<date&&q>best)best=q;});return best;}
@@ -7038,7 +7038,7 @@ function _finReviewDashHtml(){
    They are ordinary recurring tasks in the Admin project (tick one off and the next appears), tagged with t.finKey
    so the Finance page can list them. Monthly jobs fall due on the 5th, quarterly ones on the review due date. */
 const FIN_TASKS=[
-  {key:'bank',g:'Monthly',name:'Update Revolut balances',type:'monthly',n:1,due:{m:'next5'}},
+  {key:'bank',g:'Monthly',name:'Enter current bank balances in Finance',type:'monthly',n:1,due:{m:'next5'}},
   {key:'receipts',g:'Monthly',name:'File receipts to Drive',type:'monthly',n:1,due:{m:'next5'}},
   {key:'invoices',g:'Monthly',name:'Chase unpaid sponsor invoices',type:'monthly',n:1,due:{m:'next5'}},
   {key:'budget',g:'Monthly',name:'Check budget against actual',type:'monthly',n:1,due:{m:'next5'}},
@@ -7047,11 +7047,11 @@ const FIN_TASKS=[
   {key:'subs',g:'Quarterly',name:'Review subscriptions and recurring costs',type:'monthly',n:3,due:{m:'qdue'}},
   {key:'targets',g:'Quarterly',name:'Update revenue targets',type:'monthly',n:3,due:{m:'qdue'}},
   {key:'savings',g:'Quarterly',name:'Savings top-up',type:'monthly',n:3,due:{m:'qdue'}},
-  {key:'nextbudget',g:'Yearly',name:"Set next year's budget",type:'yearly',n:1,due:{md:'03-01'}},
-  {key:'corptax',g:'Yearly',name:'Pay corporation tax',type:'yearly',n:1,due:{md:'01-01'}},
-  {key:'accounts',g:'Yearly',name:'File annual accounts at Companies House',type:'yearly',n:1,due:{md:'12-31'}},
-  {key:'confirm',g:'Yearly',name:'Companies House confirmation statement',type:'yearly',n:1,due:{md:'02-14'}},
-  {key:'dividends',g:'Yearly',name:'Dividend paperwork',type:'yearly',n:1,due:{md:'03-31'}}
+  {key:'nextbudget',g:'Yearly',name:"Set next year's budget",type:'yearly',n:1,due:{md:'01-01'}},
+  {key:'corptax',g:'Yearly',name:'Pay corporation tax',type:'yearly',n:1,due:{md:'11-01'}},
+  {key:'accounts',g:'Yearly',name:'File annual accounts at Companies House',type:'yearly',n:1,due:{md:'10-31'}},
+  {key:'confirm',g:'Yearly',name:'Companies House confirmation statement',type:'yearly',n:1,due:{md:'01-31'}},
+  {key:'dividends',g:'Yearly',name:'Dividend paperwork',type:'yearly',n:1,due:{md:'01-31'}}
 ];
 function finTaskFirstDue(def,today){
   today=today||_frToday();
@@ -7122,7 +7122,7 @@ function saveFinTasksSetup(){
    Everything shown is read from data that already exists (revenue streams, recurring and one-off costs, event pages,
    team hours, bank balances), so nothing is typed in twice. */
 function _finHeadHtml(tab){
-  const years=getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}${y===S.finance.finYear?' · ends 31 Mar':''}</option>`).join('');
+  const years=getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}${y===S.finance.finYear?' · ends 31 Jan':''}</option>`).join('');
   return `<div class="fh-top"><div class="page-title">Finances</div>
     <select class="fsel" aria-label="Financial year" onchange="S.finance.finYear=parseInt(this.value);save();render();">${years}</select>
     <button class="btn btn-ghost btn-xs" onclick="generateFinanceReport()" title="Export PDF report">Export PDF</button>
@@ -10765,7 +10765,7 @@ function _finMoney(n){n=Number(n)||0;const neg=n<0,a=Math.abs(n);return(neg?'-':
 function finBankSorted(){return (S.finance.bank||[]).map((e,i)=>({e,i})).sort((x,y)=>(x.e.date||'').localeCompare(y.e.date||'')||x.i-y.i).map(x=>x.e);}
 function finBankLatest(){const l=finBankSorted();return l.length?l[l.length-1]:null;}
 function _finFYInfo(fy){
-  const t=new Date(_localToday()+'T00:00:00'),st=new Date(fy,3,1),en=new Date(fy+1,2,31),DAY=864e5;
+  const t=new Date(_localToday()+'T00:00:00'),st=new Date(fy,1,1),en=new Date(fy+1,0,31),DAY=864e5;
   const total=Math.round((en-st)/DAY)+1;
   if(t<st)return{state:'future',days:Math.ceil((st-t)/DAY),pct:0};
   if(t>en)return{state:'done',days:0,pct:100};
@@ -10785,13 +10785,13 @@ function _finBankHtml(){
   const L=finBankLatest(),fy=S.finance.finYear,info=_finFYInfo(fy);
   const fyTxt=info.state==='now'?`${info.pct}% through · ${info.days} days left`:info.state==='done'?'Year complete':`Starts in ${info.days} days`;
   const fyBar=`<div class="fin-fybar"><s style="width:${info.pct}%"></s></div>`;
-  if(!L)return `<div class="fin-bank" id="fin-bank"><div class="fin-metric fin-bank-empty"><div class="flbl2">Money in the bank</div><div style="font-size:.8rem;color:var(--text2);margin:4px 0 10px;">Add today’s balances to see cash, savings and how many months of costs they cover.</div><button class="btn btn-acc btn-xs" onclick="editFinBank('')">+ Add balances</button></div><div class="fin-metric"><div class="flbl2">${getFYLabel(fy)} ends 31 Mar</div><div class="fval" style="font-size:.95rem;">${fyTxt}</div>${fyBar}</div></div>`;
+  if(!L)return `<div class="fin-bank" id="fin-bank"><div class="fin-metric fin-bank-empty"><div class="flbl2">Money in the bank</div><div style="font-size:.8rem;color:var(--text2);margin:4px 0 10px;">Add today’s balances to see cash, savings and how many months of costs they cover.</div><button class="btn btn-acc btn-xs" onclick="editFinBank('')">+ Add balances</button></div><div class="fin-metric"><div class="flbl2">${getFYLabel(fy)} ends 31 Jan</div><div class="fval" style="font-size:.95rem;">${fyTxt}</div>${fyBar}</div></div>`;
   const cash=Number(L.cash)||0,sav=Number(L.savings)||0,tot=cash+sav,cv=_finCover(tot,fy);
   return `<div class="fin-bank" id="fin-bank"><div class="fin-grid4" style="margin-bottom:8px;">
     <div class="fin-metric"><div class="flbl2">Cash in bank</div><div class="fval blue">${_finMoney(cash)}</div></div>
     <div class="fin-metric"><div class="flbl2">Current savings</div><div class="fval green">${_finMoney(sav)}</div></div>
     <div class="fin-metric"><div class="flbl2">Total cash</div><div class="fval">${_finMoney(tot)}</div><div style="font-size:.66rem;color:var(--muted);margin-top:2px;">${cv===null?'':'≈ '+(cv>=100?'100+':cv.toFixed(1))+' months of costs'}</div></div>
-    <div class="fin-metric"><div class="flbl2">${getFYLabel(fy)} · ends 31 Mar</div><div class="fval" style="font-size:.95rem;">${fyTxt}</div>${fyBar}</div></div>
+    <div class="fin-metric"><div class="flbl2">${getFYLabel(fy)} · ends 31 Jan</div><div class="fval" style="font-size:.95rem;">${fyTxt}</div>${fyBar}</div></div>
     <div class="fin-bank-meta"><span>Updated ${escHtml(fmtD(L.date))}${L.note?' · '+escHtml(L.note):''}</span><button class="btn btn-ghost btn-xs" onclick="editFinBank('')">Update balances</button></div></div>`;
 }
 function _finBankCardHtml(){
@@ -11457,7 +11457,7 @@ function renderFinRecurring(){
 ${items.map(e=>`<div class="exp-row">
 <input style="flex:1;min-width:100px;background:none;border:none;color:var(--text);font-size:.8rem;outline:none;" value="${escHtml(e.name)}" oninput="updFinField('r','${e.id}','name',this.value)">
 <select class="amt-inp cat-sel" onchange="updFinField('r','${e.id}','cat',this.value)">${FIN_CAT_NAMES.map(cn=>`<option value="${cn}"${e.cat===cn?' selected':''}>${cn}</option>`).join('')}</select>
-<select class="amt-inp freq-sel" onchange="updFinField('r','${e.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${e.freq===f?' selected':''}>${f}</option>`).join('')}</select>${e.freq==='Annual'?`<select class="amt-inp freq-sel" title="Month this yearly bill is paid" aria-label="Month paid" onchange="updFinField('r','${e.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(e.payMonth)||4)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:''}
+<select class="amt-inp freq-sel" onchange="updFinField('r','${e.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${e.freq===f?' selected':''}>${f}</option>`).join('')}</select>${e.freq==='Annual'?`<select class="amt-inp freq-sel" title="Month this yearly bill is paid" aria-label="Month paid" onchange="updFinField('r','${e.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(e.payMonth)||2)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:''}
 <input class="amt-inp amt-num" type="number" value="${e.amount.toFixed(2)}" step="0.01" min="0" oninput="updFinAmt('r','${e.id}',this.value)">
 <button class="del-btn" onclick="delFin('r','${e.id}')">×</button>
 </div>`).join('')}</div>`;
@@ -12028,7 +12028,7 @@ function importData(input){
         S.finance.revenueStreams=[{id:'rs1',name:'Revenue',amount:S.finance.revenue||0,cat:'Other'}];
       }
       if(S.finance.finYear===undefined){
-        const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;
+        const n=new Date();S.finance.finYear=n.getMonth()>=1?n.getFullYear():n.getFullYear()-1;
       }
 
       // Settings
