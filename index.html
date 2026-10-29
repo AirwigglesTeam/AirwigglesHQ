@@ -1466,6 +1466,23 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .st-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:14px;align-items:start;}
 .st-grid>.settings-sec{margin-bottom:0;}
 @media(max-width:760px){.st-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}.st-tabs>span{flex:0 0 4px!important;}.st-tab{padding:9px 13px;}}
+
+.settings-sec.st-flush{padding:0;overflow:hidden;}
+.st-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));border-bottom:1px solid var(--border);}
+.st-strip>div{padding:12px 16px;border-right:1px solid var(--border);min-width:0;}
+.st-strip>div:last-child{border-right:0;}
+.st-strip b{display:block;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;}
+.st-strip span{font-family:'DM Mono',monospace;font-size:1rem;font-weight:600;}
+.st-strip .ok{color:var(--green);}.st-strip .warn{color:var(--yellow);}.st-strip .bad{color:var(--red);}
+.st-fold{border-top:1px solid var(--border);}
+.st-fold:first-child{border-top:0;}
+.st-fold>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:13px 16px;font-size:.8rem;font-weight:600;}
+.st-fold>summary::-webkit-details-marker{display:none;}
+.st-fold>summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--acc);border-bottom:2px solid var(--acc);transform:rotate(-45deg);transition:transform .15s;flex:none;}
+.st-fold[open]>summary::before{transform:rotate(45deg);}
+.st-fold>summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+.st-meta{font-size:.68rem;color:var(--muted);font-weight:400;}
+.st-in{padding:0 16px 14px;}
 </style>
 </head>
 <body>
@@ -3018,7 +3035,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=97;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=98;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -3286,6 +3303,7 @@ function _validateBeforeSave(){
  * ─────────────────────────────────────────────────── */
 const PB_MAX_HISTORY=20; // keep last 20 server-side snapshots
 
+let _histTotalCache=null;
 let _histLoaded=false,_histRows=[],_histPage=0,_histMoreAvail=false;
 async function _histMore(){
   const snaps=await listHistorySnapshots(_histPage+1);
@@ -3307,6 +3325,7 @@ async function renderPBHistoryList(keep){
   const el3=document.getElementById('pb-history-list');if(!el3)return;
   const snaps=_histRows;
   const total=_histState.listErr?null:await _histCount();
+  if(typeof total==='number'){_histTotalCache=total;const sc=document.getElementById('st-snapcount');if(sc)sc.textContent=total;}
   const warn=_histState.listErr?'<div class="pf-warn">Could not read server snapshots: '+escHtml(_histState.listErr)+'. <a href="#" onclick="renderPBHistoryList();return false;">Retry</a><br>If this says timed out or HTTP 502, the server is struggling to read the snapshot table (each snapshot is a full copy of your data). Try <b>Clean up old snapshots</b>, or delete old records in the PocketBase admin (workspace_history).</div>':'';
   const clean=(total!==null&&total>45)?'<div class="pf-warn">The server holds <b>'+total+'</b> snapshots. <button class="btn btn-acc btn-xs" onclick="_histCleanup()">Clean up old snapshots</button></div>':'';
   if(snaps.length===0){
@@ -10783,34 +10802,59 @@ function renderSettings(){
   return`<div class="fu"><div class="page-hd"><div class="page-title">Settings</div></div>
 <div class="st-tabs" role="tablist" aria-label="Settings groups"><button class="st-tab${_stT==='backup'?' on':''}" role="tab" data-st-tab="backup" onclick="stTab('backup')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Data &amp; Backup</button><button class="st-tab${_stT==='workspace'?' on':''}" role="tab" data-st-tab="workspace" onclick="stTab('workspace')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>Workspace</button><button class="st-tab${_stT==='nav'?' on':''}" role="tab" data-st-tab="nav" onclick="stTab('nav')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Navigation</button><button class="st-tab${_stT==='slack'?' on':''}" role="tab" data-st-tab="slack" onclick="stTab('slack')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Slack</button><button class="st-tab${_stT==='aircon'?' on':''}" role="tab" data-st-tab="aircon" onclick="stTab('aircon')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 10.5L9 4H18v9l-6.5 6.5L2.5 10.5z"/></svg>AirCon</button><button class="st-tab${_stT==='keys'?' on':''}" role="tab" data-st-tab="keys" onclick="stTab('keys')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg>Shortcuts</button><span style="flex:1"></span><button class="st-tab${_stT==='adv'?' on':''}" role="tab" data-st-tab="adv" onclick="stTab('adv')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Advanced</button></div>
 <div class="st-panel" data-st="backup" style="display:${_stT==='backup'?'':'none'}">
-<div class="settings-sec">
-  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Data &amp; Backup</div>
-  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Export all data to JSON, then re-import later to restore everything. Auto-backups are saved locally every 10 minutes.</p>
-  <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:16px;">
-    <button class="btn btn-acc btn-sm" onclick="downloadFullBackup()">⬇ Download full backup</button>
-    <button class="btn btn-ghost btn-sm" onclick="exportData()">Export this device's data (.json)</button>
-    <button class="btn btn-ghost btn-sm" onclick="triggerImport()">⬆ Import data</button>
-    <button class="btn btn-ghost btn-sm" onclick="_saveLocalBackup();showToast('Backup saved ✓');render()">💾 Save backup now</button>
-    <a class="btn btn-ghost btn-sm" href="https://drive.google.com/drive/folders/1IU17dl7BGzI1fizvsG1IFOfC4vfQV29x?usp=drive_link" target="_blank" rel="noopener" style="text-decoration:none;" title="Shared Google Drive folder that holds the manual backup copies">📁 Backup folder (Google Drive)</a>
+<div class="settings-sec st-flush">
+  <div class="st-strip">
+    ${(()=>{
+      let iso=null;try{iso=localStorage.getItem('pf_last_backup');}catch(_){}
+      const days=iso?Math.floor((Date.now()-new Date(iso).getTime())/864e5):null;
+      const lastTxt=days===null?'None yet':days<=0?'Today':days===1?'Yesterday':days+' days ago';
+      const lastCls=days===null||days>=14?'warn':'ok';
+      const bad=!!_pfBadSince,uns=!!_pfUnsynced;
+      const syncTxt=bad?'Not saving':uns?'Saving…':'Saved';
+      const syncCls=bad?'bad':uns?'':'ok';
+      let nLocal=0;try{nLocal=listLocalBackups().length;}catch(_){}
+      return`<div><b>Last full backup</b><span class="${lastCls}">${lastTxt}</span></div>
+      <div><b>Sync</b><span class="${syncCls}">${syncTxt}</span></div>
+      <div><b>On this device</b><span>${nLocal} auto</span></div>
+      <div><b>Server snapshots</b><span id="st-snapcount">${typeof _histTotalCache==='number'?_histTotalCache:'—'}</span></div>`;
+    })()}
   </div>
-  <div style="font-size:.74rem;margin:-6px 0 14px;line-height:1.5;"><div id="bk-age" style="color:var(--text2);">${_bkAgeHtml()}</div><div id="bk-st" style="color:var(--muted);"></div></div>
-  <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importData(this)">
-  <!-- Auto-backup list -->
-  <div id="pf-backup-list"></div>
-  <div style="margin-top:10px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <button class="btn btn-ghost btn-sm" onclick="document.getElementById('rc-file-input').click()">Compare with a backup file…</button>
-    <span style="font-size:.7rem;color:var(--muted);">Pick a downloaded backup to see what differs and restore only what you choose.</span>
-    <input type="file" id="rc-file-input" accept=".json,application/json" style="display:none" onchange="rcFromFile(this)">
-  </div>
-  <!-- PocketBase version history -->
-  <div style="margin-top:18px;">
-    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-      <span style="font-size:.72rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;">Server Version History</span>
-      <button class="btn btn-acc btn-sm" onclick="_histDownAt=0;_saveHistorySnapshot('Manual',true).then(()=>{_histLoaded=true;renderPBHistoryList();})">Save snapshot now</button>
+  <div style="padding:14px 16px;">
+    <div style="display:flex;gap:8px;flex-wrap:wrap;">
+      <button class="btn btn-acc btn-sm" onclick="downloadFullBackup()">⬇ Download full backup</button>
+      <button class="btn btn-ghost btn-sm" onclick="_saveLocalBackup();showToast('Backup saved ✓');render()">💾 Save backup now</button>
+      <button class="btn btn-ghost btn-sm" onclick="triggerImport()">⬆ Import data</button>
+      <button class="btn btn-ghost btn-sm" onclick="exportData()">Export this device's data (.json)</button>
+      <a class="btn btn-ghost btn-sm" href="https://drive.google.com/drive/folders/1IU17dl7BGzI1fizvsG1IFOfC4vfQV29x?usp=drive_link" target="_blank" rel="noopener" style="text-decoration:none;" title="Shared Google Drive folder that holds the manual backup copies">📁 Backup folder (Google Drive)</a>
     </div>
-    <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Stored in PocketBase: a snapshot of the server's data at the start of each session (last ${PB_MAX_SESSION}), one per day (last ${PB_MAX_DAILY} days), and one every 5 changes (last ${PB_MAX_HISTORY}). Each kind is kept separately.</div>
-    <div id="pb-history-list"><div style="color:var(--muted);font-size:.78rem;">Loading…</div></div>
+    <div style="font-size:.74rem;margin-top:12px;line-height:1.5;"><div id="bk-age" style="color:var(--text2);">${_bkAgeHtml()}</div><div id="bk-st" style="color:var(--muted);"></div></div>
+    <p style="font-size:.7rem;color:var(--muted);margin:8px 0 0;">Download a full backup, then drop it into the Drive folder to keep a copy outside this browser and the server.</p>
+    <input type="file" id="import-file-input" accept=".json" style="display:none;" onchange="importData(this)">
   </div>
+</div>
+<div class="settings-sec st-flush">
+  <details class="st-fold" open>
+    <summary>Automatic backups on this device<span style="flex:1"></span><span class="st-meta">every 10 minutes</span></summary>
+    <div class="st-in"><div id="pf-backup-list"></div></div>
+  </details>
+  <details class="st-fold">
+    <summary>Server version history<span style="flex:1"></span><span class="st-meta">session ${PB_MAX_SESSION} · daily ${PB_MAX_DAILY} · auto ${PB_MAX_HISTORY}</span></summary>
+    <div class="st-in">
+      <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;">
+        <button class="btn btn-acc btn-sm" onclick="_histDownAt=0;_saveHistorySnapshot('Manual',true).then(()=>{_histLoaded=true;renderPBHistoryList();})">Save snapshot now</button>
+      </div>
+      <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Stored in PocketBase: a snapshot of the server's data at the start of each session (last ${PB_MAX_SESSION}), one per day (last ${PB_MAX_DAILY} days), and one every 15 saves (last ${PB_MAX_HISTORY}). Each kind is kept separately.</div>
+      <div id="pb-history-list"><div style="color:var(--muted);font-size:.78rem;">Loading…</div></div>
+    </div>
+  </details>
+  <details class="st-fold">
+    <summary>Compare with a backup file</summary>
+    <div class="st-in">
+      <p style="font-size:.72rem;color:var(--muted);margin:0 0 10px;">Pick a downloaded backup to see what differs and restore only what you choose.</p>
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('rc-file-input').click()">Choose backup file…</button>
+      <input type="file" id="rc-file-input" accept=".json,application/json" style="display:none" onchange="rcFromFile(this)">
+    </div>
+  </details>
 </div>
 </div>
 <div class="st-panel st-grid" data-st="workspace" style="display:${_stT==='workspace'?'':'none'}">
