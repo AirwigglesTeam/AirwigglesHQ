@@ -1637,6 +1637,89 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .mcal-frlab{font-size:.58rem;font-weight:700;color:var(--fin);background:color-mix(in srgb,var(--fin) 16%,transparent);border-radius:4px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
 .mcal-lg.fr{background:color-mix(in srgb,var(--fin) 30%,var(--surface));box-shadow:inset 0 2px 0 var(--fin);}
 @media(max-width:700px){.mcal-frlab{display:none;}}
+
+/* ── Finance page, matching the approved mockup ── */
+.fh-top{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:6px;}
+.fh-top .page-title{flex:1;min-width:120px;}
+.fh-sub{color:var(--muted);font-size:.78rem;margin:2px 0 4px;}
+.fin-pills{display:flex;gap:8px;flex-wrap:wrap;margin:12px 0 14px;border:0;padding:0;background:none;}
+.fin-pills .fin-pill{all:unset;cursor:pointer;display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:99px;font-size:.76rem;font-weight:600;color:var(--text2);background:var(--surface);border:1px solid var(--border);box-sizing:border-box;}
+.fin-pills .fin-pill:hover{border-color:var(--acc);}
+.fin-pills .fin-pill.on{background:var(--teal-dim,rgba(98,208,170,.12));color:var(--acc);border-color:var(--acc);}
+.fin-pills .fin-pill:focus-visible{outline:2px solid var(--acc);}
+.fo-top2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;align-items:start;margin-bottom:12px;}
+.fo-top2 .fin-review{margin-bottom:0;}
+@media(max-width:820px){.fo-top2{grid-template-columns:minmax(0,1fr);}}
+#fin-overview .fo-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:12px;overflow:hidden;}
+#fin-overview .fo-strip>div{padding:12px 16px;border-right:1px solid var(--border);min-width:0;}
+#fin-overview .fo-strip>div:last-child{border-right:0;}
+#fin-overview .fo-strip b{display:block;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;}
+#fin-overview .fo-strip span{font-family:'DM Mono',monospace;font-size:1.15rem;font-weight:600;}
+#fin-overview .fo-strip small{display:block;font-size:.66rem;color:var(--muted);margin-top:1px;}
+#fin-overview .ok{color:var(--green);}#fin-overview .warn{color:var(--yellow);}#fin-overview .bad{color:var(--red);}
+#fin-overview .mono{font-family:'DM Mono',monospace;}#fin-overview .mut{color:var(--muted);}
+#fin-overview .sp{flex:1;}
+#fin-overview .card-hd,#fin-overview .hd{display:flex;align-items:center;gap:8px;padding:11px 16px;border-bottom:1px solid var(--border);font-size:.7rem;letter-spacing:.07em;text-transform:uppercase;font-weight:700;}
+#fin-overview .bd{padding:14px 16px;font-size:.78rem;line-height:1.5;}
+#fin-overview .hint{font-size:.68rem;color:var(--muted);margin:10px 0 0;}
+.fo-go{font-size:.68rem;text-transform:none;letter-spacing:0;color:var(--acc);cursor:pointer;font-weight:600;}
+.fo-go:focus-visible{outline:2px solid var(--acc);}
+.fo-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(340px,100%),1fr));gap:12px;align-items:start;margin-bottom:12px;}
+.fo-2{display:flex;justify-content:space-between;gap:10px;align-items:baseline;flex-wrap:wrap;}
+.fo-big{font-size:1.1rem;}
+.fo-bar{height:6px;border-radius:99px;background:var(--surface3);overflow:hidden;margin-top:5px;}
+.fo-bar s{display:block;height:100%;border-radius:99px;background:var(--acc);}
+.fo-bar.over s{background:var(--red);}.fo-bar.near s{background:var(--yellow);}
+.fo-ev{margin-bottom:10px;font-size:.76rem;}.fo-ev:last-child{margin-bottom:0;}
+.fo-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.76rem;}
+.fo-row:last-child{border-bottom:0;}.fo-row .l{flex:1;min-width:0;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}.fo-row .mut{font-size:.68rem;white-space:nowrap;}
+.fo-flow{display:flex;height:34px;border-radius:9px;overflow:hidden;margin:2px 0 10px;border:1px solid var(--border);}
+.fo-flow div{display:grid;place-items:center;font-size:.62rem;font-weight:700;color:#0d1f19;min-width:0;overflow:hidden;white-space:nowrap;}
+.fo-leg{display:flex;flex-wrap:wrap;gap:6px 14px;font-size:.7rem;color:var(--text2);}
+.fo-leg i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:5px;vertical-align:-1px;}
+#fin-overview .fin-flow{margin-bottom:12px;}
+@media(max-width:640px){.fin-pills{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}.fin-pills .fin-pill{padding:9px 14px;white-space:nowrap;}#fin-overview .fo-strip>div{border-right:0;border-bottom:1px solid var(--border);}}
+/* bank strip joins into one card, like the mockup */
+#fin-overview .fin-bank>.fin-grid4{gap:0;border:1px solid var(--border);border-radius:12px;overflow:hidden;background:var(--surface);margin-bottom:12px!important;}
+#fin-overview .fin-bank .fin-metric{border:0;border-radius:0;border-right:1px solid var(--border);background:transparent;}
+#fin-overview .fin-bank .fin-metric:last-child{border-right:0;}
+
+/* Budget & spending */
+#fin-budget .card{margin-bottom:12px;}
+.fb-bd{padding:14px 16px;font-size:.78rem;line-height:1.5;}
+.fb-hint{font-size:.68rem;color:var(--muted);margin:0 0 10px;}
+.fb-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin:0 -16px 10px;border-top:1px solid var(--border);border-bottom:1px solid var(--border);}
+.fb-strip>div{padding:12px 16px;border-right:1px solid var(--border);min-width:0;}.fb-strip>div:last-child{border-right:0;}
+.fb-strip b{display:block;font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:2px;}
+.fb-strip span{font-family:'DM Mono',monospace;font-size:1.15rem;font-weight:600;}.fb-strip small{display:block;font-size:.66rem;color:var(--muted);margin-top:1px;}
+#fin-budget .ok{color:var(--green);}#fin-budget .warn{color:var(--yellow);}#fin-budget .bad{color:var(--red);}
+.fb-tr{display:grid;grid-template-columns:minmax(0,1.6fr) .8fr .8fr 1fr .8fr;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid var(--border);font-size:.76rem;}
+.fb-tr:last-child{border-bottom:0;}
+.fb-th{font-size:.58rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+.fb-sep{margin-top:8px;border-top:1px solid var(--border);}
+.fb-l{font-weight:600;min-width:0;display:flex;align-items:center;gap:7px;flex-wrap:wrap;}.fb-l small,.fb-sm{font-weight:400;color:var(--muted);font-size:.66rem;}
+.fb-m{font-family:'DM Mono',monospace;font-size:.76rem;}.fb-d{color:var(--muted);}
+.fb-p{font-weight:700;}
+.fb-inp{background:var(--surface2);border:1px solid var(--border);border-radius:7px;padding:5px 8px;color:var(--text);font:inherit;font-family:'DM Mono',monospace;font-size:.76rem;text-align:right;width:100%;max-width:96px;box-sizing:border-box;}
+.fb-inp:focus-visible{outline:2px solid var(--acc);}
+.fb-tag{font-size:.6rem;font-weight:700;padding:2px 8px;border-radius:99px;background:var(--surface2);border:1px solid var(--border);white-space:nowrap;}
+.fb-tag.lk{color:var(--acc);border-color:var(--acc);background:var(--teal-dim,rgba(98,208,170,.12));}
+.fb-tag.bad{color:var(--red);border-color:var(--red);}.fb-tag.warn{color:var(--yellow);border-color:var(--yellow);}
+.fb-none{font-size:.76rem;color:var(--muted);padding:6px 0;}
+.fb-cat{padding:9px 0;border-bottom:1px solid var(--border);}.fb-cat:last-child{border-bottom:0;}
+.fb-cr{display:grid;grid-template-columns:minmax(0,1fr) 80px 96px;gap:10px;align-items:center;font-size:.78rem;}
+.fb-cr .fb-m:last-child{text-align:right;}
+.fb-dot{width:8px;height:8px;border-radius:2px;flex:none;display:inline-block;}
+.fb-more{margin:10px 0 0;border:1px solid var(--border);border-radius:10px;}
+.fb-more summary{padding:9px 12px;}.fb-more>div{padding:0 12px 6px;}
+.fb-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(460px,100%),1fr));gap:12px;align-items:start;}
+@media(max-width:640px){.fb-tr{grid-template-columns:1fr 1fr;gap:4px 10px;}.fb-th{display:none;}.fb-tr .fb-l{grid-column:1/-1;}.fb-strip>div{border-right:0;border-bottom:1px solid var(--border);}.fb-cr{grid-template-columns:minmax(0,1fr) 70px 84px;}}
+.fb-more>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;font-size:.78rem;font-weight:600;}
+.fb-more>summary::-webkit-details-marker{display:none;}
+.fb-more>summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--acc);border-bottom:2px solid var(--acc);transform:rotate(-45deg);transition:transform .15s;}
+.fb-more[open]>summary::before{transform:rotate(45deg);}
+.fb-more .meta{margin-left:auto;font-size:.68rem;color:var(--muted);font-weight:400;}
+#fin-budget .card-hd{display:flex;align-items:center;gap:8px;}
 </style>
 </head>
 <body>
@@ -3191,7 +3274,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=115;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=117;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6586,6 +6669,8 @@ function finPlanCalc(fy,todayIso){
     else if(e.freq==='Annual'){const pm=parseInt(e.payMonth)||4;if(m>=_finFyMonthIdx(pm))r.spent+=a;}
   });
   (S.finance.oneoff||[]).forEach(e=>{if(!isInFY(e.date,fy))return;const r=row(e.cat||'Other');r.full+=e.amount||0;if(upTo(e.date))r.spent+=e.amount||0;});
+  // team pay: contracted hours x rate not already entered as a cost (the same figure the profit calculation uses)
+  {const tp=finTeamPayCost();if(tp>0){const r=row('Team Pay');r.full+=tp;r.spent+=tp;}}
   // events: budget = event budgets starting in this year, spent = expenses logged so far (read from the event pages)
   let evBud=0,evSpent=0,evFull=0;
   (S.projects||[]).forEach(p=>{
@@ -6619,25 +6704,49 @@ function _finPlanTag(s,rev){
   const M=rev?{ahead:['Ahead','var(--green)'],watch:['Watch','var(--yellow)'],behind:['Behind','var(--red)']}:{ok:['On track','var(--green)'],watch:['Watch','var(--yellow)'],over:['Over','var(--red)']};
   const x=M[s];return x?`<span class="fp-tag" style="color:${x[1]};border-color:${x[1]};">${x[0]}</span>`:'';
 }
+function setCatBudget(cat,v){if(!S.finance.budgets)S.finance.budgets={};S.finance.budgets[cat]=Math.max(0,parseFloat(v)||0);save();reCalcFin();}
+function setStreamTarget(id,v){
+  if(String(id).indexOf('link-')===0){setLinkTarget(id.slice(5),v);return;}
+  updateRevStream(id,'target',Math.max(0,parseFloat(v)||0));
+}
 function _finPlanHtml(){
   const fy=S.finance.finYear,P=finPlanCalc(fy),pc=Math.round(P.frac*100);
-  const money=_finMoney;
-  const kindNote=s=>s.linked?' <span class="fp-lk">linked</span>'+(s.extra>0?' <small>+'+money(s.extra)+' projected</small>':''):s.kind==='recurring'?' <small>'+money(s.amount)+' '+({Monthly:'monthly',Quarterly:'quarterly',Annual:'yearly'}[s.freq]||'monthly')+'</small>':s.kind==='oneoff'?' <small>one-off'+(s.date?', '+escHtml(fmtD(s.date)):'')+'</small>':'';
-  const revRows=P.streams.length?P.streams.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${s.target>0?money(s.target):'<em>no target</em>'}</span><span class="fp-s">${_finPlanTag(s.state,true)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No revenue streams yet.</div>';
-  const allCost=P.rows.concat(P.ev.budget>0||P.ev.spent>0||P.ev.full>0?[P.ev]:[]);
-  const costRows=allCost.length?allCost.map(r=>`<div class="fp-row fp-c"><span class="fp-n">${escHtml(r.cat)}${r.events?' <small>from event pages</small>':''}</span><span class="fp-v">${money(r.spent)}</span><span class="fp-v fp-t">${r.budget>0?money(r.budget):'<em>no budget</em>'}</span><span class="fp-v fp-f">${money(r.full)}</span><span class="fp-s">${_finPlanTag(r.state,false)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No costs yet.</div>';
-  return `<div class="card" style="margin-bottom:14px;" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${P.funding.length?`<span class="fp-seg" role="group" aria-label="Funding"><button type="button" class="${P.fundingIncluded?'on':''}" onclick="setFundingOn(true)">With funding</button><button type="button" class="${P.fundingIncluded?'':'on'}" onclick="setFundingOn(false)">Without</button></span>`:''}<button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue streams</button></span></div><div class="card-bd">
-  <p class="fp-help">Set targets and budgets once. Revenue and costs below are compared with them as the year goes on. ${P.state==='now'?pc+'% of the year has passed.':P.state==='done'?'This year is complete.':'This year has not started.'}</p>
-  <div class="fin-grid4" style="margin-bottom:12px;">
-    <div class="fin-metric"><div class="flbl2">Revenue target${P.funding.length?(P.fundingIncluded?' (with funding)':' (without funding)'):''}</div><div class="fval blue">${money(P.revTarget)}</div><div class="fp-sub">${money(P.revActual)} so far${P.revTarget>0?' · '+Math.round(P.revActual/P.revTarget*100)+'%':''}</div>${P.projExtra>0?`<div class="fp-sub">+${money(P.projExtra)} projected (sponsors in talks, expected income)</div>`:''}${P.funding.length?`<div class="fp-sub"><b style="color:var(--text2);">${money(P.coreTarget)}</b> without funding · ${money(P.coreActual)} so far</div>`:''}</div>
-    <div class="fin-metric"><div class="flbl2">Cost budget</div><div class="fval">${money(P.costBudget)}</div><div class="fp-sub">${money(P.costSpent)} spent so far</div></div>
-    <div class="fin-metric"><div class="flbl2">Planned profit</div><div class="fval ${P.planned>=0?'green':'red'}">${money(P.planned)}</div><div class="fp-sub">target minus budget</div></div>
-    <div class="fin-metric"><div class="flbl2">Year passed</div><div class="fval" style="font-size:.95rem;">${pc}%</div><div class="fin-fybar"><s style="width:${pc}%"></s></div></div></div>
-  <div class="fp-grp"><div class="fp-hd"><span class="fp-n">Revenue</span><span class="fp-v">So far</span><span class="fp-v">Target</span><span class="fp-s">Pace</span></div>${revRows}${_finLinkedNote()}</div>
-  ${P.funding.length?`<div class="fp-grp"><div class="fp-hd"><span class="fp-n">Funding <small>${P.fundingIncluded?'included above':'left out of the totals'}</small></span><span class="fp-v">Received</span><span class="fp-v">Expected</span><span class="fp-s"></span></div>${P.funding.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${money(s.full)}</span><span class="fp-s"></span></div>`).join('')}${(()=>{const fe=finFundingEnd();return fe?`<div class="fp-help" style="margin:6px 0 0;">${fe.over?'Funding ended':'Funding ends'} <b>${escHtml(fmtD(fe.end))}</b>${!fe.over?' · about '+fe.months+' month'+(fe.months===1?'':'s')+' left':''}. Revenue without it: <b>${money(P.coreTarget)}</b> for the year.</div>`:`<div class="fp-help" style="margin:6px 0 0;">Set an end date on a recurring funding stream to see when it runs out.</div>`;})()}</div>`:''}
-  <div class="fp-grp"><div class="fp-hd fp-c"><span class="fp-n">Costs</span><span class="fp-v">Spent so far</span><span class="fp-v">Budget</span><span class="fp-v fp-f">Full year</span><span class="fp-s">Pace</span></div>${costRows}</div>
-  <p class="fp-help" style="margin:10px 0 0;">Spent so far counts recurring costs as they fall due (yearly bills on the month you choose), one-off costs by date, and event expenses from each event page. Edit category budgets below.</p>
-  </div></div>`;
+  const money=n=>_finMoney(Math.round(n));
+  const kindNote=s=>s.linked?' <span class="fb-tag lk">Linked</span>':s.kind==='recurring'?' <small>'+money(s.amount)+' '+({Monthly:'monthly',Quarterly:'quarterly',Annual:'yearly'}[s.freq]||'monthly')+'</small>':s.kind==='oneoff'?' <small>one-off'+(s.date?', '+escHtml(fmtD(s.date)):'')+'</small>':'';
+  const pace=s=>({ahead:['Ahead','ok'],watch:['Watch','warn'],behind:['Behind','bad']}[s]);
+  const row=(s,proj)=>{const p=pace(s.state);return `<div class="fb-tr"><span class="fb-l">${escHtml(s.name)}${kindNote(s)}</span><span class="fb-m">${money(s.actual)}</span><span class="fb-m fb-d">${money(proj)}</span><input class="fb-inp" type="number" min="0" step="100" inputmode="decimal" value="${s.target||''}" placeholder="target" aria-label="${escHtml(s.name)} target" onchange="setStreamTarget('${s.id}',this.value)"><span class="fb-p ${p?p[1]:''}">${p?p[0]:''}</span></div>`;};
+  const revRows=P.streams.length?P.streams.map(s=>row(s,s.linked?s.actual+s.extra:s.full)).join(''):'<div class="fb-none">No revenue streams yet. Use "Edit revenue streams" to add one.</div>';
+  const fundRows=P.funding.map(s=>`<div class="fb-tr"><span class="fb-l">${escHtml(s.name)}${kindNote(s)}</span><span class="fb-m">${money(s.actual)}</span><span class="fb-m fb-d">${money(s.full)}</span><span class="fb-m fb-d">${P.fundingIncluded?'included':'left out'}</span><span></span></div>`).join('');
+  const fe=P.funding.length?finFundingEnd(_localToday()):null;
+  const fundEnd=fe?`<div class="fb-hint" style="margin:6px 0 0">${fe.over?'Funding ended '+escHtml(fmtD(fe.end))+'. Plan without it from here.':'Funding ends '+escHtml(fmtD(fe.end))+' · '+fe.months+' month'+(fe.months===1?'':'s')+' left.'}</div>`:'';
+  const seg=P.funding.length?`<span class="fp-seg" role="group" aria-label="Funding"><button type="button" class="${P.fundingIncluded?'on':''}" onclick="setFundingOn(true)">With funding</button><button type="button" class="${P.fundingIncluded?'':'on'}" onclick="setFundingOn(false)">Without</button></span>`:'';
+  return `<div class="card" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><span style="flex:1"></span>${seg}<button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue streams</button></div><div class="fb-bd">
+  <p class="fb-hint">Set the plan once at the start of the year. Revenue is then compared with it all year. Projected adds sponsors still in talks and expected event income. ${P.state==='now'?pc+'% of the year has passed.':P.state==='done'?'This year is complete.':'This year has not started.'}</p>
+  <div class="fb-strip">
+    <div><b>Revenue target${P.funding.length?(P.fundingIncluded?' (with funding)':' (without funding)'):''}</b><span>${money(P.revTarget)}</span><small>${P.projExtra>0?'projected '+money(P.revActual+P.projExtra):'no projections yet'}</small>${P.funding.length?`<small><b style="color:var(--text2);display:inline;font-size:inherit;letter-spacing:0;text-transform:none;">${money(P.coreTarget)}</b> without funding</small>`:''}</div>
+    <div><b>Revenue so far</b><span class="ok">${money(P.revActual)}</span><small>${P.revTarget>0?Math.round(P.revActual/P.revTarget*100)+'% of target':'no target set'}</small></div>
+    <div><b>Cost budget</b><span>${money(P.costBudget)}</span><small>${money(P.costSpent)} spent so far</small></div>
+    <div><b>Planned profit</b><span class="${P.planned>=0?'ok':'bad'}">${money(P.planned)}</span><small>target minus budget</small></div></div>
+  <div class="fb-tbl"><div class="fb-tr fb-th"><span>Revenue line</span><span>Actual</span><span>Projected</span><span>Target</span><span>Pace</span></div>${revRows}${fundRows?`<div class="fb-tr fb-th fb-sep"><span>Funding</span><span>Received</span><span>Expected</span><span></span><span></span></div>${fundRows}`:''}</div>${fundEnd}
+  ${_finLinkedNote()}
+  <p class="fb-hint" style="margin:8px 0 0">Linked lines fill in from confirmed sponsors and received event income. Manual lines you update as money arrives.</p></div></div>`;
+}
+/* Cost budget: type a yearly amount per category; actuals are read from recurring and one-off costs, event pages and team pay */
+function _finCostBudgetHtml(){
+  const fy=S.finance.finYear,P=finPlanCalc(fy),money=n=>_finMoney(Math.round(n));
+  const bud=S.finance.budgets||{};
+  const have=new Set(P.rows.map(r=>r.cat));
+  const col=c=>(FIN_CATS[c]||{c:'#888'}).c;
+  const tag=r=>{if(!(r.budget>0))return'';if(r.spent>r.budget)return `<span class="fb-tag bad">Over by ${money(r.spent-r.budget)}</span>`;return r.state==='watch'?'<span class="fb-tag warn">Watch</span>':'<span class="fb-tag">On pace</span>';};
+  const bar=r=>{const p=r.budget>0?Math.round(r.spent/r.budget*100):0;return r.budget>0?`<div class="fo-bar ${p>100?'over':p>85?'near':''}"><s style="width:${Math.min(100,p)}%"></s></div>`:'';};
+  const line=r=>`<div class="fb-cat"><div class="fb-cr"><span class="fb-l"><i class="fb-dot" style="background:${col(r.cat)}"></i>${escHtml(r.cat)}${tag(r)}</span><span class="fb-m">${money(r.spent)}</span><input class="fb-inp" type="number" min="0" step="50" inputmode="decimal" value="${r.budget||''}" placeholder="budget" aria-label="${escHtml(r.cat)} budget" onchange="setCatBudget('${r.cat.replace(/'/g,"\\'")}',this.value)"></div>${bar(r)}</div>`;
+  const evRow=(P.ev.budget>0||P.ev.spent>0)?`<div class="fb-cat"><div class="fb-cr"><span class="fb-l"><i class="fb-dot" style="background:${col('Events')}"></i>Events${tag(P.ev)}<small class="fb-sm">budgets from the event pages</small></span><span class="fb-m">${money(P.ev.spent)}</span><span class="fb-m fb-d">${money(P.ev.budget)}</span></div>${bar(P.ev)}</div>`:'';
+  const more=FIN_CAT_NAMES.filter(c=>!have.has(c)&&c!=='Events').map(c=>({cat:c,budget:0,spent:0,full:0}));
+  const tot=`<div class="fo-2" style="margin-bottom:4px"><b>Total</b><span class="mono"><b>${money(P.costSpent)}</b> <span class="mut">of ${money(P.costBudget)}</span></span></div>${P.costBudget>0?`<div class="fo-bar ${P.costSpent>P.costBudget?'over':P.costSpent>P.costBudget*P.frac*1.15?'near':''}"><s style="width:${Math.min(100,Math.round(P.costSpent/P.costBudget*100))}%"></s></div>`:''}`;
+  return `<div class="card" id="fin-costbudget"><div class="card-hd"><span class="card-title">Cost budget</span></div><div class="fb-bd">
+    <p class="fb-hint">Set a yearly amount per category. Actuals are read from recurring costs, one-off costs, event expenses and team pay, so you only type the budget.</p>
+    ${tot}<div style="margin-top:8px">${P.rows.map(line).join('')}${evRow}${!P.rows.length&&!evRow?'<div class="fb-none">No costs or budgets yet. Add recurring or one-off costs below, or set a budget for a category.</div>':''}</div>
+    ${more.length?`<details class="fold fb-more"><summary>Set a budget for another category<span class="meta">${more.length} unused</span></summary><div>${more.map(line).join('')}</div></details>`:''}</div></div>`;
 }
 /* ── Event money: sponsor fees + event income, next to the expenses already logged on the event page ──
    Counting rules (one place, used by the event page and Finance):
@@ -6782,13 +6891,13 @@ function finPayCalc(){
 }
 /* Where the money goes: one stacked bar from revenue */
 function _finFlowHtml(){
-  const P=finPayCalc(),money=_finMoney;
+  const P=finPayCalc(),m=n=>_finMoney(Math.round(n));
   if(!(P.rev>0))return'';
-  const seg=[['Costs',Math.min(P.costs-P.teamPay,P.rev),'var(--red)'],['Team pay',P.teamPay,'#ec4899'],['Tax',P.ct.tax,'var(--yellow)'],['Savings',P.savings,'var(--blue)'],['Dividends',P.pool,'var(--green)']];
+  const seg=[['Costs',Math.min(P.costs-P.teamPay,P.rev),'#d08a3b'],['Team pay',P.teamPay,'#7c5cd6'],['Tax',P.ct.tax,'#e06060'],['Savings',P.savings,'#3b82d6'],['Dividends',P.pool,'#1b9a78']];
   const tot=seg.reduce((a,s)=>a+s[1],0)||1;
-  const bar=seg.filter(s=>s[1]>0).map(s=>`<i style="width:${(s[1]/tot*100).toFixed(2)}%;background:${s[2]}" title="${s[0]} ${money(s[1])}"></i>`).join('');
-  const leg=seg.map(s=>`<span class="ff-k"><b style="background:${s[2]}"></b>${s[0]} <em>${money(s[1])}</em></span>`).join('');
-  return`<div class="card fin-flow" id="fin-flow"><div class="card-hd"><span class="card-title">Where the money goes</span><span style="font-size:.7rem;color:var(--muted);">${getFYLabel(S.finance.finYear)} · of ${money(P.rev)} revenue</span></div><div class="card-bd"><div class="ff-bar">${bar}</div><div class="ff-leg">${leg}</div>${P.profit<0?`<div class="ff-warn">Costs including team pay are higher than revenue, so there is nothing for tax, savings or dividends.</div>`:''}</div></div>`;
+  const bar=seg.filter(s=>s[1]>0).map(s=>`<div style="flex:${s[1]};background:${s[2]}" title="${s[0]} ${m(s[1])}">${s[1]/tot>.09?s[0]:''}</div>`).join('');
+  const leg=seg.map(s=>`<span><i style="background:${s[2]}"></i>${s[0]} <b class="mono">${m(s[1])}</b></span>`).join('');
+  return`<div class="card fin-flow" id="fin-flow"><div class="hd">Where the money goes<span class="sp"></span>${_foGo('pay','Savings &amp; pay →')}</div><div class="bd"><div class="fo-flow">${bar}</div><div class="fo-leg">${leg}</div>${P.profit<0?`<div class="ff-warn">Costs including team pay are higher than revenue, so there is nothing for tax, savings or dividends.</div>`:''}</div></div>`;
 }
 /* ── Finance review: a scheduled meeting (like a co-working day) tied to each quarter end ──
    S.finance.reviews = [{id,title,date,startTime,endTime,notes,objectives,members}]
@@ -6994,6 +7103,53 @@ function saveFinTasksSetup(){
   saveWithUndo('Add finance tasks');
   const n=finTasksAdd(items);
   saveNow();closeModal();render();showToast(n+' finance task'+(n===1?'':'s')+' added to '+finAdminProject(false).name);
+}
+/* ── Finance page header and Overview, laid out as in the approved mockup ──
+   Everything shown is read from data that already exists (revenue streams, recurring and one-off costs, event pages,
+   team hours, bank balances), so nothing is typed in twice. */
+function _finHeadHtml(tab){
+  const years=getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}${y===S.finance.finYear?' · ends 31 Mar':''}</option>`).join('');
+  return `<div class="fh-top"><div class="page-title">Finances</div>
+    <select class="fsel" aria-label="Financial year" onchange="S.finance.finYear=parseInt(this.value);save();render();">${years}</select>
+    <button class="btn btn-ghost btn-xs" onclick="generateFinanceReport()" title="Export PDF report">Export PDF</button>
+    <button class="btn btn-ghost btn-xs" onclick="lockFinance()" title="Lock finance">Lock</button></div>
+  ${_finLinksHtml()}
+  <p class="fh-sub">Everything on this page is read from your events, sponsors, recurring costs and team hours, so it is only entered once.</p>
+  <div class="fin-pills" role="tablist">${_finPillsHtml(tab)}</div>`;
+}
+function _foGo(k,txt){return `<a class="fo-go" role="button" tabindex="0" onclick="finGo('${k}')" onkeydown="if(event.key==='Enter')finGo('${k}')">${txt}</a>`;}
+function _foBar(a,b){const p=b>0?Math.round(a/b*100):0;return `<div class="fo-bar ${p>100?'over':p>85?'near':''}"><s style="width:${Math.min(100,p)}%"></s></div>`;}
+function _foPace(spent,budget,frac,rev){
+  const e=budget*frac;
+  if(rev)return spent>=e?['Ahead','ok']:spent>=e*.85?['Watch','warn']:['Behind','bad'];
+  return spent<=e*1.05?['On pace','ok']:spent<=e*1.25?['Watch','warn']:['Over pace','bad'];
+}
+function _finOverviewHtml(){
+  const m=n=>_finMoney(Math.round(n)),fy=S.finance.finYear,P=finPayCalc(),L=finPlanCalc(fy),frac=L.frac,pc=Math.round(frac*100);
+  const revT=L.revTarget,revP=revT>0?_foPace(L.revActual,revT,frac,true):null;
+  const strip=`<div class="card fo-strip">
+    <div><b>Revenue</b><span>${m(P.rev)}</span><small>${revT>0?'target '+m(revT)+' · '+revP[0].toLowerCase():'no target set yet'}</small>${_finFundNote()}</div>
+    <div><b>Costs</b><span>${m(P.costs)}</span><small>${m(P.rec/12)}/mo recurring${P.teamPay>0?' · incl. team pay':''}</small></div>
+    <div><b>Profit</b><span class="${P.profit>=0?'ok':'bad'}">${m(P.profit)}</span><small>before tax</small></div>
+    <div><b>Net after tax</b><span class="${P.net>=0?'ok':'bad'}">${m(P.net)}</span><small>tax ${m(P.ct.tax)}</small></div>
+    <div><b>Savings set aside</b><span style="color:var(--blue)">${m(P.savings)}</span><small>${parseFloat((S.finance.savings||{}).rate)||0}% of net</small></div></div>`;
+  // budget
+  const over=L.rows.filter(r=>r.state==='over').map(r=>r.cat).concat(L.ev.state==='over'?['Events']:[]);
+  const bp=L.costBudget>0?_foPace(L.costSpent,L.costBudget,frac,false):null;
+  const budget=`<div class="card"><div class="hd">Budget<span class="sp"></span>${_foGo('spend','Edit budget →')}</div><div class="bd">${L.costBudget>0
+    ?`<div class="fo-2"><b class="mono">${m(L.costSpent)}</b><span class="mono mut">of ${m(L.costBudget)}</span></div>${_foBar(L.costSpent,L.costBudget)}<p class="hint">Year is ${pc}% through, budget used ${Math.round(L.costSpent/L.costBudget*100)}%. <b class="${bp[1]}">${bp[0]}</b>${over.length?' · over in '+escHtml(over.join(', ')):''}</p>`
+    :`<p class="hint" style="margin:0">No cost budget set yet.</p><button class="btn btn-xs" style="margin-top:8px" onclick="finGo('spend')">Set a budget</button>`}</div></div>`;
+  // recurring
+  const rec=(S.finance.recurring||[]).slice().sort((a,b)=>finAnn(b)-finAnn(a));
+  const recC=`<div class="card"><div class="hd">Recurring costs<span class="sp"></span>${_foGo('spend','All recurring →')}</div><div class="bd"><div class="fo-2"><b class="mono">${m(P.rec/12)} / month</b><span class="mono mut">${m(P.rec)} / year</span></div>${rec.slice(0,3).map(r=>`<div class="fo-row"><span class="l">${escHtml(r.name||'Untitled')}</span><span class="mut">${escHtml(r.cat||'')}</span><span class="mono">${m(finAnn(r))}</span></div>`).join('')}${rec.length>3?`<div class="fo-row"><span class="mut">+ ${rec.length-3} more</span></div>`:''}${!rec.length?'<p class="hint" style="margin:0">No recurring costs yet.</p>':''}</div></div>`;
+  // events: active events with a budget, closest to (or over) budget first
+  const evs=(S.projects||[]).filter(p=>isEvt(p)&&p.status==='active'&&(parseFloat(p.budget)||0)>0).map(p=>({p,sp:evMoney(p).spent,b:parseFloat(p.budget)||0})).sort((a,b)=>b.sp/b.b-a.sp/a.b).slice(0,3);
+  const evC=`<div class="card"><div class="hd">Event budget vs actual<span class="sp"></span>${_foGo('events','All events →')}</div><div class="bd">${evs.map(e=>`<div class="fo-ev"><div class="fo-2"><b>${escHtml(e.p.name)}</b><span class="mono">${m(e.sp)} / ${m(e.b)}</span></div>${_foBar(e.sp,e.b)}</div>`).join('')||'<p class="hint" style="margin:0">No active events with a budget.</p>'}</div></div>`;
+  const rate=parseFloat((S.finance.savings||{}).rate)||0;
+  const sav=`<div class="card"><div class="hd">Savings<span class="sp"></span>${_foGo('pay','Change →')}</div><div class="bd"><div class="fo-2"><b class="mono fo-big" style="color:var(--blue)">${m(P.savings)}</b><span class="mono mut">${rate}% of net profit</span></div><p class="hint">Set aside after tax, before dividends.</p></div></div>`;
+  const hrs=(S.members||[]).filter(x=>!x.isDirector).reduce((a,x)=>a+memberHoursTotal(x),0);
+  const team=`<div class="card"><div class="hd">Team pay<span class="sp"></span>${_foGo('pay','Rates &amp; hours →')}</div><div class="bd"><div class="fo-2"><b class="mono fo-big">${m(P.teamPay)}</b><span class="mono mut">${Math.round(hrs*10)/10} hrs logged</span></div><p class="hint">Counted as a cost before tax. Hours come from the team page. Directors are paid through dividends.</p></div></div>`;
+  return `<div class="fo-top2">${_finReviewCardHtml()}${_finTasksHtml()}</div>${_finBankHtml()}${strip}${_finFlowHtml()}<div class="fo-grid">${budget}${recC}${evC}${sav}${team}</div>`;
 }
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
@@ -10420,7 +10576,7 @@ const FIN_GROUPS=[
 const FIN_TAB_LABEL={oneoff:'One-off',payout:'Team Payout',savings:'Savings',budget:'Budgets',projects:'Events'};
 function _finGroupOf(tab){return FIN_GROUPS.find(g=>g.t.includes(tab))||FIN_GROUPS[0];}
 function _finPillsHtml(tab){const cur=_finGroupOf(tab);return FIN_GROUPS.map(g=>`<button class="st-tab fin-pill${g===cur?' on':''}" onclick="finGo('${g.k}')">${g.l}</button>`).join('');}
-function _finSubHtml(tab){const g=_finGroupOf(tab);if(g.t.length<2)return'';return '<div class="fin-sub-nav fin-sub">'+g.t.map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${FIN_TAB_LABEL[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')+'</div>';}
+function _finSubHtml(tab){const g=_finGroupOf(tab);if(g.t.length<2||g.k==='spend')return'';return '<div class="fin-sub-nav fin-sub">'+g.t.map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${FIN_TAB_LABEL[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')+'</div>';}
 function finGo(k){const g=FIN_GROUPS.find(x=>x.k===k);if(!g)return;if(!g.t.includes(S.finance.finTab))S.finance.finTab=g.t[0];save();render();}
 
 /* ── Bank balances: dated updates, latest one is "now" ── */
@@ -10531,91 +10687,11 @@ function renderFinance(){
   if(tab==='assets'){return renderAssetsPage();}
 
   return`<div class="fu">
-<div class="page-hd"><div class="page-title">Finances</div>
-<div style="display:flex;align-items:center;gap:10px;">
-  <button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()" style="display:flex;align-items:center;gap:5px;">
-  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
-  Revenue streams: <strong style="font-family:'DM Mono',monospace;color:var(--acc);">${fmtGBP(rev)}</strong>
-</button>
-  <span style="font-family:'DM Mono',monospace;font-size:.8rem;padding:4px 10px;border-radius:20px;${net>=0?'background:rgba(31,186,122,.1);color:var(--green)':'background:rgba(224,96,96,.1);color:var(--red)'}">Net: ${fmtS(net)}</span>
-</div>
-</div>
-
-${_finLinksHtml()}
-${_finReviewCardHtml()}
-${_finTasksHtml()}
-<div class="st-tabs fin-pills">${_finPillsHtml(tab)}
-  <select class="fsel" style="margin-left:auto;font-size:.72rem;" onchange="S.finance.finYear=parseInt(this.value);save();render();">
-    ${getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}</option>`).join('')}
-  </select>
-  <button class="btn btn-ghost btn-xs" onclick="generateFinanceReport()" style="display:flex;align-items:center;gap:5px;" title="Export PDF report"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Export PDF</button>
-  <button class="btn btn-ghost btn-xs" onclick="lockFinance()" style="display:flex;align-items:center;gap:5px;" title="Lock finance"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Lock</button>
-</div>
+${_finHeadHtml(tab)}
 ${_finSubHtml(tab)}
 
 <div class="fin-view${tab==='overview'?' active':''}" id="fin-overview">
-  ${_finBankHtml()}
-  ${_finFlowHtml()}
-  <div class="fin-grid4">
-    <div class="fin-metric"><div class="flbl2">Revenue</div><div class="fval blue">${fmtGBP(rev)}</div>${_finFundNote()}</div>
-    <div class="fin-metric"><div class="flbl2">Total Expenses</div><div class="fval red">${fmtGBP(allExp)}</div></div>
-    <div class="fin-metric"><div class="flbl2">Pre-tax Profit</div><div class="fval ${profit>0?'green':'red'}">${fmtS(profit)}</div></div>
-    <div class="fin-metric"><div class="flbl2">Corp Tax (est.)</div><div class="fval red">${fmtGBP(ct.tax)}</div></div>
-    <div class="fin-metric"><div class="flbl2">Net Profit</div><div class="fval ${net>0?'green':'red'}">${fmtS(net)}</div></div>
-    <div class="fin-metric"><div class="flbl2">Margin</div><div class="fval ${parseFloat(pct(net))>15?'green':parseFloat(pct(net))>0?'amber':'red'}">${pct(net)}%</div></div>
-    <div class="fin-metric"><div class="flbl2">Recurring (ann.)</div><div class="fval amber">${fmtGBP(rec)}</div></div>
-    <div class="fin-metric"><div class="flbl2">Project Expenses</div><div class="fval" style="color:var(--yellow);">${fmtGBP(projExp)}</div></div>
-  </div>
-  <div class="fin-grid3">
-    <div class="card">
-      <div class="card-hd"><span class="card-title">P&amp;L Waterfall</span></div>
-      <div class="card-bd" id="fin-waterfall"></div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Revenue Allocation</span></div>
-      <div class="card-bd"><div class="chart-wrap"><canvas id="fin-donut-main"></canvas></div><div class="leg" id="fin-leg-main"></div></div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Expenses by category</span></div>
-      <div class="card-bd"><div class="chart-wrap"><canvas id="fin-donut-cat-ov"></canvas></div><div class="leg" id="fin-leg-cat-ov"></div></div>
-    </div>
-  </div>
-</div>
-
-<div class="fin-view${tab==='recurring'?' active':''}" id="fin-recurring">
-  <div style="max-width:780px;">
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Recurring Expenses</span></div>
-      <div class="card-bd">
-        <div style="font-size:.68rem;color:var(--muted);font-family:'DM Mono',monospace;margin-bottom:12px;padding:6px 9px;background:var(--surface2);border-radius:7px;">Monthly ×12 · Quarterly ×4 · Annual ×1 — annualised totals update live</div>
-        <div id="fin-rec-list"></div>
-        <button class="add-row-btn" onclick="addFinRec()">+ add recurring expense</button>
-      </div>
-    </div>
-  </div>
-</div>
-
-<div class="fin-view${tab==='oneoff'?' active':''}" id="fin-oneoff">
-  <div style="max-width:780px;">
-    <div class="card">
-      <div class="card-hd"><span class="card-title">One-off Expenses</span></div>
-      <div class="card-bd"><div id="fin-oo-list"></div><button class="add-row-btn" onclick="addFinOO()">+ add one-off expense</button></div>
-    </div>
-    <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border-radius:9px;padding:11px 14px;margin-top:12px;font-family:'DM Mono',monospace;">
-      <span style="font-size:.65rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;">TOTAL ONE-OFF</span>
-      <span id="fin-oo-total" style="font-size:1rem;font-weight:500;color:var(--orange);">${fmtGBP(oo)}</span>
-    </div>
-  </div>
-</div>
-
-<div class="fin-view${tab==='categories'?' active':''}" id="fin-categories">
-  <div class="fin-grid2">
-    <div class="card"><div class="card-hd"><span class="card-title">All expenses by category</span></div><div class="card-bd"><div class="chart-wrap"><canvas id="fin-donut-cat"></canvas></div><div class="leg" id="fin-leg-cat"></div></div></div>
-    <div>
-      <div class="card" style="margin-bottom:12px;"><div class="card-hd"><span class="card-title">Recurring by category</span></div><div class="card-bd"><div class="chart-wrap-sm"><canvas id="fin-donut-rec"></canvas></div></div></div>
-      <div class="card"><div class="card-hd"><span class="card-title">One-off by category</span></div><div class="card-bd"><div class="chart-wrap-sm"><canvas id="fin-donut-oo"></canvas></div></div></div>
-    </div>
-  </div>
+  ${tab==='overview'?_finOverviewHtml():''}
 </div>
 
 <div class="fin-view${tab==='tax'?' active':''}" id="fin-tax">
@@ -10868,65 +10944,11 @@ ${_finSubHtml(tab)}
   })()}
 </div>
 
-<div class="fin-view${tab==='budget'?' active':''}" id="fin-budget">
-  ${(()=>{
-    const budgets=S.finance.budgets||{};
-    const allItems=[...S.finance.recurring,...S.finance.oneoff.map(e=>({...e,freq:'One-off'}))];
-    const catSpend={};
-    allItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catSpend[e.cat||'Other']=(catSpend[e.cat||'Other']||0)+v;});
-    const allCats=[...new Set([...FIN_CAT_NAMES,...Object.keys(catSpend)])];
-    const totalBudget=allCats.reduce((a,cat)=>a+(parseFloat(budgets[cat])||0),0);
-    const totalSpend=allCats.reduce((a,cat)=>a+(catSpend[cat]||0),0);
-    const overBudgetCats=allCats.filter(cat=>{const b=parseFloat(budgets[cat])||0;return b>0&&(catSpend[cat]||0)>b;});
-    return`<div style="max-width:780px;">
-    ${_finPlanHtml()}
-    ${overBudgetCats.length>0?`<div style="background:rgba(224,96,96,.1);border:1px solid rgba(224,96,96,.25);border-radius:9px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
-      <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <div><div style="font-size:.82rem;font-weight:700;color:var(--red);">Over budget in ${overBudgetCats.length} ${overBudgetCats.length===1?"category":"categories"}</div>
-      <div style="font-size:.72rem;color:var(--muted);">${overBudgetCats.join(' · ')}</div></div>
-    </div>`:''}    <div class="fin-grid4" style="margin-bottom:14px;">
-      <div class="fin-metric"><div class="flbl2">Total Budgeted</div><div class="fval blue">${fmtGBP(totalBudget)}</div></div>
-      <div class="fin-metric"><div class="flbl2">Total Spent</div><div class="fval ${totalSpend>totalBudget?'red':'green'}">${fmtGBP(totalSpend)}</div></div>
-      <div class="fin-metric"><div class="flbl2">Remaining</div><div class="fval ${totalBudget-totalSpend<0?'red':'green'}">${fmtGBP(totalBudget-totalSpend)}</div></div>
-      <div class="fin-metric"><div class="flbl2">Over Budget</div><div class="fval ${overBudgetCats.length>0?'red':'green'}">${overBudgetCats.length} ${overBudgetCats.length===1?'Category':'Categories'}</div></div>
-    </div>
-    <div class="card">
-      <div class="card-hd"><span class="card-title">Category Budgets vs Actual Spend (annualised)</span></div>
-      <div class="card-bd">
-        <div style="display:grid;grid-template-columns:1fr auto auto;gap:0;padding-bottom:7px;border-bottom:1px solid var(--border);margin-bottom:4px;" class="budget-hdr">
-          <div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Category</div>
-          <div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right;padding-right:8px;min-width:90px;">Budget / yr</div>
-          <div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right;min-width:70px;">Actual</div>
-        </div>
-        ${allCats.map(cat=>{
-          const budget=parseFloat(budgets[cat])||0;
-          const spend=catSpend[cat]||0;
-          const rem=budget-spend;
-          const over=budget>0&&spend>budget;
-          const pct=budget>0?Math.min(100,Math.round(spend/budget*100)):0;
-          const catColor=(FIN_CATS[cat]||{c:'#888'}).c;
-          return`<div style="padding:8px 0;border-bottom:1px solid rgba(255,255,255,.04);">
-            <div style="display:grid;grid-template-columns:1fr auto auto;align-items:center;gap:4px;margin-bottom:${budget>0?'5':'0'}px;">
-              <div style="display:flex;align-items:center;gap:6px;min-width:0;">
-                <div style="width:8px;height:8px;border-radius:2px;background:${catColor};flex-shrink:0;"></div>
-                <span style="font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${cat}</span>
-                ${over?`<span style="font-size:.58rem;color:var(--red);background:rgba(224,96,96,.12);padding:1px 5px;border-radius:3px;font-weight:700;flex-shrink:0;">OVER</span>`:''}
-              </div>
-              <div style="text-align:right;padding-right:6px;min-width:90px;">
-                <input class="amt-inp" type="number" min="0" step="10" value="${budget||''}" placeholder="Set budget" style="width:82px;text-align:right;font-size:.74rem;" onchange="if(!S.finance.budgets)S.finance.budgets={};S.finance.budgets['${cat}']=parseFloat(this.value)||0;save();reCalcFin();">
-              </div>
-              <div style="text-align:right;font-family:'DM Mono',monospace;font-size:.76rem;color:${over?'var(--red)':'var(--text2)'};min-width:70px;">${fmtGBP(spend)}</div>
-            </div>
-            ${budget>0?`<div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:4px;">
-              <div style="font-size:.65rem;color:${rem<0?'var(--red)':'var(--green)'};font-family:'DM Mono',monospace;">${rem<0?'Over by '+fmtGBP(Math.abs(rem)):'Remaining: '+fmtGBP(rem)}</div>
-              <div style="font-size:.62rem;color:var(--muted);">${pct}%</div>
-            </div>
-            <div style="height:4px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${pct}%;background:${over?'var(--red)':catColor};border-radius:99px;transition:width .3s;"></div></div>`:''}
-          </div>`;
-        }).join('')}
-      </div>
-    </div>`;
-  })()}
+<div class="fin-view${_finGroupOf(tab).k==='spend'?' active':''}" id="fin-budget">
+  ${_finGroupOf(tab).k==='spend'?`${_finPlanHtml()}${_finCostBudgetHtml()}<div class="fb-grid">
+    <div class="card"><div class="card-hd"><span class="card-title">Recurring costs</span><span style="flex:1"></span><button class="btn btn-acc btn-xs" onclick="addFinRec()">+ Add</button></div><div class="fb-bd"><div class="fb-hint" style="margin:0 0 10px">Monthly ×12 · Quarterly ×4 · Annual ×1. Annualised totals update live. ${fmtGBP(rec/12)} / month, ${fmtGBP(rec)} / year.</div><div id="fin-rec-list"></div></div></div>
+    <div class="card"><div class="card-hd"><span class="card-title">One-off costs</span><span style="flex:1"></span><span class="fb-m" id="fin-oo-total">${fmtGBP(oo)}</span><button class="btn btn-acc btn-xs" onclick="addFinOO()">+ Add</button></div><div class="fb-bd"><div class="fb-hint" style="margin:0 0 10px">Costs that are not part of an event. Event spending is added on the event page and appears under Events.</div><div id="fin-oo-list"></div></div></div>
+  </div>`:''}
 </div>
 
 </div>`;}
@@ -11433,7 +11455,8 @@ function generateFinanceReport(){
 }
 function lockFinance(){S.finance.finAuth=false;save();nav('finance');}
 
-function reCalcFin(){const c=el('content');if(c&&V==='finance'){c.innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);}}
+/* Re-draws the Finance page. A field's change event fires during its blur (or a click elsewhere), and the browser refuses to remove a node that is mid-blur, so a redraw triggered from a change/blur event waits one tick. */
+function reCalcFin(now){const c=el('content');if(!(c&&V==='finance'))return;const ev=window.event;if(!now&&ev&&(ev.type==='change'||ev.type==='blur'||ev.type==='focusout')){setTimeout(()=>reCalcFin(true),0);return;}c.innerHTML=renderFinance();setTimeout(()=>renderFinCharts(),80);}
 
 function renderFinCharts(){
   const rev=totalRevenue(),rec=totalRec(),oo=totalOO(),proj=projExpTotal(),tpay=finTeamPayCost(),allExp=rec+oo+proj+tpay;
@@ -11467,8 +11490,7 @@ function renderFinCharts(){
     const bbEl=el('fin-band-bars');if(bbEl)bbEl.innerHTML=bands.map(b=>{const w=Math.min(100,Math.round(profit/b.th*100));const here=(b.th===50000&&profit<=50000)||(b.th===250000&&profit>50000&&profit<=250000)||(b.th===500000&&profit>250000);return`<div class="band-row"><div class="band-lbl"><span style="color:${here?b.c:'var(--muted)'};font-weight:${here?600:400};">${b.l}${here?' ◀':''}</span></div><div class="prog-bg"><div class="prog-fill-f" style="width:${w}%;background:${b.c}"></div></div></div>`}).join('');
     mkDonut('fin-donut-tax',['Net profit','Corp tax'],[Math.max(0,net),ct.tax],['#1fba7a','#8b5cf6']);
   }
-  if(tab==='recurring'){renderFinRecurring();}
-  if(tab==='oneoff'){renderFinOneoff();}
+  if(_finGroupOf(tab).k==='spend'){renderFinRecurring();renderFinOneoff();}
 }
 
 function var_css(name){return getComputedStyle(document.documentElement).getPropertyValue(name).trim()||'#e06060';}
