@@ -1720,6 +1720,20 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fb-more[open]>summary::before{transform:rotate(45deg);}
 .fb-more .meta{margin-left:auto;font-size:.68rem;color:var(--muted);font-weight:400;}
 #fin-budget .card-hd{display:flex;align-items:center;gap:8px;}
+
+/* Savings & pay */
+#fin-pay .card{margin-bottom:12px;}
+#fin-pay .fb-grid .card{margin-bottom:0;}#fin-pay .fb-grid{margin-bottom:12px;}
+.fy-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);font-size:.76rem;}
+.fy-row:last-child{border-bottom:0;}
+.fy-l{flex:1;min-width:0;font-weight:600;overflow:hidden;text-overflow:ellipsis;}
+.fy-m{color:var(--muted);font-size:.68rem;white-space:nowrap;}
+.fo-mono{font-family:'DM Mono',monospace;white-space:nowrap;}
+.fy-ok{color:var(--green);}
+.fy-warn{margin-top:8px;font-size:.72rem;color:var(--red);}
+.fy-band{margin-bottom:8px;font-size:.72rem;}
+.fy-fold>summary{padding:11px 16px;}.fy-fold{border:1px solid var(--border);border-radius:12px;margin:0 0 12px;}
+.fy-in{padding:2px 16px 14px;}
 </style>
 </head>
 <body>
@@ -3274,7 +3288,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=117;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=118;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -7151,6 +7165,173 @@ function _finOverviewHtml(){
   const team=`<div class="card"><div class="hd">Team pay<span class="sp"></span>${_foGo('pay','Rates &amp; hours →')}</div><div class="bd"><div class="fo-2"><b class="mono fo-big">${m(P.teamPay)}</b><span class="mono mut">${Math.round(hrs*10)/10} hrs logged</span></div><p class="hint">Counted as a cost before tax. Hours come from the team page. Directors are paid through dividends.</p></div></div>`;
   return `<div class="fo-top2">${_finReviewCardHtml()}${_finTasksHtml()}</div>${_finBankHtml()}${strip}${_finFlowHtml()}<div class="fo-grid">${budget}${recC}${evC}${sav}${team}</div>`;
 }
+/* ── Finance: Savings & pay page, laid out as in the approved mockup ──
+   Money in the bank, the profit-to-payout list, Savings and Team pay cards, then folds for dividends (per the Articles),
+   revenue sources, corporation tax and assets. All figures come from finPayCalc(), the same calculation the Overview and report use. */
+function _finDividendsHtml(profitForPayout){
+    // ── DIVIDEND WATERFALL per Articles of Association (Art. 3.1) ──
+    // A shares (held by directors): Greg 42, Jonny 20, Lewis 38 (raw weights → total 100)
+    // B shares (investor): Asbjoern 25 (raw weight, same pool as above-threshold)
+    // Phase 1: First £81,000 of distributable profit → A shareholders only, pro-rata
+    // Phase 2: Above £81,000 → all shareholders, new weights: Greg 32, Jonny 15, Lewis 28, Asbjoern 25 (total 100)
+    const THRESHOLD = 81000;
+    const A_SHARES = [{name:'Greg Lester',w:42},{name:'Jonny Sands',w:20},{name:'Lewis Thompson',w:38}];
+    const ALL_SHARES = [{name:'Greg Lester',w:32,type:'A'},{name:'Jonny Sands',w:15,type:'A'},{name:'Lewis Thompson',w:28,type:'A'},{name:'Asbjoern Andersen',w:25,type:'B'}];
+    const aTotal = A_SHARES.reduce((s,x)=>s+x.w,0);  // 100
+    const allTotal = ALL_SHARES.reduce((s,x)=>s+x.w,0); // 100
+
+    // Phase 1 pool: min(profitForPayout, THRESHOLD)
+    const phase1Pool = Math.min(profitForPayout, THRESHOLD);
+    // Phase 2 pool: anything above threshold
+    const phase2Pool = Math.max(0, profitForPayout - THRESHOLD);
+
+    // Calculate each person's total dividend
+    const dividends = {};
+    A_SHARES.forEach(s=>{dividends[s.name]=(dividends[s.name]||0)+phase1Pool*(s.w/aTotal);});
+    ALL_SHARES.forEach(s=>{dividends[s.name]=(dividends[s.name]||0)+phase2Pool*(s.w/allTotal);});
+
+    const phase1Done = profitForPayout >= THRESHOLD;
+    const phase2Active = phase2Pool > 0;
+    const phase1Pct = profitForPayout > 0 ? Math.min(100, (phase1Pool/THRESHOLD)*100) : 0;
+
+    function avBadge(name,type){
+      const initials=name.split(' ').map(w=>w[0]).join('');
+      const col=type==='B'?'var(--blue)':'var(--acc)';
+      return`<div style="position:relative;flex-shrink:0;">
+        <div style="width:32px;height:32px;border-radius:50%;background:${type==='B'?'rgba(61,130,240,.15)':'var(--teal-dim)'};border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:${col};">${initials}</div>
+        <div style="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:.48rem;font-weight:800;color:var(--black);border:1.5px solid var(--surface);">${type}</div>
+      </div>`;
+    }
+
+
+    return`
+      <div style="display:flex;flex-direction:column;gap:12px;">
+
+        <!-- Summary bar -->
+        <div class="card">
+          <div class="card-hd"><span class="card-title">Dividend Pool</span><span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
+          <div class="card-bd">
+            <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;">Profit after team pay, tax and savings, available for dividends</div>
+            <!-- Phase 1 progress -->
+            <div style="margin-bottom:10px;">
+              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
+                <span style="font-size:.68rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;">Phase 1 — A Share Threshold</span>
+                <span style="font-family:'DM Mono',monospace;font-size:.7rem;color:${phase1Done?'var(--green)':'var(--yellow)'};">${phase1Done?'✓ Complete':fmtGBP(phase1Pool)+' / '+fmtGBP(THRESHOLD)}</span>
+              </div>
+              <div style="height:6px;background:var(--surface3);border-radius:99px;overflow:hidden;">
+                <div style="height:100%;width:${phase1Pct}%;background:${phase1Done?'var(--green)':'var(--acc)'};border-radius:99px;transition:width .3s;"></div>
+              </div>
+              <div style="font-size:.67rem;color:var(--muted);margin-top:4px;">First £81,000 goes exclusively to A shareholders per Art. 3.1</div>
+            </div>
+            ${phase2Active?`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:rgba(61,130,240,.08);border:1px solid rgba(61,130,240,.2);border-radius:7px;">
+              <span style="font-size:.68rem;font-weight:700;color:#3d82f0;text-transform:uppercase;letter-spacing:.06em;">Phase 2 — All Shareholders</span>
+              <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:#3d82f0;">${fmtGBP(phase2Pool)}</span>
+            </div>`:'<div style="font-size:.7rem;color:var(--muted);padding:7px 10px;background:var(--surface2);border-radius:7px;">Phase 2 (B share participation) begins above £81,000</div>'}
+          </div>
+        </div>
+
+        <!-- A shareholders -->
+        <div class="card">
+          <div class="card-hd">
+            <span class="card-title" style="display:flex;align-items:center;gap:7px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0;"></span>
+              Ordinary A Shareholders
+            </span>
+          </div>
+          <div class="card-bd">
+            <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px;">Phase 1: 42/20/38 weights · Phase 2: 32/15/28 weights</div>
+            ${A_SHARES.map(s=>{
+              const p1=phase1Pool*(s.w/aTotal);
+              const abl=ALL_SHARES.find(x=>x.name===s.name);
+              const p2=abl?phase2Pool*(abl.w/allTotal):0;
+              const total=p1+p2;
+              return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);">
+                ${avBadge(s.name,'A')}
+                <span style="flex:1;font-size:.84rem;font-weight:500;">${escHtml(s.name)}</span>
+                <div style="text-align:right;">
+                  ${phase2Active?`<div style="font-size:.65rem;color:var(--muted);">Ph1: ${fmtGBP(p1)} + Ph2: ${fmtGBP(p2)}</div>`:''}
+                  <div style="font-family:Inter,sans-serif;font-size:.92rem;font-weight:700;color:var(--green);">${fmtGBP(total)}</div>
+                </div>
+              </div>`;
+            }).join('')}
+            <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);margin-top:2px;font-size:.72rem;color:var(--muted);">
+              <span>A total</span>
+              <span style="font-family:Inter,sans-serif;color:var(--green);font-weight:600;">${fmtGBP(A_SHARES.reduce((s,x)=>{const p1=phase1Pool*(x.w/aTotal);const abl=ALL_SHARES.find(a=>a.name===x.name);const p2=abl?phase2Pool*(abl.w/allTotal):0;return s+p1+p2;},0))}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- B shareholders -->
+        <div class="card" style="opacity:${phase2Active?1:.55};">
+          <div class="card-hd">
+            <span class="card-title" style="display:flex;align-items:center;gap:7px;">
+              <span style="width:8px;height:8px;border-radius:50%;background:#3d82f0;flex-shrink:0;"></span>
+              Ordinary B Shareholders
+            </span>
+            ${!phase2Active?`<span style="font-size:.65rem;color:var(--muted);padding:2px 7px;background:var(--surface2);border-radius:4px;">Threshold not yet reached</span>`:''}
+          </div>
+          <div class="card-bd">
+            <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px;">Phase 2 only · 25% weight · participates above £81,000 threshold</div>
+            ${ALL_SHARES.filter(s=>s.type==='B').map(s=>{
+              const total=phase2Pool*(s.w/allTotal);
+              return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);">
+                ${avBadge(s.name,'B')}
+                <span style="flex:1;font-size:.84rem;font-weight:500;">${escHtml(s.name)}</span>
+                <div style="text-align:right;">
+                  ${phase2Active?`<div style="font-size:.65rem;color:var(--muted);">25% of ${fmtGBP(phase2Pool)}</div>`:''}
+                  <div style="font-family:Inter,sans-serif;font-size:.92rem;font-weight:700;color:#3d82f0;">${fmtGBP(total)}</div>
+                </div>
+              </div>`;
+            }).join('')}
+          </div>
+        </div>
+
+        <!-- Total check -->
+        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px 14px;">
+          <span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:'DM Mono',monospace;">Total distributed</span>
+          <span style="font-family:Inter,sans-serif;font-size:1rem;font-weight:700;color:var(--acc);">${fmtGBP(Object.values(dividends).reduce((a,b)=>a+b,0))}</span>
+        </div>
+
+      </div>`;
+}
+
+function setSavingsRate(v){S.finance.savings=Object.assign({},S.finance.savings,{rate:Math.min(100,Math.max(0,parseFloat(v)||0))});save();reCalcFin();}
+function setGlobalRate(v){S.finance.globalRate=Math.max(0,parseFloat(v)||0);save();reCalcFin();}
+function _finTaxHtml(profit,ct){
+  const m=_finMoney,rows=[['Taxable profit',m(profit)],['Rate',escHtml(ct.label)+' · '+escHtml(ct.rate)],['Gross tax',m(ct.gross)],['Marginal relief',ct.mr>0?'−'+m(ct.mr):m(0)],['Tax due',m(ct.tax)],['Effective rate',ct.eff]];
+  const bands=[{l:'Small profits up to £50k',th:50000,c:'#1b9a78'},{l:'Marginal relief £50k to £250k',th:250000,c:'#d08a3b'},{l:'Main rate above £250k',th:500000,c:'#e06060'}];
+  const bar=bands.map(b=>{const w=Math.max(0,Math.min(100,Math.round(profit/b.th*100)));const here=(b.th===50000&&profit<=50000)||(b.th===250000&&profit>50000&&profit<=250000)||(b.th===500000&&profit>250000);
+    return `<div class="fy-band"><span style="${here?'font-weight:700;color:var(--text)':'color:var(--muted)'}">${b.l}${here?' ◀':''}</span><div class="fo-bar"><s style="width:${w}%;background:${b.c}"></s></div></div>`;}).join('');
+  return rows.map(r=>`<div class="fy-row"><span class="fy-l" style="font-weight:500">${r[0]}</span><span class="fo-mono">${r[1]}</span></div>`).join('')+`<div style="margin-top:12px">${bar}</div><p class="fb-hint" style="margin:10px 0 0">Corporation tax rates: 19% up to £50k, 25% above £250k, marginal relief in between. Team pay is counted as a cost before tax.</p>`;
+}
+function _finPayHtml(){
+  const P=finPayCalc(),m=n=>_finMoney(Math.round(n)),fy=S.finance.finYear;
+  const rate=parseFloat((S.finance.savings||{}).rate)||0;
+  const gr=parseFloat(S.finance.globalRate)||0,tr=S.finance.teamRates||{};
+  const eff=x=>gr>0?gr:(parseFloat(tr[x.id])||0);
+  const L=[['Revenue',P.rev,''],['Costs',-(P.costs-P.teamPay),''],['Team pay',-P.teamPay,''],['Corporation tax',-P.ct.tax,''],['Net profit',P.net,'b'],['Savings ('+rate+'%)',-P.savings,''],['Left for dividends',P.pool,'b']];
+  const payout=`<div class="card" id="fin-payout-card"><div class="card-hd"><span class="card-title">Profit to payout</span></div><div class="fb-bd">${L.map(r=>`<div class="fy-row"${r[2]?' style="font-weight:700"':''}><span class="fy-l" style="${r[2]?'':'font-weight:500'}">${r[0]}</span><span class="fo-mono ${r[1]<0?'':'fy-ok'}">${r[1]<0?'−':''}${m(Math.abs(r[1]))}</span></div>`).join('')}<p class="fb-hint" style="margin:8px 0 0">Team pay is treated as a cost, so tax and savings are worked out after it. Each line is read from the pages above.</p></div></div>`;
+  const savings=`<div class="card" id="fin-savings-card"><div class="card-hd"><span class="card-title">Savings</span></div><div class="fb-bd"><div class="fy-row"><span class="fy-l">Savings rate</span><input class="fb-inp" style="max-width:64px" type="number" min="0" max="100" step="1" inputmode="decimal" value="${rate}" aria-label="Savings rate" onchange="setSavingsRate(this.value)"><span class="fy-m">% of net profit</span></div><div class="fy-row"><span class="fy-l">Set aside</span><span class="fo-mono" style="color:var(--blue)">${m(P.savings)}</span></div></div></div>`;
+  const nd=(S.members||[]).filter(x=>!x.isDirector),dirs=(S.members||[]).filter(x=>x.isDirector);
+  const budget=parseFloat((S.finance.budgets||{})['Team Pay'])||0;
+  const team=`<div class="card" id="fin-team-card"><div class="card-hd"><span class="card-title">Team pay</span></div><div class="fb-bd"><div class="fy-row"><span class="fy-l">Hourly rate</span><input class="fb-inp" style="max-width:64px" type="number" min="0" step="0.5" inputmode="decimal" value="${gr||''}" placeholder="0" aria-label="Hourly rate for everyone" onchange="setGlobalRate(this.value)"><span class="fy-m">£ / hr, everyone</span></div>
+    ${nd.map(x=>{const h=memberHoursTotal(x),r=eff(x);return `<div class="fy-row"><span class="fy-l">${escHtml(x.name)}</span><span class="fy-m">${Math.round(h*10)/10} hrs × £${r.toFixed(2)}</span><span class="fo-mono">${m(h*r)}</span></div>`;}).join('')||'<div class="fb-none">No team members added yet.</div>'}
+    <div class="fy-row" style="font-weight:700"><span class="fy-l">Total</span><span class="fo-mono">${m(P.contracted)}</span></div>
+    ${budget>0&&P.contracted>budget?`<div class="fy-warn">${m(P.contracted-budget)} over the Team Pay budget of ${m(budget)}.</div>`:''}
+    <p class="fb-hint" style="margin:8px 0 0">${dirs.length?'Directors ('+dirs.map(x=>escHtml(x.name)).join(', ')+') are paid through dividends. ':''}Hours come from the team page.</p></div></div>`;
+  const pool=P.pool;
+  const L2=finPlanCalc(fy);
+  const srcs=L2.streams.concat(L2.funding);
+  const srcRows=srcs.map(s=>`<div class="fy-row"><span class="fy-l">${escHtml(s.name)}</span><span class="fy-m">${s.linked?'from event pages':escHtml(s.cat||'')}</span><span class="fb-tag ${s.linked?'lk':''}">${s.linked?'Linked':s.funding?'Funding':'Manual'}</span><span class="fo-mono">${m(s.actual)}</span></div>`).join('')||'<div class="fb-none">No revenue yet.</div>';
+  const assets=(S.finance.assets||[]).filter(a=>a.status!=='Sold');
+  const aVal=assets.reduce((a,x)=>a+(parseFloat(x.value)||0),0);
+  const fold=(id,title,meta,inner,open)=>`<details class="fb-more fy-fold card" id="${id}"${open?' open':''}><summary>${title}<span class="meta">${meta}</span></summary><div class="fy-in">${inner}</div></details>`;
+  return `${_finBankCardHtml()}${payout}<div class="fb-grid">${savings}${team}</div>
+  ${fold('fin-fold-div','Dividends','per the Articles, from what is left: '+m(pool),`<p class="fb-hint">Worked out from the amount left for dividends above.</p>${_finDividendsHtml(pool)}`)}
+  ${fold('fin-fold-src','Revenue sources',srcs.filter(s=>s.linked).length+' linked, '+srcs.filter(s=>!s.linked).length+' manual',srcRows)}
+  ${fold('fin-fold-tax','Corporation tax',m(P.ct.tax)+' on '+m(P.profit)+' profit',_finTaxHtml(P.profit,P.ct))}
+  ${fold('fin-fold-assets','Assets',assets.length+' on the register · '+m(aVal),`<div class="fy-row"><span class="fy-l">${assets.length} active asset${assets.length===1?'':'s'}</span><span class="fo-mono">${m(aVal)}</span></div><button class="btn btn-ghost btn-xs" style="margin-top:8px" onclick="S.finance.finTab='assets';save();render()">Open the assets register →</button>`)}`;
+}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -10573,10 +10754,10 @@ const FIN_GROUPS=[
   {k:'spend',l:'Budget & spending',t:['budget','recurring','oneoff','categories']},
   {k:'events',l:'Events',t:['projects']},
   {k:'pay',l:'Savings & pay',t:['savings','payout','tax','assets']}];
-const FIN_TAB_LABEL={oneoff:'One-off',payout:'Team Payout',savings:'Savings',budget:'Budgets',projects:'Events'};
+const FIN_TAB_LABEL={oneoff:'One-off',payout:'Team Payout',savings:'Savings & pay',budget:'Budgets',projects:'Events'};
 function _finGroupOf(tab){return FIN_GROUPS.find(g=>g.t.includes(tab))||FIN_GROUPS[0];}
 function _finPillsHtml(tab){const cur=_finGroupOf(tab);return FIN_GROUPS.map(g=>`<button class="st-tab fin-pill${g===cur?' on':''}" onclick="finGo('${g.k}')">${g.l}</button>`).join('');}
-function _finSubHtml(tab){const g=_finGroupOf(tab);if(g.t.length<2||g.k==='spend')return'';return '<div class="fin-sub-nav fin-sub">'+g.t.map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${FIN_TAB_LABEL[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')+'</div>';}
+function _finSubHtml(tab){const g=_finGroupOf(tab);if(g.t.length<2||g.k==='spend'||(g.k==='pay'&&tab!=='assets'))return'';return '<div class="fin-sub-nav fin-sub">'+(g.k==='pay'?['savings','assets']:g.t).map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${FIN_TAB_LABEL[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')+'</div>';}
 function finGo(k){const g=FIN_GROUPS.find(x=>x.k===k);if(!g)return;if(!g.t.includes(S.finance.finTab))S.finance.finTab=g.t[0];save();render();}
 
 /* ── Bank balances: dated updates, latest one is "now" ── */
@@ -10694,254 +10875,12 @@ ${_finSubHtml(tab)}
   ${tab==='overview'?_finOverviewHtml():''}
 </div>
 
-<div class="fin-view${tab==='tax'?' active':''}" id="fin-tax">
-  <div class="fin-grid2">
-    <div class="card">
-      <div class="card-hd"><span class="card-title">UK Corporation Tax 2025/26</span></div>
-      <div class="card-bd"><div id="fin-tax-rows"></div>
-      <div style="margin-top:12px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:.68rem;color:var(--muted);line-height:1.7;font-family:'DM Mono',monospace;">
-        ≤£50k → 19% · £50k–£250k → 25% minus marginal relief · >£250k → 25%
-      </div></div>
-    </div>
-    <div>
-      <div class="card" style="margin-bottom:12px;"><div class="card-hd"><span class="card-title">Tax band position</span></div><div class="card-bd" id="fin-band-bars"></div></div>
-      <div class="card"><div class="card-hd"><span class="card-title">Profit vs tax</span></div><div class="card-bd"><div class="chart-wrap-sm"><canvas id="fin-donut-tax"></canvas></div></div></div>
-    </div>
-  </div>
-</div>
-
 <div class="fin-view${tab==='projects'?' active':''}" id="fin-projects">
   ${_finEventsHtml()}
 </div>
 
-<div class="fin-view${tab==='savings'?' active':''}" id="fin-savings">
-  ${(()=>{
-    const sv=S.finance.savings||{rate:20};
-    const rev2=totalRevenue();
-    const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE+finTeamPayCost();
-    const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
-    const savingsAmt=Math.max(0,net2)*(sv.rate/100);
-    const profitForPayout=finPayCalc().pool;
-    return`<div style="max-width:780px;">${_finBankCardHtml()}<div class="fin-grid4" style="margin-bottom:14px;">
-      <div class="fin-metric"><div class="flbl2">Net Profit</div><div class="fval green">${fmtS(net2)}</div></div>
-      <div class="fin-metric"><div class="flbl2">Savings Rate</div><div class="fval amber">${sv.rate}%</div></div>
-      <div class="fin-metric"><div class="flbl2">Savings (${sv.rate}%)</div><div class="fval blue">${fmtGBP(savingsAmt)}</div></div>
-      <div class="fin-metric"><div class="flbl2">Profit for Payout</div><div class="fval green">${fmtGBP(profitForPayout)}</div></div>
-    </div>
-    <div class="card" style="margin-bottom:14px;">
-      <div class="card-hd"><span class="card-title">Savings Configuration</span></div>
-      <div class="card-bd">
-        <div class="field"><label class="flbl">Savings percentage of net profit</label>
-          <div style="display:flex;align-items:center;gap:10px;">
-            <input class="inp" type="number" min="0" max="100" value="${sv.rate}" onchange="S.finance.savings={rate:parseFloat(this.value)||0};save();reCalcFin();" style="width:90px;">
-            <span style="font-size:.82rem;color:var(--text2);">% of net profit = <strong style="color:var(--acc);">${fmtGBP(savingsAmt)}</strong> goes to savings</span>
-          </div>
-        </div>
-        <div style="margin-top:14px;background:var(--surface2);border-radius:9px;padding:12px 14px;">
-          <div style="font-size:.72rem;color:var(--muted);margin-bottom:8px;text-transform:uppercase;letter-spacing:.08em;">Breakdown</div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Net profit</span><span style="font-family:Inter,sans-serif;color:var(--green);">${fmtS(net2)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.8rem;"><span>Savings (${sv.rate}%)</span><span style="font-family:Inter,sans-serif;color:var(--blue);">- ${fmtGBP(savingsAmt)}</span></div>
-          <div style="display:flex;justify-content:space-between;padding:7px 0;font-size:.88rem;font-weight:700;"><span>Dividend pool</span><span style="font-family:Inter,sans-serif;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
-        </div>
-      </div>
-    </div></div>`;
-  })()}
-</div>
-
-<div class="fin-view${tab==='payout'?' active':''}" id="fin-payout">
-  ${(()=>{
-    const sv=S.finance.savings||{rate:20};
-    const rev2=totalRevenue();
-    const rec2=totalRec(),oo2=totalOO(),projE=projExpTotal(),allE=rec2+oo2+projE+finTeamPayCost();
-    const profit2=rev2-allE,ct2=corpTax(Math.max(0,profit2)),net2=profit2-ct2.tax;
-    const savingsAmt=Math.max(0,net2)*(sv.rate/100);
-    const PC=finPayCalc(),profitForPayout=PC.pool;
-    const teamRates=S.finance.teamRates||{};
-    const globalRate=parseFloat(S.finance.globalRate)||0;
-    const effRate=m=>globalRate>0?globalRate:(parseFloat(teamRates[m.id])||0);
-    const totalTeamPay=S.members.reduce((a,m)=>{const h=memberHoursTotal(m);return a+h*effRate(m);},0);
-
-    // ── DIVIDEND WATERFALL per Articles of Association (Art. 3.1) ──
-    // A shares (held by directors): Greg 42, Jonny 20, Lewis 38 (raw weights → total 100)
-    // B shares (investor): Asbjoern 25 (raw weight, same pool as above-threshold)
-    // Phase 1: First £81,000 of distributable profit → A shareholders only, pro-rata
-    // Phase 2: Above £81,000 → all shareholders, new weights: Greg 32, Jonny 15, Lewis 28, Asbjoern 25 (total 100)
-    const THRESHOLD = 81000;
-    const A_SHARES = [{name:'Greg Lester',w:42},{name:'Jonny Sands',w:20},{name:'Lewis Thompson',w:38}];
-    const ALL_SHARES = [{name:'Greg Lester',w:32,type:'A'},{name:'Jonny Sands',w:15,type:'A'},{name:'Lewis Thompson',w:28,type:'A'},{name:'Asbjoern Andersen',w:25,type:'B'}];
-    const aTotal = A_SHARES.reduce((s,x)=>s+x.w,0);  // 100
-    const allTotal = ALL_SHARES.reduce((s,x)=>s+x.w,0); // 100
-
-    // Phase 1 pool: min(profitForPayout, THRESHOLD)
-    const phase1Pool = Math.min(profitForPayout, THRESHOLD);
-    // Phase 2 pool: anything above threshold
-    const phase2Pool = Math.max(0, profitForPayout - THRESHOLD);
-
-    // Calculate each person's total dividend
-    const dividends = {};
-    A_SHARES.forEach(s=>{dividends[s.name]=(dividends[s.name]||0)+phase1Pool*(s.w/aTotal);});
-    ALL_SHARES.forEach(s=>{dividends[s.name]=(dividends[s.name]||0)+phase2Pool*(s.w/allTotal);});
-
-    const phase1Done = profitForPayout >= THRESHOLD;
-    const phase2Active = phase2Pool > 0;
-    const phase1Pct = profitForPayout > 0 ? Math.min(100, (phase1Pool/THRESHOLD)*100) : 0;
-
-    function avBadge(name,type){
-      const initials=name.split(' ').map(w=>w[0]).join('');
-      const col=type==='B'?'var(--blue)':'var(--acc)';
-      return`<div style="position:relative;flex-shrink:0;">
-        <div style="width:32px;height:32px;border-radius:50%;background:${type==='B'?'rgba(61,130,240,.15)':'var(--teal-dim)'};border:1.5px solid ${col};display:flex;align-items:center;justify-content:center;font-size:.6rem;font-weight:700;color:${col};">${initials}</div>
-        <div style="position:absolute;bottom:-2px;right:-2px;width:12px;height:12px;border-radius:50%;background:${col};display:flex;align-items:center;justify-content:center;font-size:.48rem;font-weight:800;color:var(--black);border:1.5px solid var(--surface);">${type}</div>
-      </div>`;
-    }
-
-    return`
-    <div class="fin-grid2" style="align-items:start;">
-
-      <!-- LEFT: Team payouts -->
-      <div class="card">
-        <div class="card-hd"><span class="card-title">Team Member Payouts (Hours × Rate)</span></div>
-        <div style="padding:11px 14px;border-bottom:1px solid var(--border2);display:flex;align-items:center;gap:12px;">
-          <span style="font-size:.76rem;font-weight:600;">Hourly rate for all members</span>
-          <div style="display:flex;align-items:center;gap:4px;">
-            <span style="font-size:.72rem;color:var(--muted);">£</span>
-            <input class="amt-inp" type="number" min="0" step="0.50" value="${parseFloat(S.finance.globalRate)||''}" placeholder="0.00" style="width:80px;" onchange="S.finance.globalRate=parseFloat(this.value)||0;save();reCalcFin();">
-            <span style="font-size:.72rem;color:var(--muted);">/hr</span>
-          </div>
-          <span style="font-size:.68rem;color:var(--muted);margin-left:4px;">applied to all team members</span>
-        </div>
-        <div class="card-bd">
-          ${(()=>{
-            const nonDirectors=S.members.filter(m=>!m.isDirector);
-            const directors=S.members.filter(m=>m.isDirector);
-            const totalNDPay=nonDirectors.reduce((a,m)=>{const h=memberHoursTotal(m);return a+h*effRate(m);},0);
-            const totalNDHours=nonDirectors.reduce((a,m)=>a+memberHoursTotal(m),0);
-            const teamPayBudget=parseFloat((S.finance.budgets||{})["Team Pay"])||0;
-            const availFunds=teamPayBudget>0?teamPayBudget:Math.max(0,PC.profit+PC.teamPay);
-            return`
-            ${S.members.length===0?'<div style="color:var(--muted);font-size:.78rem;">No team members added yet.</div>':''}            ${directors.length>0?`<div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:4px 0 6px;">Directors — paid via dividends</div>
-            ${directors.map(m=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);opacity:.6;min-width:0;">
-              ${m.photoUrl?`<img src="${escHtml(m.photoUrl)}" style="width:26px;height:26px;border-radius:50%;object-fit:cover;flex-shrink:0;">`:`<div class="av" style="width:26px;height:26px;background:${m.color};font-size:.5rem;flex-shrink:0;">${escHtml(m.initials)}</div>`}
-              <span style="font-size:.8rem;flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escHtml(m.name)}</span>
-              <span style="font-size:.6rem;color:var(--acc);padding:1px 6px;background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:4px;flex-shrink:0;">dividends</span>
-            </div>`).join('')}`:''}
-            ${nonDirectors.length>0?`<div style="font-size:.62rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding:${directors.length>0?'10':'4'}px 0 6px;">Team Members</div>
-            ${nonDirectors.map(m=>{
-              const h=memberHoursTotal(m);const rate=effRate(m);const pay=h*rate;
-              const propPay=totalNDHours>0?(h/totalNDHours)*Math.min(availFunds,totalNDPay):0;
-              const isCapped=totalNDPay>availFunds&&h>0;
-              return`<div style="display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--border2);min-width:0;">
-                ${m.photoUrl?`<img src="${escHtml(m.photoUrl)}" style="width:28px;height:28px;border-radius:50%;object-fit:cover;flex-shrink:0;">`:`<div class="av" style="width:28px;height:28px;background:${m.color};font-size:.55rem;flex-shrink:0;">${escHtml(m.initials)}</div>`}
-                <div style="flex:1;min-width:0;">
-                  <div style="font-size:.82rem;font-weight:500;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(m.name)}</div>
-                  <div style="font-size:.7rem;color:var(--muted);margin-top:1px;">${h.toFixed(1)}h × <span style="font-family:'DM Mono',monospace;">£${rate.toFixed(2)}/hr</span></div>
-                </div>
-                <div style="text-align:right;flex-shrink:0;">
-                  <div style="font-family:Inter,sans-serif;font-size:.85rem;font-weight:700;color:var(--acc);">${fmtGBP(pay)}</div>
-                  ${isCapped?`<div style="font-size:.62rem;color:var(--yellow);">≈${fmtGBP(propPay)}</div>`:''}
-                </div>
-              </div>`;
-            }).join('')}
-            <div style="margin-top:10px;padding:10px 12px;background:var(--surface2);border-radius:8px;font-size:.73rem;">
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--muted);">Team contracted total</span><span style="font-family:'DM Mono',monospace;">${fmtGBP(totalNDPay)}</span></div>
-              <div style="display:flex;justify-content:space-between;margin-bottom:4px;"><span style="color:var(--muted);">Available funds${teamPayBudget>0?" (Team Pay budget)":""}</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${fmtGBP(availFunds)}</span></div>
-              ${totalNDPay>availFunds?`<div style="display:flex;justify-content:space-between;padding-top:5px;border-top:1px solid var(--border);"><span style="color:var(--red);font-weight:600;">Shortfall — prop. split</span><span style="font-family:'DM Mono',monospace;color:var(--red);">${fmtGBP(totalNDPay-availFunds)}</span></div>`:`<div style="display:flex;justify-content:space-between;padding-top:5px;border-top:1px solid var(--border);"><span style="color:var(--green);">Surplus</span><span style="font-family:'DM Mono',monospace;color:var(--green);">${fmtGBP(availFunds-totalNDPay)}</span></div>`}
-            </div>`:''}            `;
-          })()}
-        </div>
-      </div>
-
-      <!-- RIGHT: Dividend waterfall -->
-      <div style="display:flex;flex-direction:column;gap:12px;">
-
-        <!-- Summary bar -->
-        <div class="card">
-          <div class="card-hd"><span class="card-title">Dividend Pool</span><span style="font-family:'DM Mono',monospace;font-size:.78rem;color:var(--acc);">${fmtGBP(profitForPayout)}</span></div>
-          <div class="card-bd">
-            <div style="font-size:.72rem;color:var(--text2);margin-bottom:10px;">Profit after team pay, tax and savings, available for dividends</div>
-            <!-- Phase 1 progress -->
-            <div style="margin-bottom:10px;">
-              <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:5px;">
-                <span style="font-size:.68rem;font-weight:700;color:var(--acc);text-transform:uppercase;letter-spacing:.06em;">Phase 1 — A Share Threshold</span>
-                <span style="font-family:'DM Mono',monospace;font-size:.7rem;color:${phase1Done?'var(--green)':'var(--yellow)'};">${phase1Done?'✓ Complete':fmtGBP(phase1Pool)+' / '+fmtGBP(THRESHOLD)}</span>
-              </div>
-              <div style="height:6px;background:var(--surface3);border-radius:99px;overflow:hidden;">
-                <div style="height:100%;width:${phase1Pct}%;background:${phase1Done?'var(--green)':'var(--acc)'};border-radius:99px;transition:width .3s;"></div>
-              </div>
-              <div style="font-size:.67rem;color:var(--muted);margin-top:4px;">First £81,000 goes exclusively to A shareholders per Art. 3.1</div>
-            </div>
-            ${phase2Active?`<div style="display:flex;justify-content:space-between;align-items:center;padding:7px 10px;background:rgba(61,130,240,.08);border:1px solid rgba(61,130,240,.2);border-radius:7px;">
-              <span style="font-size:.68rem;font-weight:700;color:#3d82f0;text-transform:uppercase;letter-spacing:.06em;">Phase 2 — All Shareholders</span>
-              <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:#3d82f0;">${fmtGBP(phase2Pool)}</span>
-            </div>`:'<div style="font-size:.7rem;color:var(--muted);padding:7px 10px;background:var(--surface2);border-radius:7px;">Phase 2 (B share participation) begins above £81,000</div>'}
-          </div>
-        </div>
-
-        <!-- A shareholders -->
-        <div class="card">
-          <div class="card-hd">
-            <span class="card-title" style="display:flex;align-items:center;gap:7px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:var(--acc);flex-shrink:0;"></span>
-              Ordinary A Shareholders
-            </span>
-          </div>
-          <div class="card-bd">
-            <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px;">Phase 1: 42/20/38 weights · Phase 2: 32/15/28 weights</div>
-            ${A_SHARES.map(s=>{
-              const p1=phase1Pool*(s.w/aTotal);
-              const abl=ALL_SHARES.find(x=>x.name===s.name);
-              const p2=abl?phase2Pool*(abl.w/allTotal):0;
-              const total=p1+p2;
-              return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);">
-                ${avBadge(s.name,'A')}
-                <span style="flex:1;font-size:.84rem;font-weight:500;">${escHtml(s.name)}</span>
-                <div style="text-align:right;">
-                  ${phase2Active?`<div style="font-size:.65rem;color:var(--muted);">Ph1: ${fmtGBP(p1)} + Ph2: ${fmtGBP(p2)}</div>`:''}
-                  <div style="font-family:Inter,sans-serif;font-size:.92rem;font-weight:700;color:var(--green);">${fmtGBP(total)}</div>
-                </div>
-              </div>`;
-            }).join('')}
-            <div style="display:flex;justify-content:space-between;padding:8px 0;border-top:1px solid var(--border);margin-top:2px;font-size:.72rem;color:var(--muted);">
-              <span>A total</span>
-              <span style="font-family:Inter,sans-serif;color:var(--green);font-weight:600;">${fmtGBP(A_SHARES.reduce((s,x)=>{const p1=phase1Pool*(x.w/aTotal);const abl=ALL_SHARES.find(a=>a.name===x.name);const p2=abl?phase2Pool*(abl.w/allTotal):0;return s+p1+p2;},0))}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- B shareholders -->
-        <div class="card" style="opacity:${phase2Active?1:.55};">
-          <div class="card-hd">
-            <span class="card-title" style="display:flex;align-items:center;gap:7px;">
-              <span style="width:8px;height:8px;border-radius:50%;background:#3d82f0;flex-shrink:0;"></span>
-              Ordinary B Shareholders
-            </span>
-            ${!phase2Active?`<span style="font-size:.65rem;color:var(--muted);padding:2px 7px;background:var(--surface2);border-radius:4px;">Threshold not yet reached</span>`:''}
-          </div>
-          <div class="card-bd">
-            <div style="font-size:.68rem;color:var(--muted);margin-bottom:10px;">Phase 2 only · 25% weight · participates above £81,000 threshold</div>
-            ${ALL_SHARES.filter(s=>s.type==='B').map(s=>{
-              const total=phase2Pool*(s.w/allTotal);
-              return`<div style="display:flex;align-items:center;gap:10px;padding:9px 0;border-bottom:1px solid var(--border2);">
-                ${avBadge(s.name,'B')}
-                <span style="flex:1;font-size:.84rem;font-weight:500;">${escHtml(s.name)}</span>
-                <div style="text-align:right;">
-                  ${phase2Active?`<div style="font-size:.65rem;color:var(--muted);">25% of ${fmtGBP(phase2Pool)}</div>`:''}
-                  <div style="font-family:Inter,sans-serif;font-size:.92rem;font-weight:700;color:#3d82f0;">${fmtGBP(total)}</div>
-                </div>
-              </div>`;
-            }).join('')}
-          </div>
-        </div>
-
-        <!-- Total check -->
-        <div style="display:flex;justify-content:space-between;align-items:center;background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:11px 14px;">
-          <span style="font-size:.72rem;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;font-family:'DM Mono',monospace;">Total distributed</span>
-          <span style="font-family:Inter,sans-serif;font-size:1rem;font-weight:700;color:var(--acc);">${fmtGBP(Object.values(dividends).reduce((a,b)=>a+b,0))}</span>
-        </div>
-
-      </div><!-- /right col -->
-    </div>`;
-  })()}
+<div class="fin-view${_finGroupOf(tab).k==='pay'&&tab!=='assets'?' active':''}" id="fin-pay">
+  ${_finGroupOf(tab).k==='pay'?_finPayHtml():''}
 </div>
 
 <div class="fin-view${_finGroupOf(tab).k==='spend'?' active':''}" id="fin-budget">
@@ -11482,13 +11421,6 @@ function renderFinCharts(){
     mkDonut('fin-donut-rec',Object.keys(recCat),Object.values(recCat),Object.keys(recCat).map(k=>(FIN_CATS[k]||{c:'#888'}).c));
     const ooCat={};S.finance.oneoff.forEach(e=>{ooCat[e.cat||'Other']=(ooCat[e.cat||'Other']||0)+e.amount;});
     mkDonut('fin-donut-oo',Object.keys(ooCat),Object.values(ooCat),Object.keys(ooCat).map(k=>(FIN_CATS[k]||{c:'#888'}).c));
-  }
-  if(tab==='tax'){
-    const txData=[{l:'Taxable profit',v:fmtS(profit)},{l:'Rate',v:ct.label+' — '+ct.rate},{l:'Gross tax',v:fmtGBP(ct.gross)},{l:'Marginal relief',v:ct.mr>0?'-'+fmtGBP(ct.mr):'£0.00'},{l:'Tax due',v:`<span style="color:var(--yellow);font-weight:600;">${fmtGBP(ct.tax)}</span>`},{l:'Effective rate',v:`<span style="color:var(--yellow);font-weight:600;">${ct.eff}</span>`}];
-    const txEl=el('fin-tax-rows');if(txEl)txEl.innerHTML=txData.map(d=>`<div class="tax-row"><span class="tax-lbl">${d.l}</span><span class="tax-val">${d.v}</span></div>`).join('');
-    const bands=[{l:'Small profits ≤ £50k',th:50000,c:'#1fba7a'},{l:'Marginal £50k–£250k',th:250000,c:'#f0a500'},{l:'Main rate > £250k',th:500000,c:'#e06060'}];
-    const bbEl=el('fin-band-bars');if(bbEl)bbEl.innerHTML=bands.map(b=>{const w=Math.min(100,Math.round(profit/b.th*100));const here=(b.th===50000&&profit<=50000)||(b.th===250000&&profit>50000&&profit<=250000)||(b.th===500000&&profit>250000);return`<div class="band-row"><div class="band-lbl"><span style="color:${here?b.c:'var(--muted)'};font-weight:${here?600:400};">${b.l}${here?' ◀':''}</span></div><div class="prog-bg"><div class="prog-fill-f" style="width:${w}%;background:${b.c}"></div></div></div>`}).join('');
-    mkDonut('fin-donut-tax',['Net profit','Corp tax'],[Math.max(0,net),ct.tax],['#1fba7a','#8b5cf6']);
   }
   if(_finGroupOf(tab).k==='spend'){renderFinRecurring();renderFinOneoff();}
 }
