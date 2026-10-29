@@ -2110,7 +2110,7 @@ let _pbEtag     = null;
       // Schedule refresh for restored session (may be close to expiry)
       setTimeout(_scheduleTokenRefresh,100);
     }
-  }catch(e){}
+  }catch(e){_pfWarn('sign-in refresh',e);}
 })();
 
 
@@ -3041,7 +3041,7 @@ setInterval(()=>{
       _pfConn('error','Changes not confirmed as saved after 30 seconds — retrying');
       PF.requestSync(0);
     }
-  }catch(_){}
+  }catch(e){_pfWarn('save watchdog',e);}
 },5000);
 
 function _pfReadStored(){
@@ -3068,7 +3068,7 @@ function _pfStash(str,label){            // a copy that lost out (or was replace
     let b=JSON.parse(localStorage.getItem(PF_BACKUP_KEY)||'[]');
     b.push({ts:new Date().toISOString(),data:str,label:label||'Unsynced local copy'});
     localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(b.slice(-PF_MAX_BACKUPS)));
-  }catch(_){}
+  }catch(e){_pfWarn('local copy of unsent changes',e);}
 }
 
 /* Render after a remote merge without yanking the screen from under someone who is typing */
@@ -3427,9 +3427,11 @@ async function _pfRunHealth(){
       +'<ul style="margin:6px 0 0 18px;padding:0">'
       +(r.problems.map(x=>'<li>'+_pfEsc(x)+'</li>').join(''))
       +'<li>Server: '+_pfEsc(r.server)+'</li><li>Waiting to sync: '+r.pending+'</li></ul>'
+      +(r.errors.length?'<details style="margin-top:8px"><summary>Recent errors ('+r.errors.length+')</summary><ul style="margin:6px 0 0 18px;padding:0">'+r.errors.slice().reverse().map(x=>'<li><span class="meta">'+_pfEsc(new Date(x.at).toLocaleString())+(x.where?' · '+_pfEsc(x.where):'')+(x.times>1?' · ×'+x.times:'')+'</span><br>'+_pfEsc(x.msg)+'</li>').join('')+'</ul><button class="btn btn-ghost btn-sm" style="margin-top:6px" onclick="_pfClearErrs()">Clear the list</button></details>':'')
       +'<button class="btn btn-ghost btn-sm" style="margin-top:8px" onclick="_pfCopyDiag()">Copy diagnostics</button>';
   }catch(e){out.textContent='Health check failed: '+e.message;}
 }
+function _pfClearErrs(){_pfErrors.length=0;try{localStorage.removeItem(PF_ERRLOG_KEY);}catch(_){}if(window._pfLastHealth)window._pfLastHealth.errors=[];_pfRunHealth();}
 function _pfCopyDiag(){
   const txt=JSON.stringify(window._pfLastHealth||{},null,1);
   (navigator.clipboard?navigator.clipboard.writeText(txt):Promise.reject()).then(()=>showToast('Diagnostics copied')).catch(()=>{window.prompt('Copy these diagnostics:',txt.slice(0,2000));});
@@ -3442,7 +3444,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=136;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=137;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -3542,13 +3544,33 @@ function _pfSizeReport(){
 const _pfKB=n=>n>=1e6?(n/1e6).toFixed(2)+' MB':Math.round(n/1000)+' KB';
 
 /* ── Health check: rules, size, and does the server agree with this screen? ── */
-const _pfErrors=[];
-function _pfNoteErr(m){_pfErrors.push({t:Date.now(),m:String(m).slice(0,300)});if(_pfErrors.length>20)_pfErrors.shift();}
-window.addEventListener('error',e=>_pfNoteErr(e.message));
-window.addEventListener('unhandledrejection',e=>_pfNoteErr('promise: '+(e.reason&&e.reason.message||e.reason)));
+/* Error log: the last 40 distinct problems, kept across reloads (this device only, cleared on sign-out). Repeats of the same problem
+   count up instead of filling the list. Shown in the sync details and included in "Copy diagnostics". Never holds tokens or workspace data. */
+const PF_ERRLOG_KEY='pf_errlog',PF_ERRLOG_MAX=40;
+const _pfErrors=(()=>{try{const a=JSON.parse(localStorage.getItem(PF_ERRLOG_KEY)||'[]');return Array.isArray(a)?a.filter(x=>x&&typeof x.m==='string').slice(-PF_ERRLOG_MAX).map(x=>({t:+x.t||0,m:x.m.slice(0,300),w:String(x.w||'').slice(0,60),n:Math.max(1,+x.n||1)})):[];}catch(_){return [];}})();
+function _pfNoteErr(m,where){
+  try{
+    m=String(m==null?'':m).slice(0,300);where=String(where||'').slice(0,60);
+    const i=_pfErrors.findIndex(x=>x.m===m&&x.w===where);
+    if(i>=0){const x=_pfErrors.splice(i,1)[0];x.n++;x.t=Date.now();_pfErrors.push(x);}
+    else{_pfErrors.push({t:Date.now(),m,w:where,n:1});if(_pfErrors.length>PF_ERRLOG_MAX)_pfErrors.shift();}
+    try{localStorage.setItem(PF_ERRLOG_KEY,JSON.stringify(_pfErrors));}catch(_){}
+  }catch(_){}
+}
+/* For a failure that is safe to carry on after but worth knowing about: _pfWarn('daily snapshot',e) */
+function _pfWarn(where,e){_pfNoteErr(e&&e.message||e||'failed',where);}
+window.addEventListener('error',e=>_pfNoteErr(e.message,e.lineno?'script line '+e.lineno:'script'));
+window.addEventListener('unhandledrejection',e=>_pfNoteErr(e.reason&&e.reason.message||e.reason,'promise'));
 
+function _pfEnv(){
+  const e={build:PF_BUILD,online:navigator.onLine,visible:document.visibilityState,viewport:innerWidth+'x'+innerHeight,ua:String(navigator.userAgent).slice(0,160)};
+  try{e.busy=!!PF.isBusy();}catch(_){}
+  try{e.held=PF.held&&PF.held();if(e.held&&typeof e.held==='object')e.held=Object.keys(e.held).length||!!e.held;}catch(_){}
+  try{e.tasks=(S.tasks||[]).length;e.projects=(S.projects||[]).length;}catch(_){}
+  return e;
+}
 async function _pfHealth(){
-  const rep={at:new Date().toISOString(),schema:{data:S._schema||0,app:PF_SCHEMA},problems:[],size:_pfSizeReport(),pending:PF.pending().length,errors:_pfErrors.slice(-8)};
+  const rep={at:new Date().toISOString(),schema:{data:S._schema||0,app:PF_SCHEMA},problems:[],size:_pfSizeReport(),pending:PF.pending().length,errors:_pfErrors.slice(-15).map(x=>({at:new Date(x.t).toISOString(),where:x.w,msg:x.m,times:x.n})),env:_pfEnv()};
   // rule violations (would be repaired on the next sync)
   const snap=PFSync.clone(S.tasks||[]);
   const before=PFSync.stable(snap);
@@ -3783,7 +3805,7 @@ async function _saveHistorySnapshot(label='Auto',manual){
       const first=await _histErr(r);const o2={...rec};delete o2.workspace;r=await post(o2);
       if(!r.ok){_histState.lastErr=first+' | retry: '+await _histErr(r);return false;}
     }else if(!r.ok){_histState.lastErr=await _histErr(r);return false;}
-    try{const j=await r.json();if(j&&j.id){const a=_snapIds();a.push({id:j.id,t:_histTier(label),ts:Date.now()});_snapSave(a);}}catch(_){}
+    try{const j=await r.json();if(j&&j.id){const a=_snapIds();a.push({id:j.id,t:_histTier(label),ts:Date.now()});_snapSave(a);}}catch(e){_pfWarn('history snapshot id',e);}
     _histState.lastOk=new Date().toISOString();_histState.lastErr=null;
     _pruneHistory();
     return true;
@@ -3876,7 +3898,7 @@ async function _pruneHistory(){
       let guard=0;
       while(c>cap[t]&&guard++<12){const id=await _histOldestId(_HIST_TIER_FILTER[t]);if(!id||!await _histDelete(id))return;c--;}
     }
-  }catch(e){}
+  }catch(e){_pfWarn('history trim',e);}
 }
 /* Clean up: the server may hold hundreds of old snapshots (pruning used to fail silently). Delete the oldest ones, a few at a time, keeping the newest 60. */
 async function _histDeleteOne(id,btn){
@@ -3901,7 +3923,7 @@ async function _histCleanup(btn){
         const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=@rowid&perPage=4&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},45000);
         const r2=r.ok?r:await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=saved_at&perPage=4&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},45000);
         if(r2.ok)ids=((await r2.json()).items||[]).map(x=>x.id).filter(x=>!skip.has(x));
-      }catch(_){}
+      }catch(e){_pfWarn('history lookup',e);}
       if(!ids.length)await new Promise(r=>setTimeout(r,2000));
     }
     if(!ids.length){fails++;continue;}
@@ -3922,14 +3944,14 @@ async function _dailySnapshotIfDue(){
     const k=_dayKey();if(localStorage.getItem('pf_last_daily')===k)return;
     if(!(S.tasks||[]).length&&!(S.projects||[]).length)return;
     if(await _saveHistorySnapshot('Daily '+k))localStorage.setItem('pf_last_daily',k);
-  }catch(_){}
+  }catch(e){_pfWarn('daily snapshot',e);}
 }
 async function _sessionSnapshot(){
   try{
     if(!(S.tasks||[]).length&&!(S.projects||[]).length)return;
     const last=+localStorage.getItem('pf_last_session_snap')||0;if(Date.now()-last<30*60*1000)return;   // not on every refresh
     if(await _saveHistorySnapshot('Session start'))localStorage.setItem('pf_last_session_snap',String(Date.now()));
-  }catch(_){}
+  }catch(e){_pfWarn('session snapshot',e);}
 }
 
 async function listHistorySnapshots(page){
@@ -4118,7 +4140,7 @@ function downloadLocalBackup(ts){
 function deleteLocalBackup(ts){
   let backups=listLocalBackups();
   backups=backups.filter(b=>b.ts!==ts);
-  try{localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(backups));}catch(e){}
+  try{localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(backups));}catch(e){_pfWarn('delete local backup',e);}
   renderBackupList();
 }
 
@@ -5354,7 +5376,7 @@ async function _pingPresence(){
       _renderPresence(others);
       if(typeof _pfDecoSoon==='function')_pfDecoSoon();
     }
-  }catch(e){}
+  }catch(e){_pfWarn('after-render decoration',e);}
   _pinging=false;
   if(_pingAgain){_pingAgain=false;_pingPresence();}
 }
@@ -5573,7 +5595,7 @@ async function handleLogout(){
     if(PF.isBusy()){for(let i=0;i<20&&PF.isBusy();i++)await new Promise(r=>setTimeout(r,150));}   // let an in-flight save finish (3 s at most)
     const clean=!PF.isBusy()&&PF.pending().length===0&&!PF.held();
     PF.reset();
-    if(clean){['pf6','pf6m','pf4',PF_BACKUP_KEY,_SNAP_KEY,'pf_last_auto_snap','pf_last_daily','pf_last_session_snap'].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});}
+    if(clean){['pf6','pf6m','pf4',PF_BACKUP_KEY,_SNAP_KEY,'pf_last_auto_snap','pf_last_daily','pf_last_session_snap',PF_ERRLOG_KEY].forEach(k=>{try{localStorage.removeItem(k);}catch(_){}});}
     else _kept=true;
   }catch(_){_kept=true;}
   _pbToken=null;_pbUser=null;_pbRecordId=null;_pbEtag=null;
@@ -5684,7 +5706,7 @@ function _onSignedIn(user){
       pwLogo.innerHTML=`<img src="${escHtml(logo)}" style="width:142%;height:142%;object-fit:cover;transform:rotate(-45deg);flex-shrink:0;display:block;" alt="">`;
     }
     if(name){const bn=document.getElementById('pw-brand-name');if(bn)bn.textContent=name.split('—')[0].trim()||name;}
-  }catch(e){}
+  }catch(e){_pfWarn('login branding',e);}
 })();
 
 // Keyboard: Enter navigates email→password→submit, also handles forgot panel
@@ -5817,18 +5839,6 @@ function ecToggle(projId){
   const card=document.querySelector(`.ec-card[data-proj="${escHtml(projId)}"]`);
   if(!card)return;
   render();return; // opening or closing moves the card between a column and the full-width row, so the grid is rebuilt (task rows are also only built for expanded projects)
-  card.classList.toggle('expanded',!!window._ecExpanded[projId]);
-  const body=card.querySelector('.ec-body');
-  const chev=card.querySelector('.ec-chevron');
-  if(body)body.classList.toggle('open',!!window._ecExpanded[projId]);
-  if(chev)chev.classList.toggle('open',!!window._ecExpanded[projId]);
-  if(window._ecExpanded[projId]){
-    setTimeout(()=>{
-      const qa=card.querySelector('.qa-bar-input');
-      // Don't auto-focus — just ensure tabs are showing correct pane
-      ecShowTab(projId,window._ecTab[projId],false);
-    },30);
-  }
 }
 
 function ecShowTab(projId,tab,save=true){
@@ -6566,7 +6576,6 @@ function _finPlanHtml(){
 /* Cost budget: type a yearly amount per category; actuals are read from recurring and one-off costs, event pages and team pay */
 function _finCostBudgetHtml(){
   const fy=S.finance.finYear,P=finPlanCalc(fy),money=n=>_finMoney(Math.round(n));
-  const bud=S.finance.budgets||{};
   const have=new Set(P.rows.map(r=>r.cat));
   const col=c=>(FIN_CATS[c]||{c:'#888'}).c;
   const tag=r=>{if(!(r.budget>0))return'';if(r.spent>r.budget)return `<span class="fb-tag bad">Over by ${money(r.spent-r.budget)}</span>`;return r.state==='watch'?'<span class="fb-tag warn">Watch</span>':'<span class="fb-tag">On pace</span>';};
@@ -7694,7 +7703,6 @@ function renderEventSponsors(p){
   const all=p.sponsors||[];const exp=(window._spExpanded||{})[p.id]!==false;
   const cashN=all.filter(sp=>sp.type==='cash'||sp.type==='both').length;
   let pool=0;all.forEach(sp=>{const s=getSponsor(sp.id);if(s)pool+=_spProdInfo(sp,s).val;});
-  const rank={headline:0,event:1,product:2,'':3};
   const order=sp=>-SP_STAGES.findIndex(x=>x.id===_spStage(sp));
   const groups=_SP_TIERS.map(tr=>({tr,list:all.filter(sp=>(sp.category||'')===tr.key&&getSponsor(sp.id)).sort((a,b)=>order(a)-order(b))})).filter(g=>g.list.length);
   // sponsors whose category is something unexpected still show, under the plain group
@@ -7746,7 +7754,7 @@ function spGroupOf(s,lineup){
 }
 /* ── numbers for the strip and the pool breakdown ── */
 function spStats(){
-  const act=spActiveEvents(),lineup=spLineupProject(),m={};
+  const act=spActiveEvents(),lineup=spLineupProject();
   const cat={},contrib={};let paid=0,awaiting=0;
   act.forEach(p=>p.sponsors.forEach(sp=>{
     const s=getSponsor(sp.id);if(!s)return;
@@ -8304,13 +8312,11 @@ ${_dashQuickHtml()}
       const memberTaskCt=mf?S.tasks.filter(t=>t.projectId===p.id&&!t.done&&(t.assignees||[]).includes(mf)).length:null;
       const overdueCt=S.tasks.filter(t=>t.projectId===p.id&&!t.done&&t.endDate&&t.endDate<todayStr&&(!mf||(t.assignees||[]).includes(mf))).length;
       const spons=isEvt(p)?(p.sponsors||[]):[];
-      const isExp=window._ecExpanded[p.id]===true||window._ecExpanded[p.id]===undefined?(!mf?!!window._ecExpanded[p.id]:true):false;
       // When a member filter is active, always expand projects that have their tasks
       const forceExp=mf&&S.tasks.some(t=>t.projectId===p.id&&!t.done&&(t.assignees||[]).includes(mf));
       const actuallyExp=forceExp||!!window._ecExpanded[p.id];
       const curTab=window._ecTab[p.id]||'tasks';
       const mems=p.ownerId?[p.ownerId].filter(id=>getMember(id)):[];
-      const datesStr=p.startDate&&p.endDate?`${fmtD(p.startDate)} → ${fmtD(p.endDate)}`:p.endDate?`Due ${fmtD(p.endDate)}`:'';
 
       return _pre+`<div class="ec-card${actuallyExp?' expanded':''}" ${isInactive?'data-inactive="1"':''} data-proj="${escHtml(p.id)}">
         <!-- Header: compact card (name, progress, dates, actions) -->
@@ -8881,9 +8887,6 @@ function renderTaskRow(t,depth=0,showProj=false){
   const hasReminder=!!(t.slackReminder?.datetime);
   const bn=blockerNames(t);
   // Priority dot colour — subtle
-  const prioMap={'Critical':'#e06060','High':'#f08c3c','Medium':'#f0c96b','Low':'#62D0AA'};
-  const prioC=prioMap[t.priority]||'var(--border2)';
-  const dotC=comp===100?'var(--green)':prioC;
 
   return`<div class="task-item" data-id="${escHtml(t.id)}">
 <div class="task-row" ${bn.length>0?`data-blockers="${bn.map(n=>escHtml(n)).join(', ')}" data-blocker-ids="${escHtml(activeBlockerIds(t).join(','))}"`:''}>
@@ -9069,7 +9072,6 @@ function toggleDone(id){
   const t=getTask(id);if(!t)return;
   const ch=kids(id);
   // Snapshot for undo ONLY if needed — defer for perf
-  const prevDone=t.done;
   t.done=!t.done;
   if(t.done){t.kStatus='done';if(t.finKey)t.doneOn=_localToday();}
   else{syncBlockedStatus(id);if(t.finKey)t.doneOn='';}
@@ -9504,7 +9506,7 @@ function renderDetail(id){
   });
 
   // Cash value & invoice status
-  let cashTotal=0,invoicesSent=0,invoicesPaid=0,cashSponsorCount=0,fulfilledCount=0;
+  let invoicesSent=0,invoicesPaid=0,cashSponsorCount=0,fulfilledCount=0;
   spons.forEach(sp=>{
     const s=getSponsor(sp.id);
     if(!s)return;
@@ -9575,7 +9577,6 @@ function renderDetail(id){
     }
     return null;
   })();
-  const calIcon='<rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/>';
   const stat=(icon,label,value,color='var(--text2)',sub='')=>`<div style="background:var(--surface);padding:11px 14px;min-width:0;">
     <div style="font-size:.62rem;color:var(--muted);font-weight:700;letter-spacing:.07em;text-transform:uppercase;white-space:nowrap;">${label/*sec-ok: fixed text*/}</div>
     <div style="font-size:1.05rem;font-weight:700;color:${color};font-family:'DM Mono',monospace;white-space:nowrap;margin-top:2px;">${value}</div>
@@ -10239,7 +10240,6 @@ function _renderGanttInner(projects,fullPage=false,opts){
       const end=new Date(seg.endDate);end.setHours(0,0,0,0);
       const start=new Date(seg.startDate);start.setHours(0,0,0,0);
       const daysToEnd=Math.round((end-today)/86400000);
-      const daysFromStart=Math.round((today-start)/86400000);
       let statusLine='';
       let daysLine='';
       if(today<start){
@@ -11047,10 +11047,7 @@ function deleteFinLink(id){saveWithUndo('Delete finance link');S.finance.links=(
 
 function renderFinance(){
   const tab=S.finance.finTab||'overview';
-  const rev=totalRevenue();
-  const rec=totalRec(),oo=totalOO(),projExp=projExpTotal(),allExp=rec+oo+projExp+finTeamPayCost();
-  const profit=rev-allExp,ct=corpTax(Math.max(0,profit)),net=profit-ct.tax;
-  const pct=n=>rev>0?(n/rev*100).toFixed(1):'0.0';
+  const rec=totalRec(),oo=totalOO();
 
   if(tab==='assets'){return renderAssetsPage();}
 
@@ -11255,7 +11252,6 @@ function generateFinanceReport(){
   const catSpend={};
   catItems.forEach(e=>{const v=e.freq==='One-off'?e.amount:finAnn(e);catSpend[e.cat||'Other']=(catSpend[e.cat||'Other']||0)+v;});
   const allCats=Object.keys(FIN_CATS);
-  const brandName=S.settings?.brandName||'Airwiggles — ProjectFlow';
   const today=new Date().toLocaleDateString('en-GB',{day:'numeric',month:'long',year:'numeric'});
 
   // ── SVG helpers ──
@@ -11738,7 +11734,6 @@ function stTab(k){
 function renderSettings(){
   const _stT=_stCur();
   const nv=S.settings.navVisible||{};
-  const _devTodayStr=new Date().toLocaleDateString('en-GB');
   const _devTodos=S.settings.devTodos||[];
   return`<div class="fu"><div class="page-hd"><div class="page-title">Settings</div></div>
 <div class="st-tabs" role="tablist" aria-label="Settings groups"><button class="st-tab${_stT==='backup'?' on':''}" role="tab" data-st-tab="backup" onclick="stTab('backup')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Data &amp; Backup</button><button class="st-tab${_stT==='workspace'?' on':''}" role="tab" data-st-tab="workspace" onclick="stTab('workspace')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>Workspace</button><button class="st-tab${_stT==='nav'?' on':''}" role="tab" data-st-tab="nav" onclick="stTab('nav')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Navigation</button><button class="st-tab${_stT==='slack'?' on':''}" role="tab" data-st-tab="slack" onclick="stTab('slack')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Slack</button><button class="st-tab${_stT==='aircon'?' on':''}" role="tab" data-st-tab="aircon" onclick="stTab('aircon')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 10.5L9 4H18v9l-6.5 6.5L2.5 10.5z"/></svg>AirCon</button><button class="st-tab${_stT==='keys'?' on':''}" role="tab" data-st-tab="keys" onclick="stTab('keys')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg>Shortcuts</button><span style="flex:1"></span><button class="st-tab${_stT==='adv'?' on':''}" role="tab" data-st-tab="adv" onclick="stTab('adv')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Advanced</button></div>
@@ -12305,8 +12300,6 @@ function saveProject(eid){
         return{...(oldSp||{stage:sp.stage,stageDates:sp.stageDates}),id:sp.id,type:sp.type,category:sp.category,products:sp.products};
       });
       // Find newly added sponsors
-      const oldSpIds=(old.sponsors||[]).map(s=>s.id);
-      const addedSponsors=proj.sponsors.filter(s=>!oldSpIds.includes(s.id));
       _pfApplyEdit('projects',eid,{...old,...proj});
     }
   } else {
@@ -12815,7 +12808,6 @@ function coworkDayModalHtml(id){
   if(!S.coworkDays)S.coworkDays=[];
   const d=id?S.coworkDays.find(x=>x.id===id):null;
   const selMems=d?.members||[];
-  const membersWithoutEmail=S.members.filter(m=>selMems.includes(m.id)&&!m.email);
   return`<div class="mo-box" style="max-width:460px;">
 <div class="mo-hd"><span class="mo-title" style="display:flex;align-items:center;gap:7px;"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3"/><path d="M3 21v-2a4 4 0 014-4h4a4 4 0 014 4v2"/><path d="M16 3.13a4 4 0 010 7.75"/><path d="M21 21v-2a4 4 0 00-3-3.87"/></svg>${d?'Edit':'Add'} Co-working Day</span><button class="mo-close" onclick="closeModal()">\u00d7</button></div>
 <div class="mo-body">
@@ -14312,7 +14304,6 @@ function openPrizeMessageChooser(projectId,sponsorId){
 
 function prizeMessageChooserHtml(data){
   const {projectId,sponsorId,prizeContext,recapUrl}=data;
-  const p=getProject(projectId);
   const s=getSponsor(sponsorId);
   const hasCode=prizeContext.some(x=>x.type==='code');
   const hasAccount=prizeContext.some(x=>x.type==='account');
@@ -14639,7 +14630,6 @@ function renderSpMatchPanel(){
 
 function runSpMatch(){
   const eventType=el('spm-type')?.value||'';
-  const spType=el('spm-sptype')?.value||'';
   const audience=(el('spm-audience')?.value||'').toLowerCase();
   const res=el('spm-results');if(!res)return;
 
@@ -14901,7 +14891,6 @@ function addAudienceTag(){
   // Re-render tags
   const wrap=el('sp-audience-tags-wrap');
   if(wrap){
-    const spans=wrap.querySelectorAll('[data-tag]');
     const newSpan=document.createElement('span');
     newSpan.dataset.tag=tag;
     newSpan.style.cssText='display:inline-flex;align-items:center;gap:4px;padding:2px 8px;background:rgba(167,139,250,.15);border:1px solid rgba(167,139,250,.3);color:#a78bfa;border-radius:20px;font-size:.68rem;';
@@ -15185,7 +15174,6 @@ function addProjSponsorRow(){
   const existingIds=existingRows.map(r=>r.id);
   const available=S.sponsors.filter(s=>!existingIds.includes(s.id));
   if(available.length===0){alert('All sponsors already added to this project.');return;}
-  const projId=wrap.dataset.projId||'';
   const newSp={id:available[0].id,type:'product',category:'',products:[]};
   const i=existingRows.length;
   wrap.insertAdjacentHTML('beforeend',_projSponsorRow(newSp,i));
