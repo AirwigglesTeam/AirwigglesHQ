@@ -1626,6 +1626,17 @@ body.mcal-dragging *{cursor:grabbing !important;}
 /* Dashboard finance review card */
 #dash-finreview .pill{font-size:.6rem;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid var(--border);}
 #dash-finreview .pill.ok{color:var(--acc);border-color:var(--acc);}#dash-finreview .pill.warn{color:var(--yellow);border-color:var(--yellow);}#dash-finreview .pill.bad{color:var(--red);border-color:var(--red);}
+
+/* Finance review on the calendar and timeline */
+:root{--fin:#ec4899;}
+.cowork-pin.fin-pin{border-color:var(--fin);color:var(--fin);background:color-mix(in srgb,var(--fin) 14%,var(--surface));}
+.cowork-pin.fin-pin:hover{border-color:var(--fin);color:var(--fin);background:color-mix(in srgb,var(--fin) 26%,var(--surface));}
+.fin-pin-p{font-size:.62rem;font-weight:800;line-height:1;color:var(--fin);font-family:'DM Mono',monospace;}
+.mcal-cell.fr:not(.cw){background:color-mix(in srgb,var(--fin) 11%,var(--surface));box-shadow:inset 0 3px 0 var(--fin);}
+.mcal-cell.fr.cw{box-shadow:inset 0 3px 0 var(--purple),inset 0 -3px 0 var(--fin);}
+.mcal-frlab{font-size:.58rem;font-weight:700;color:var(--fin);background:color-mix(in srgb,var(--fin) 16%,transparent);border-radius:4px;padding:0 5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0;}
+.mcal-lg.fr{background:color-mix(in srgb,var(--fin) 30%,var(--surface));box-shadow:inset 0 2px 0 var(--fin);}
+@media(max-width:700px){.mcal-frlab{display:none;}}
 </style>
 </head>
 <body>
@@ -3180,7 +3191,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=114;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=115;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6265,7 +6276,7 @@ function mcGridDays(y,m){
 /* everything that happens, grouped by date. Pure: reads S, returns data. */
 function mcCollect(sc,days){
   const lo=days[0],hi=days[days.length-1];
-  const by={};const at=d=>by[d]||(by[d]={tasks:[],cw:[],marks:[]});
+  const by={};const at=d=>by[d]||(by[d]={tasks:[],cw:[],fr:[],marks:[]});
   const cf=sc==='camp'?(S.campaignFilter||{}):null;   // the Campaign board has its own project / phase / member filters
   const mf=cf?(cf.member||null):(sc?null:S.activeMember);   // the 'my view' member filter belongs to the dashboard; a project page shows the whole project
   const projs=cf?S.projects.filter(p=>p.status==='active'&&(!cf.project||p.id===cf.project)):(sc?[getProject(sc)].filter(Boolean):S.projects.filter(p=>p.status==='active'));
@@ -6282,6 +6293,11 @@ function mcCollect(sc,days){
     if(mf&&(c.members||[]).length&&!(c.members||[]).includes(mf))return;
     at(c.date).cw.push(c);
   });
+  ((S.finance&&S.finance.reviews)||[]).forEach(c=>{
+    if(!c.date||c.date<lo||c.date>hi)return;
+    if(mf&&(c.members||[]).length&&!(c.members||[]).includes(mf))return;
+    at(c.date).fr.push(c);
+  });
   projs.forEach(p=>{
     if(p.startDate&&p.startDate>=lo&&p.startDate<=hi)at(p.startDate).marks.push({p,kind:'start'});
     if(p.endDate&&p.endDate>=lo&&p.endDate<=hi&&projType(p)!=='ongoing')at(p.endDate).marks.push({p,kind:'end'});
@@ -6293,11 +6309,12 @@ function _mcChip(t,today){
   return '<div class="mcal-chip'+(t.done?' done':'')+(over?' over':'')+'" data-task="'+t.id+'" data-tip-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' onclick="event.stopPropagation();openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span>'+escHtml(t.name)+'</span></div>';
 }
 function _mcDayDetail(iso,data,today,sc){
-  const d=data[iso]||{tasks:[],cw:[],marks:[]};
+  const d=data[iso]||{tasks:[],cw:[],fr:[],marks:[]};
   const q=_isoParts(iso);const dow=_MC_DOW[(new Date(Date.UTC(q[0],q[1]-1,q[2])).getUTCDay()+6)%7];
   let h='<div class="mcal-detail" data-detail="'+iso+'"><div class="mcal-dt-hd">'+dow+' '+_updDate(iso)+(iso===today?' <span class="mcal-today-tag">Today</span>':'')+'</div>';
-  if(!d.tasks.length&&!d.cw.length&&!d.marks.length)return h+'<div class="mcal-empty">Nothing scheduled.</div></div>';
+  if(!d.tasks.length&&!d.cw.length&&!(d.fr||[]).length&&!d.marks.length)return h+'<div class="mcal-empty">Nothing scheduled.</div></div>';
   d.cw.forEach(c=>{h+='<div class="mcal-row mcal-cw"><span class="mcal-cwlab">Co-working day</span> '+escHtml(c.title&&c.title!=='Co-working Day'?c.title:'')+' <span class="mcal-muted">'+escHtml((c.startTime||'')+(c.endTime?'–'+c.endTime:''))+'</span>'+((c.members||[]).length?'<span class="mcal-avs">'+(c.members||[]).map(id=>avHtml(id,16)).join('')+'</span>':'')+(c.notes?'<div class="mcal-muted">'+escHtml(c.notes)+'</div>':'')+'</div>';});
+  (d.fr||[]).forEach(c=>{h+='<div class="mcal-row mcal-fr" onclick="openModal(\'financeReview\',\''+c.id+'\')" style="cursor:pointer;"><span class="mcal-frlab">Finance review</span> '+escHtml(c.title&&!/^Finance review$/i.test(c.title)?c.title:'')+' <span class="mcal-muted">'+escHtml((c.startTime||'')+(c.endTime?'–'+c.endTime:''))+'</span>'+((c.members||[]).length?'<span class="mcal-avs">'+(c.members||[]).map(id=>avHtml(id,16)).join('')+'</span>':'')+(c.notes?'<div class="mcal-muted">'+escHtml(c.notes)+'</div>':'')+'</div>';});
   d.marks.forEach(m=>{h+='<div class="mcal-row"><i style="background:'+(m.p.color||'var(--acc)')+'"></i> '+escHtml(m.p.name)+' '+(m.kind==='start'?'starts':'ends')+'</div>';});
   d.tasks.slice().sort((a,b)=>(a.done-b.done)||a.name.localeCompare(b.name)).forEach(t=>{
     const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
@@ -6312,18 +6329,18 @@ function renderMonthCal(sc){
   let h='<div class="mcal" data-mcal="'+sc+'"><div class="mcal-nav"><button class="btn btn-ghost btn-xs" onclick="mcNav('+q+',-1)" aria-label="Previous month">‹</button><span class="mcal-title">'+_MC_MON[st.m]+' '+st.y+'</span><button class="btn btn-ghost btn-xs" onclick="mcNav('+q+',1)" aria-label="Next month">›</button><button class="btn btn-ghost btn-xs" style="margin-left:auto;" onclick="mcToday('+q+')">Today</button></div>';
   h+='<div class="mcal-grid">'+_MC_DOW.map(d=>'<div class="mcal-dow">'+d+'</div>').join('');
   days.forEach((iso,i)=>{
-    const d=data[iso]||{tasks:[],cw:[],marks:[]};const inM=+iso.slice(5,7)-1===st.m;const wk=i%7>=5;
+    const d=data[iso]||{tasks:[],cw:[],fr:[],marks:[]};const inM=+iso.slice(5,7)-1===st.m;const wk=i%7>=5;
     const open=d.tasks.filter(t=>!t.done).length;
     const shown=d.tasks.slice().sort((a,b)=>(a.done-b.done)).slice(0,3);
-    h+='<div class="mcal-cell'+(inM?'':' out')+(wk?' wk':'')+(iso===today?' today':'')+(iso===st.sel?' sel':'')+(d.cw.length?' cw':'')+'" data-iso="'+iso+'" onclick="mcSel('+q+',\''+iso+'\')">'
-      +'<div class="mcal-dn">'+(+iso.slice(8))+'</div>'+(d.cw.length?'<div class="mcal-cwrow"><span class="mcal-cwlab" title="'+escHtml(d.cw.map(c=>c.title||'Co-working day').join(', '))+'">Co-working day</span></div>':'')
+    h+='<div class="mcal-cell'+(inM?'':' out')+(wk?' wk':'')+(iso===today?' today':'')+(iso===st.sel?' sel':'')+(d.cw.length?' cw':'')+((d.fr||[]).length?' fr':'')+'" data-iso="'+iso+'" onclick="mcSel('+q+',\''+iso+'\')">'
+      +'<div class="mcal-dn">'+(+iso.slice(8))+'</div>'+(d.cw.length?'<div class="mcal-cwrow"><span class="mcal-cwlab" title="'+escHtml(d.cw.map(c=>c.title||'Co-working day').join(', '))+'">Co-working day</span></div>':'')+((d.fr||[]).length?'<div class="mcal-cwrow"><span class="mcal-frlab" title="'+escHtml(d.fr.map(c=>c.title||'Finance review').join(', '))+'">Finance review</span></div>':'')
       +'<div class="mcal-chips">'+d.marks.map(m=>'<div class="mcal-mark" title="'+escHtml(m.p.name)+(m.kind==='start'?' starts':' ends')+'"><i style="background:'+(m.p.color||'var(--acc)')+'"></i>'+(m.kind==='start'?'▶ ':'⚑ ')+escHtml(m.p.name)+'</div>').join('')+shown.map(t=>_mcChip(t,today)).join('')+(d.tasks.length>3?'<div class="mcal-more">+'+(d.tasks.length-3)+' more</div>':'')+'</div>'
       +((d.tasks.length||d.marks.length)?'<div class="mcal-dots">'+(open?'<b>'+open+'</b>':'')+(d.marks.length?'<em>⚑</em>':'')+'</div>':'')
       +'</div>';
   });
   h+='</div>';
   h+=st.sel?_mcDayDetail(st.sel,data,today,sc):'';
-  h+='<div class="mcal-legend"><span><i class="mcal-lg cw"></i>Co-working day</span><span><i class="mcal-lg td"></i>Today</span><span><i class="mcal-lg sl"></i>Selected</span><span class="mcal-late">Overdue</span><span>▶ start · ⚑ end</span></div></div>';
+  h+='<div class="mcal-legend"><span><i class="mcal-lg cw"></i>Co-working day</span><span><i class="mcal-lg fr"></i>Finance review</span><span><i class="mcal-lg td"></i>Today</span><span><i class="mcal-lg sl"></i>Selected</span><span class="mcal-late">Overdue</span><span>▶ start · ⚑ end</span></div></div>';
   return h;
 }
 function mcRefresh(sc){const e=document.querySelector('[data-mcal-host="'+(sc||'')+'"]');if(e)e.innerHTML=renderMonthCal(sc);}
@@ -8330,6 +8347,17 @@ ${ch.length>0?`<div class="sub-wrap${isExp?' open':''}">${((!S.taskSort||S.taskS
 </div>`;
 }
 
+function renderFinReviewRow(totalW){
+  const rv=(S.finance&&S.finance.reviews)||[];
+  if(!rv.length)return'';
+  const pins=rv.map(d=>{
+    const off=ganttDayOffset(d.date);if(off===null)return'';
+    const names=(d.members||[]).map(id=>getMember(id)).filter(Boolean).map(m=>m.name).join(', ');
+    return`<div class="cowork-pin fin-pin" style="left:${off*DPX-9}px;" onclick="openModal('financeReview','${d.id}')" onmouseenter="showCoworkTip(event,'${jsq(d.title||'Finance review')}','${jsq(fmtD(d.date)+(d.startTime?' '+d.startTime:''))}','${jsq(d.notes||'')}','${jsq(names)}','${jsq(d.objectives||'')}')" onmouseleave="hideCoworkTip()"><span class="fin-pin-p">£</span></div>`;
+  }).join('');
+  return`<div class="grow grow-fin"><div class="grow-lbl" onclick="openModal('financeReview',null)" style="cursor:pointer;"><span class="fin-pin-p" style="font-size:.7rem;">£</span><span class="grow-lbl-name" style="font-size:.66rem;">Finance reviews</span></div><div class="grow-chart" style="width:${totalW}px;">${pins}</div></div>`;
+}
+
 function hideBlockTooltip(){const bt=el('block-tooltip');if(bt)bt.style.display='none';}
 
 function showCoworkTip(e,label,date,notes,memberNames,objectives){
@@ -9727,7 +9755,7 @@ function _renderGanttInner(projects,fullPage=false,opts){
       if(opts.all&&depth<3)_kids(t.id).filter(k=>_hasDated(k,0)).sort((x,y)=>String(x.endDate||x.startDate||'9').localeCompare(String(y.endDate||y.startDate||'9'))).forEach(k=>_trow(k,depth+1));};
     if(isExp)top.forEach(t=>_trow(t,0));
   });
-  const inner=`<div class="gantt-scroll" id="${opts.id||'gantt-scroll'}"${opts.pid?` data-pgantt="${opts.pid}"`:''}><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;">${(opts.range&&(todayOffset===null||todayOffset<0||todayOffset>totalDays))?'':`<div class="today-ln" style="left:${175+Math.max(0,todayOffset)*_dpx()}px;height:100%;"><span class="today-tag">TODAY</span></div>`}${opts.noCowork?'':renderCoworkRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
+  const inner=`<div class="gantt-scroll" id="${opts.id||'gantt-scroll'}"${opts.pid?` data-pgantt="${opts.pid}"`:''}><div class="gantt-inner" style="width:${175+totalW}px;"><div class="gantt-hdr"><div class="glcol">Project / Task</div><div class="gmonths" style="width:${totalW}px;">${monthsHtml}</div></div><div style="position:relative;">${(opts.range&&(todayOffset===null||todayOffset<0||todayOffset>totalDays))?'':`<div class="today-ln" style="left:${175+Math.max(0,todayOffset)*_dpx()}px;height:100%;"><span class="today-tag">TODAY</span></div>`}${opts.noCowork?'':renderCoworkRow(totalW)+renderFinReviewRow(totalW)}${projects.length===0?`<div class="empty"><div class="empty-ico">${ICO.calendar}</div><div class="empty-txt">No projects with dates yet. Add start or end dates to see them on the timeline.</div></div>`:rows}</div></div></div>`;
   if(fullPage)return`<div class="fu"><div class="page-hd"><div class="page-title">Gantt <em>Timeline</em></div></div>${inner}</div>`;
   return inner;
 }
