@@ -1509,6 +1509,13 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fl-x{all:unset;cursor:pointer;padding:0 9px;color:var(--muted);font-size:.78rem;border-left:1px solid var(--border);display:grid;place-items:center;}
 .fl-x:hover{color:var(--acc);background:var(--surface2);}.fl-x:focus-visible,.fl-a:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 @media (max-width:640px){.fl-x{padding:0 14px;}.fl-a{min-width:0;}}
+
+/* Finance pills + sub-tabs */
+.fin-pills{margin-bottom:12px;}
+.fin-pills .fsel{margin-left:auto;}
+.fin-sub{margin:-2px 0 16px;}
+@media (max-width:640px){.fin-sub{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;}.fin-tab{white-space:nowrap;padding:9px 14px;}}
+@media(max-width:760px){.fin-pills{flex-wrap:wrap;overflow:visible;}.fin-pills .fsel{margin-left:0;}}
 </style>
 </head>
 <body>
@@ -3063,7 +3070,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=102;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=103;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -9752,6 +9759,18 @@ function _createSponsorTemplate(type){
 }
 
 /* ════ FINANCE ════ */
+/* ── Finance navigation: four pills, each holding the existing tabs (tab ids and data are unchanged) ── */
+const FIN_GROUPS=[
+  {k:'overview',l:'Overview',t:['overview']},
+  {k:'spend',l:'Budget & spending',t:['budget','recurring','oneoff','categories']},
+  {k:'events',l:'Events',t:['projects']},
+  {k:'pay',l:'Savings & pay',t:['savings','payout','tax','assets']}];
+const FIN_TAB_LABEL={oneoff:'One-off',payout:'Team Payout',savings:'Savings',budget:'Budgets',projects:'Events'};
+function _finGroupOf(tab){return FIN_GROUPS.find(g=>g.t.includes(tab))||FIN_GROUPS[0];}
+function _finPillsHtml(tab){const cur=_finGroupOf(tab);return FIN_GROUPS.map(g=>`<button class="st-tab fin-pill${g===cur?' on':''}" onclick="finGo('${g.k}')">${g.l}</button>`).join('');}
+function _finSubHtml(tab){const g=_finGroupOf(tab);if(g.t.length<2)return'';return '<div class="fin-sub-nav fin-sub">'+g.t.map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${FIN_TAB_LABEL[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')+'</div>';}
+function finGo(k){const g=FIN_GROUPS.find(x=>x.k===k);if(!g)return;if(!g.t.includes(S.finance.finTab))S.finance.finTab=g.t[0];save();render();}
+
 /* ── Finance links (shared with the team; same look as quick links) ── */
 function _finSafeUrl(u){u=(u||'').trim();if(!u)return'';if(!/^[a-z][a-z0-9+.-]*:/i.test(u))u='https://'+u;return /^https?:\/\//i.test(u)?u:'';}
 function _finLinksHtml(){
@@ -9803,14 +9822,14 @@ function renderFinance(){
 </div>
 
 ${_finLinksHtml()}
-<div class="fin-sub-nav">
-  ${['overview','recurring','oneoff','categories','tax','projects','savings','payout','budget','assets'].map(t=>`<button class="fin-tab${tab===t?' active':''}" onclick="S.finance.finTab='${t}';save();render()">${{'oneoff':'One-off','payout':'Team Payout','savings':'Savings','budget':'Budgets'}[t]||t.charAt(0).toUpperCase()+t.slice(1)}</button>`).join('')}
+<div class="st-tabs fin-pills">${_finPillsHtml(tab)}
   <select class="fsel" style="margin-left:auto;font-size:.72rem;" onchange="S.finance.finYear=parseInt(this.value);save();render();">
     ${getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}</option>`).join('')}
   </select>
   <button class="btn btn-ghost btn-xs" onclick="generateFinanceReport()" style="display:flex;align-items:center;gap:5px;" title="Export PDF report"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg> Export PDF</button>
   <button class="btn btn-ghost btn-xs" onclick="lockFinance()" style="display:flex;align-items:center;gap:5px;" title="Lock finance"><svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Lock</button>
 </div>
+${_finSubHtml(tab)}
 
 <div class="fin-view${tab==='overview'?' active':''}" id="fin-overview">
   <div class="fin-grid4">
@@ -10263,16 +10282,7 @@ function renderAssetsPage(){
 
   // Sub nav (same as other finance tabs)
   h+=_finLinksHtml();
-  h+='<div class="fin-sub-nav">';
-  var tabs=['overview','recurring','oneoff','categories','tax','projects','savings','payout','budget','assets'];
-  var tabLabels={oneoff:'One-off',payout:'Team Payout',savings:'Savings',budget:'Budgets',assets:'Assets'};
-  for(var i=0;i<tabs.length;i++){
-    var t=tabs[i];
-    var lbl=tabLabels[t]||(t.charAt(0).toUpperCase()+t.slice(1));
-    var active=t===tab?' active':'';
-    h+='<button class="fin-tab'+active+'" onclick="S.finance.finTab=\''+t+'\';save();render()">'+lbl+'</button>';
-  }
-  h+='</div>';
+  h+='<div class="st-tabs fin-pills">'+_finPillsHtml(tab)+'</div>'+_finSubHtml(tab);
 
   // Summary strip
   h+='<div class="fin-grid4" style="margin-bottom:16px;">';
