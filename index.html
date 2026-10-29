@@ -1455,6 +1455,17 @@ body.mcal-dragging *{cursor:grabbing !important;}
   .ev-tk{min-height:36px;}
   .ev-card-hd .btn{min-height:34px;}
 }
+
+/* Settings: tab row + one panel at a time */
+.st-tabs{display:flex;flex-wrap:wrap;gap:8px;align-items:center;margin-bottom:16px;}
+.st-tab{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;border-radius:99px;font-size:.78rem;font-weight:600;color:var(--text2);background:var(--surface);border:1px solid var(--border);cursor:pointer;white-space:nowrap;font-family:inherit;}
+.st-tab:hover{border-color:var(--acc);}
+.st-tab.on{background:var(--teal-dim);color:var(--acc);border-color:var(--acc);}
+.st-tab:focus-visible{outline:2px solid var(--acc);}
+.st-tab svg{flex:none;}
+.st-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:14px;align-items:start;}
+.st-grid>.settings-sec{margin-bottom:0;}
+@media(max-width:760px){.st-tabs{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none;padding-bottom:2px;}.st-tabs>span{flex:0 0 4px!important;}.st-tab{padding:9px 13px;}}
 </style>
 </head>
 <body>
@@ -3007,7 +3018,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=96;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=97;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -10756,12 +10767,22 @@ function renderBackupList(){
   };
 }
 
+const _ST_TABS=['backup','workspace','nav','slack','aircon','keys','adv'];
+function _stCur(){let t=window._stTab;if(!t){try{t=localStorage.getItem('pf_settings_tab');}catch(_){}}return _ST_TABS.includes(t)?t:'backup';}
+function stTab(k){
+  if(!_ST_TABS.includes(k))return;
+  window._stTab=k;try{localStorage.setItem('pf_settings_tab',k);}catch(_){}
+  document.querySelectorAll('[data-st-tab]').forEach(b=>b.classList.toggle('on',b.dataset.stTab===k));
+  document.querySelectorAll('.st-panel').forEach(p=>{p.style.display=p.dataset.st===k?'':'none';});
+}
 function renderSettings(){
+  const _stT=_stCur();
   const nv=S.settings.navVisible||{};
   const _devTodayStr=new Date().toLocaleDateString('en-GB');
   const _devTodos=S.settings.devTodos||[];
   return`<div class="fu"><div class="page-hd"><div class="page-title">Settings</div></div>
-
+<div class="st-tabs" role="tablist" aria-label="Settings groups"><button class="st-tab${_stT==='backup'?' on':''}" role="tab" data-st-tab="backup" onclick="stTab('backup')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/></svg>Data &amp; Backup</button><button class="st-tab${_stT==='workspace'?' on':''}" role="tab" data-st-tab="workspace" onclick="stTab('workspace')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M12 2v20M2 12h20"/></svg>Workspace</button><button class="st-tab${_stT==='nav'?' on':''}" role="tab" data-st-tab="nav" onclick="stTab('nav')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Navigation</button><button class="st-tab${_stT==='slack'?' on':''}" role="tab" data-st-tab="slack" onclick="stTab('slack')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg>Slack</button><button class="st-tab${_stT==='aircon'?' on':''}" role="tab" data-st-tab="aircon" onclick="stTab('aircon')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 10.5L9 4H18v9l-6.5 6.5L2.5 10.5z"/></svg>AirCon</button><button class="st-tab${_stT==='keys'?' on':''}" role="tab" data-st-tab="keys" onclick="stTab('keys')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="5" width="20" height="14" rx="2"/><path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M7 15h10"/></svg>Shortcuts</button><span style="flex:1"></span><button class="st-tab${_stT==='adv'?' on':''}" role="tab" data-st-tab="adv" onclick="stTab('adv')"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.3 3.9L1.8 18a2 2 0 001.7 3h17a2 2 0 001.7-3L13.7 3.9a2 2 0 00-3.4 0z"/><path d="M12 9v4M12 17h.01"/></svg>Advanced</button></div>
+<div class="st-panel" data-st="backup" style="display:${_stT==='backup'?'':'none'}">
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 01-2-2V5a2 2 0 012-2h11l5 5v11a2 2 0 01-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg> Data &amp; Backup</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Export all data to JSON, then re-import later to restore everything. Auto-backups are saved locally every 10 minutes.</p>
@@ -10790,7 +10811,9 @@ function renderSettings(){
     <div style="font-size:.72rem;color:var(--muted);margin-bottom:10px;">Stored in PocketBase: a snapshot of the server's data at the start of each session (last ${PB_MAX_SESSION}), one per day (last ${PB_MAX_DAILY} days), and one every 5 changes (last ${PB_MAX_HISTORY}). Each kind is kept separately.</div>
     <div id="pb-history-list"><div style="color:var(--muted);font-size:.78rem;">Loading…</div></div>
   </div>
-
+</div>
+</div>
+<div class="st-panel st-grid" data-st="workspace" style="display:${_stT==='workspace'?'':'none'}">
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><polygon points="16.24 7.76 14.12 14.12 7.76 16.24 9.88 9.88 16.24 7.76"/></svg> Branding</div>
   <div class="field"><label class="flbl">Brand / Workspace Name</label>
@@ -10830,33 +10853,36 @@ function renderSettings(){
   </div>
 </div>
 
-${_airconSettingsHtml()}
-
 <div class="settings-sec">
-  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg> Navigation Icons</div>
-  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Choose an icon for each navigation section.</p>
-  ${['dashboard','kanban','campaign','templates','finance','sponsors','settings'].map(view=>{
+  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 10.5L9 4H18v9l-6.5 6.5L2.5 10.5z"/><circle cx="13.5" cy="7.5" r="1.5"/></svg> Labels</div>
+  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Labels can be applied to tasks to categorise and filter them.</p>
+  <div class="label-list" id="settings-label-list" style="margin-bottom:10px;">
+    ${S.labels.length===0?`<div style="color:var(--muted);font-size:.75rem;">No labels yet.</div>`:''}
+    ${S.labels.map(l=>{const tc=S.tasks.filter(t=>(t.labels||[]).includes(l.id)).length;return`<div class="label-row"><div class="lswatch" style="background:${l.color};"></div><div style="flex:1;font-size:.84rem;">${escHtml(l.name)}</div><span style="font-size:.68rem;color:var(--muted);">${tc} task${tc!==1?'s':''}</span><button class="btn btn-ghost btn-xs" onclick="openModal('label','${l.id}')">Edit</button><button class="del-btn" onclick="deleteLabel('${l.id}')">×</button></div>`;}).join('')}
+  </div>
+  <button class="btn btn-ghost btn-sm" onclick="openModal('label',null)">+ New Label</button>
+</div>
+
+</div>
+<div class="st-panel" data-st="nav" style="display:${_stT==='nav'?'':'none'}">
+<div class="settings-sec">
+  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg> Navigation</div>
+  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Choose the icon for each section of the side menu and whether it is shown.</p>
+  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Kanban Board'},{v:'campaign',l:'Campaign Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Finances'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>{
+    const view=item.v;
     const opts=NAV_ICON_OPTIONS[view]||[];
     const curId=S.settings?.navIcons?.[view]||opts[0]?.id;
     const cur=opts.find(o=>o.id===curId)||opts[0];
     return`<div style="display:flex;align-items:center;gap:12px;padding:9px 0;border-bottom:1px solid var(--border2);">
-      <span style="font-size:.82rem;font-weight:500;width:100px;flex-shrink:0;">${view.charAt(0).toUpperCase()+view.slice(1)}</span>
-      ${cur?`<div style="width:34px;height:34px;background:var(--teal-dim);border:1.5px solid var(--acc);border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--acc);">
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">${cur.d}</svg>
-      </div>`:''}
+      ${cur?`<div style="width:34px;height:34px;background:var(--teal-dim);border:1.5px solid var(--acc);border-radius:7px;display:flex;align-items:center;justify-content:center;color:var(--acc);flex-shrink:0;"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" stroke-width="1.5">${cur.d}</svg></div>`:''}
+      <span style="font-size:.82rem;font-weight:500;flex:1;min-width:0;">${item.l}</span>
       <button class="btn btn-ghost btn-sm" onclick="openIconPickerModal('${view}')">Change icon</button>
-    </div>`;
-  }).join('')}
+      <button class="toggle-sw${nv[view]===false?'':' on'}" onclick="toggleNavVis('${view}',this)" title="Show or hide ${item.l}"></button>
+    </div>`;}).join('')}
 </div>
 
-<div class="settings-sec">
-  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg> Navigation Visibility</div>
-  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Kanban Board'},{v:'campaign',l:'Campaign Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Finances'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>`<div class="nav-vis-row">
-    <span class="nav-vis-lbl">${item.l}</span>
-    <button class="toggle-sw${nv[item.v]===false?'':' on'}" onclick="toggleNavVis('${item.v}',this)"></button>
-  </div>`).join('')}
 </div>
-
+<div class="st-panel" data-st="slack" style="display:${_stT==='slack'?'':'none'}">
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Slack Integration</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Connect a Slack webhook for task reminders. <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:var(--acc);">Learn how →</a></p>
@@ -10875,16 +10901,12 @@ ${_airconSettingsHtml()}
   </div>
 </div>
 
-<div class="settings-sec">
-  <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M2.5 10.5L9 4H18v9l-6.5 6.5L2.5 10.5z"/><circle cx="13.5" cy="7.5" r="1.5"/></svg> Labels</div>
-  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Labels can be applied to tasks to categorise and filter them.</p>
-  <div class="label-list" id="settings-label-list" style="margin-bottom:10px;">
-    ${S.labels.length===0?`<div style="color:var(--muted);font-size:.75rem;">No labels yet.</div>`:''}
-    ${S.labels.map(l=>{const tc=S.tasks.filter(t=>(t.labels||[]).includes(l.id)).length;return`<div class="label-row"><div class="lswatch" style="background:${l.color};"></div><div style="flex:1;font-size:.84rem;">${escHtml(l.name)}</div><span style="font-size:.68rem;color:var(--muted);">${tc} task${tc!==1?'s':''}</span><button class="btn btn-ghost btn-xs" onclick="openModal('label','${l.id}')">Edit</button><button class="del-btn" onclick="deleteLabel('${l.id}')">×</button></div>`;}).join('')}
-  </div>
-  <button class="btn btn-ghost btn-sm" onclick="openModal('label',null)">+ New Label</button>
 </div>
+<div class="st-panel" data-st="aircon" style="display:${_stT==='aircon'?'':'none'}">
+${_airconSettingsHtml()}
 
+</div>
+<div class="st-panel" data-st="keys" style="display:${_stT==='keys'?'':'none'}">
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="M6 8h.01M10 8h.01M14 8h.01M18 8h.01M8 12h.01M12 12h.01M16 12h.01M7 16h10"/></svg> Keyboard Shortcuts</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:14px;font-weight:300;">Click any key badge to remap it. Press the new key to confirm, or Esc to cancel. Press <kbd style="font-family:'DM Mono',monospace;font-size:.65rem;padding:1px 5px;background:var(--surface2);border:1px solid var(--border);border-radius:3px;">?</kbd> anywhere to open the quick-reference overlay.</p>
@@ -10943,6 +10965,8 @@ ${_airconSettingsHtml()}
   })()}
 </div>
 
+</div>
+<div class="st-panel" data-st="adv" style="display:${_stT==='adv'?'':'none'}">
 <div class="settings-sec">
   <div class="settings-ttl" style="color:var(--red);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Danger Zone</div>
   <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear all data</button>
@@ -10970,6 +10994,7 @@ ${_airconSettingsHtml()}
     <input class="inp" id="dev-todo-inp" placeholder="Add a development note or reminder…" style="flex:1;" onkeydown="if(event.key==='Enter')addDevTodo()">
     <button class="btn btn-ghost btn-sm" onclick="addDevTodo()">Add</button>
   </div>
+</div>
 </div>
 </div>`;
 }
