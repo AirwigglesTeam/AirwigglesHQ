@@ -1534,6 +1534,20 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fbh-v{font-family:'DM Mono',monospace;text-align:right;white-space:nowrap;}.fbh-v small{color:var(--muted);font-family:inherit;font-size:.6rem;}
 .fbh-x{border-left:0;padding:4px 8px;}
 @media (max-width:640px){.fbh-row{grid-template-columns:76px minmax(0,1fr) auto;}.fbh-n{display:none}.fbh-vals{flex-direction:column;gap:1px;align-items:flex-end}}
+
+/* Finance year plan */
+.fp-help{font-size:.74rem;color:var(--muted);margin:0 0 12px;line-height:1.5;}
+.fp-sub{font-size:.66rem;color:var(--muted);margin-top:2px;}
+.fp-grp{margin-bottom:12px;}
+.fp-hd,.fp-row{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(70px,.8fr) minmax(70px,.8fr) 78px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--border2);font-size:.76rem;}
+.fp-hd.fp-c,.fp-row.fp-c{grid-template-columns:minmax(0,1.5fr) minmax(70px,.8fr) minmax(70px,.8fr) minmax(70px,.8fr) 78px;}
+.fp-hd{font-size:.58rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;}
+.fp-row:last-child{border-bottom:0;}
+.fp-n{min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;font-weight:600;}.fp-n small{font-weight:400;color:var(--muted);font-size:.62rem;}
+.fp-v{font-family:'DM Mono',monospace;text-align:right;}.fp-v em{color:var(--muted);font-style:normal;font-family:inherit;font-size:.68rem;}.fp-f{color:var(--muted);}
+.fp-s{text-align:right;}
+.fp-tag{font-size:.6rem;font-weight:700;padding:2px 8px;border:1px solid;border-radius:99px;white-space:nowrap;}
+@media (max-width:640px){.fp-hd,.fp-row{grid-template-columns:minmax(0,1fr) auto auto;}.fp-hd.fp-c,.fp-row.fp-c{grid-template-columns:minmax(0,1fr) auto auto;}.fp-f,.fp-hd .fp-f{display:none}.fp-s{grid-column:1/-1;text-align:left}.fp-hd .fp-s{display:none}}
 </style>
 </head>
 <body>
@@ -3088,7 +3102,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=104;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=105;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4653,7 +4667,7 @@ const REV_CATS=['Sponsorship','Grants','Merchandise','Events','Consulting','Othe
 function openRevenueStreams(){
   const mc=el('mc');
   mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()">
-    <div class="mo-box" style="max-width:480px;">
+    <div class="mo-box" style="max-width:560px;">
       <div class="mo-hd"><span class="mo-title">Revenue Streams</span><button class="mo-close" onclick="closeModal()">×</button></div>
       <div class="mo-body">
         <div id="rev-stream-list">${renderRevStreamList()}</div>
@@ -4668,13 +4682,15 @@ function openRevenueStreams(){
 function renderRevStreamList(){
   const streams=S.finance.revenueStreams||[];
   if(!streams.length)return'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;">No revenue streams yet.</div>';
-  return streams.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);">
+  return streams.map(s=>`<div style="display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border2);flex-wrap:wrap;">
     <input class="inp" value="${escHtml(s.name)}" style="flex:1;padding:5px 8px;" onchange="updateRevStream('${s.id}','name',this.value)" placeholder="Stream name">
     <select class="sel" style="width:110px;padding:5px 7px;font-size:.75rem;" onchange="updateRevStream('${s.id}','cat',this.value)">
       ${REV_CATS.map(cat=>`<option value="${cat}"${s.cat===cat?' selected':''}>${cat}</option>`).join('')}
     </select>
-    <div style="display:flex;align-items:center;gap:3px;"><span style="font-size:.72rem;color:var(--muted);">£</span>
-    <input class="amt-inp" type="number" min="0" step="100" value="${s.amount||''}" style="width:90px;" placeholder="0" onchange="updateRevStream('${s.id}','amount',parseFloat(this.value)||0);reCalcFin();"></div>
+    <div style="display:flex;align-items:center;gap:3px;" title="Revenue so far"><span style="font-size:.72rem;color:var(--muted);">£</span>
+    <input class="amt-inp" type="number" min="0" step="100" value="${s.amount||''}" style="width:84px;" placeholder="So far" aria-label="Revenue so far" onchange="updateRevStream('${s.id}','amount',parseFloat(this.value)||0);reCalcFin();"></div>
+    <div style="display:flex;align-items:center;gap:3px;" title="Target for the year"><span style="font-size:.72rem;color:var(--muted);">\u2192</span>
+    <input class="amt-inp" type="number" min="0" step="100" value="${s.target||''}" style="width:84px;" placeholder="Target" aria-label="Revenue target" onchange="updateRevStream('${s.id}','target',parseFloat(this.value)||0);reCalcFin();"></div>
     <button class="tb del" onclick="deleteRevStream('${s.id}')" title="Remove"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button>
   </div>`).join('')
   +`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;">
@@ -6375,6 +6391,69 @@ function showTaskTip(e,id){
   document.addEventListener('mouseout',e=>{if(!e.relatedTarget&&cur){cur=null;hideCoworkTip();}});
   document.addEventListener('click',()=>{if(cur){cur=null;hideCoworkTip();}},true);
 })();
+/* ── Finance year plan: revenue targets and cost budget compared with what has actually happened so far ──
+   Pure calculation (finPlanCalc) plus one card on the Budget tab. Reads existing data only:
+   revenue streams (+ their new "target"), recurring and one-off costs, event expenses and the category budgets. */
+const FIN_MONTHS=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+function _finFyMonthIdx(m){return((m-4+12)%12)+1;}      // calendar month (1-12) -> position in the financial year (Apr=1 ... Mar=12)
+function finPlanCalc(fy,todayIso){
+  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00'),st=new Date(fy,3,1),en=new Date(fy+1,2,31),DAY=864e5;
+  const total=Math.round((en-st)/DAY)+1;
+  const state=t<st?'future':t>en?'done':'now';
+  const done=state==='now'?Math.floor((t-st)/DAY)+1:state==='done'?total:0;
+  const frac=done/total;
+  const m=state==='now'?_finFyMonthIdx(t.getMonth()+1):state==='done'?12:0;   // financial-year months started so far
+  const upTo=d=>state==='future'?false:(!d||d<=today);
+  const cats={};const row=c=>cats[c]||(cats[c]={cat:c,budget:0,spent:0,full:0});
+  const bud=S.finance.budgets||{};
+  Object.keys(bud).forEach(c=>{const b=parseFloat(bud[c])||0;if(b>0)row(c).budget=b;});
+  (S.finance.recurring||[]).forEach(e=>{
+    const c=e.cat||'Other',a=e.amount||0,r=row(c);r.full+=finAnn(e);
+    if(e.freq==='Monthly')r.spent+=a*m;
+    else if(e.freq==='Quarterly')r.spent+=a*Math.ceil(m/3);
+    else if(e.freq==='Annual'){const pm=parseInt(e.payMonth)||4;if(m>=_finFyMonthIdx(pm))r.spent+=a;}
+  });
+  (S.finance.oneoff||[]).forEach(e=>{if(!isInFY(e.date,fy))return;const r=row(e.cat||'Other');r.full+=e.amount||0;if(upTo(e.date))r.spent+=e.amount||0;});
+  // events: budget = event budgets starting in this year, spent = expenses logged so far (read from the event pages)
+  let evBud=0,evSpent=0,evFull=0;
+  (S.projects||[]).forEach(p=>{
+    if(projType(p)==='event'&&p.startDate&&isInFY(p.startDate,fy))evBud+=parseFloat(p.budget)||0;
+    (p.expenses||[]).forEach(x=>{if(!isInFY(x.date,fy))return;evFull+=x.amount||0;if(upTo(x.date))evSpent+=x.amount||0;});
+  });
+  const rows=Object.values(cats).filter(r=>r.budget>0||r.spent>0||r.full>0).sort((a,b)=>b.budget-a.budget||b.spent-a.spent);
+  const costState=r=>{if(!(r.budget>0))return'';if(r.spent>r.budget)return'over';if(frac<1&&r.spent>r.budget*frac*1.15)return'watch';return'ok';};
+  rows.forEach(r=>r.state=costState(r));
+  const ev={cat:'Events',budget:evBud,spent:evSpent,full:evFull,events:true};ev.state=costState(ev);
+  const streams=(S.finance.revenueStreams||[]).map(s=>{
+    const actual=parseFloat(s.amount)||0,target=parseFloat(s.target)||0,exp=target*frac;
+    return{id:s.id,name:s.name,cat:s.cat,actual,target,state:target>0?(actual>=exp?'ahead':actual>=exp*.85?'watch':'behind'):''};});
+  const revTarget=streams.reduce((a,x)=>a+x.target,0),revActual=streams.reduce((a,x)=>a+x.actual,0);
+  const costBudget=rows.reduce((a,r)=>a+r.budget,0)+evBud,costSpent=rows.reduce((a,r)=>a+r.spent,0)+evSpent;
+  return{fy,state,frac,months:m,streams,rows,ev,revTarget,revActual,costBudget,costSpent,planned:revTarget-costBudget};
+}
+function _finPlanTag(s,rev){
+  if(!s)return'';
+  const M=rev?{ahead:['Ahead','var(--green)'],watch:['Watch','var(--yellow)'],behind:['Behind','var(--red)']}:{ok:['On track','var(--green)'],watch:['Watch','var(--yellow)'],over:['Over','var(--red)']};
+  const x=M[s];return x?`<span class="fp-tag" style="color:${x[1]};border-color:${x[1]};">${x[0]}</span>`:'';
+}
+function _finPlanHtml(){
+  const fy=S.finance.finYear,P=finPlanCalc(fy),pc=Math.round(P.frac*100);
+  const money=_finMoney;
+  const revRows=P.streams.length?P.streams.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${s.target>0?money(s.target):'<em>no target</em>'}</span><span class="fp-s">${_finPlanTag(s.state,true)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No revenue streams yet.</div>';
+  const allCost=P.rows.concat(P.ev.budget>0||P.ev.spent>0||P.ev.full>0?[P.ev]:[]);
+  const costRows=allCost.length?allCost.map(r=>`<div class="fp-row fp-c"><span class="fp-n">${escHtml(r.cat)}${r.events?' <small>from event pages</small>':''}</span><span class="fp-v">${money(r.spent)}</span><span class="fp-v fp-t">${r.budget>0?money(r.budget):'<em>no budget</em>'}</span><span class="fp-v fp-f">${money(r.full)}</span><span class="fp-s">${_finPlanTag(r.state,false)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No costs yet.</div>';
+  return `<div class="card" style="margin-bottom:14px;" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue targets</button></div><div class="card-bd">
+  <p class="fp-help">Set targets and budgets once. Revenue and costs below are compared with them as the year goes on. ${P.state==='now'?pc+'% of the year has passed.':P.state==='done'?'This year is complete.':'This year has not started.'}</p>
+  <div class="fin-grid4" style="margin-bottom:12px;">
+    <div class="fin-metric"><div class="flbl2">Revenue target</div><div class="fval blue">${money(P.revTarget)}</div><div class="fp-sub">${money(P.revActual)} so far${P.revTarget>0?' · '+Math.round(P.revActual/P.revTarget*100)+'%':''}</div></div>
+    <div class="fin-metric"><div class="flbl2">Cost budget</div><div class="fval">${money(P.costBudget)}</div><div class="fp-sub">${money(P.costSpent)} spent so far</div></div>
+    <div class="fin-metric"><div class="flbl2">Planned profit</div><div class="fval ${P.planned>=0?'green':'red'}">${money(P.planned)}</div><div class="fp-sub">target minus budget</div></div>
+    <div class="fin-metric"><div class="flbl2">Year passed</div><div class="fval" style="font-size:.95rem;">${pc}%</div><div class="fin-fybar"><s style="width:${pc}%"></s></div></div></div>
+  <div class="fp-grp"><div class="fp-hd"><span class="fp-n">Revenue</span><span class="fp-v">So far</span><span class="fp-v">Target</span><span class="fp-s">Pace</span></div>${revRows}</div>
+  <div class="fp-grp"><div class="fp-hd fp-c"><span class="fp-n">Costs</span><span class="fp-v">Spent so far</span><span class="fp-v">Budget</span><span class="fp-v fp-f">Full year</span><span class="fp-s">Pace</span></div>${costRows}</div>
+  <p class="fp-help" style="margin:10px 0 0;">Spent so far counts recurring costs as they fall due (yearly bills on the month you choose), one-off costs by date, and event expenses from each event page. Edit category budgets below.</p>
+  </div></div>`;
+}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -10292,9 +10371,10 @@ ${_finSubHtml(tab)}
     const totalSpend=allCats.reduce((a,cat)=>a+(catSpend[cat]||0),0);
     const overBudgetCats=allCats.filter(cat=>{const b=parseFloat(budgets[cat])||0;return b>0&&(catSpend[cat]||0)>b;});
     return`<div style="max-width:780px;">
+    ${_finPlanHtml()}
     ${overBudgetCats.length>0?`<div style="background:rgba(224,96,96,.1);border:1px solid rgba(224,96,96,.25);border-radius:9px;padding:12px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px;">
       <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="var(--red)" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-      <div><div style="font-size:.82rem;font-weight:700;color:var(--red);">Over budget in ${overBudgetCats.length} category${overBudgetCats.length!==1?'s':''}</div>
+      <div><div style="font-size:.82rem;font-weight:700;color:var(--red);">Over budget in ${overBudgetCats.length} ${overBudgetCats.length===1?"category":"categories"}</div>
       <div style="font-size:.72rem;color:var(--muted);">${overBudgetCats.join(' · ')}</div></div>
     </div>`:''}    <div class="fin-grid4" style="margin-bottom:14px;">
       <div class="fin-metric"><div class="flbl2">Total Budgeted</div><div class="fval blue">${fmtGBP(totalBudget)}</div></div>
@@ -10914,7 +10994,7 @@ function renderFinRecurring(){
 ${items.map(e=>`<div class="exp-row">
 <input style="flex:1;min-width:100px;background:none;border:none;color:var(--text);font-size:.8rem;outline:none;" value="${escHtml(e.name)}" oninput="updFinField('r','${e.id}','name',this.value)">
 <select class="amt-inp cat-sel" onchange="updFinField('r','${e.id}','cat',this.value)">${FIN_CAT_NAMES.map(cn=>`<option value="${cn}"${e.cat===cn?' selected':''}>${cn}</option>`).join('')}</select>
-<select class="amt-inp freq-sel" onchange="updFinField('r','${e.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${e.freq===f?' selected':''}>${f}</option>`).join('')}</select>
+<select class="amt-inp freq-sel" onchange="updFinField('r','${e.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${e.freq===f?' selected':''}>${f}</option>`).join('')}</select>${e.freq==='Annual'?`<select class="amt-inp freq-sel" title="Month this yearly bill is paid" aria-label="Month paid" onchange="updFinField('r','${e.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(e.payMonth)||4)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:''}
 <input class="amt-inp amt-num" type="number" value="${e.amount.toFixed(2)}" step="0.01" min="0" oninput="updFinAmt('r','${e.id}',this.value)">
 <button class="del-btn" onclick="delFin('r','${e.id}')">×</button>
 </div>`).join('')}</div>`;
