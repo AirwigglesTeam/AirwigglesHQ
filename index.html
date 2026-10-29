@@ -1553,6 +1553,11 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .ev-inc-tick{all:unset;cursor:pointer;width:18px;height:18px;border-radius:5px;border:1.5px solid var(--border);display:grid;place-items:center;font-size:.7rem;font-weight:800;color:#0d1f19;flex:none;}
 .ev-inc-tick.on{background:var(--green);border-color:var(--green);}
 .ev-inc-tick:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+
+.fp-seg{display:inline-flex;border:1px solid var(--border);border-radius:8px;overflow:hidden;}
+.fp-seg button{all:unset;cursor:pointer;padding:4px 10px;font-size:.68rem;font-weight:600;color:var(--text2);background:var(--surface2);}
+.fp-seg button.on{background:var(--teal-dim);color:var(--acc);}
+.fp-seg button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 </style>
 </head>
 <body>
@@ -3107,7 +3112,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=107;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=108;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4333,7 +4338,7 @@ function showUndoToast(label,isRedo=false){
 
 /* ── Finance helpers ── */
 function finAnn(e){return(e.amount||0)*(FIN_MULT[e.freq]||1);}
-function totalRevenue(){return _finStreamsFy().filter(x=>!x.f.funding).reduce((a,x)=>a+x.f.full,0);}   // revenue for the selected financial year; funding (investment) is kept out
+function totalRevenue(){return totalRevenueCore()+(fundingOn()?totalFunding():0);}   // revenue for the selected financial year; includes funding (investment) unless switched off
 function totalRec(){return(S.finance.recurring||[]).reduce((a,e)=>a+finAnn(e),0);}
 function totalOO(){return(S.finance.oneoff||[]).reduce((a,e)=>a+(e.amount||0),0);}
 function projExpTotal(){return(S.projects||[]).reduce((a,p)=>a+(p.expenses||[]).reduce((b,e)=>b+(e.amount||0),0),0);}
@@ -4697,8 +4702,9 @@ function renderRevStreamList(){
     else if(k==='recurring'){
       det=`${lab('\u00a3')}${num(s.id,'amount',s.amount,'0','Amount each period',84)}${lab('every')}<select class="sel" style="width:96px;padding:5px 7px;font-size:.75rem;" aria-label="How often" onchange="updateRevStream('${s.id}','freq',this.value)">${['Monthly','Quarterly','Annual'].map(f=>`<option${(s.freq||'Monthly')===f?' selected':''}>${f}</option>`).join('')}</select>`
         +(s.freq==='Annual'?`<select class="sel" style="width:70px;padding:5px 7px;font-size:.75rem;" aria-label="Month received" onchange="updateRevStream('${s.id}','payMonth',parseInt(this.value))">${FIN_MONTHS.map((mn,i)=>`<option value="${i+1}"${(parseInt(s.payMonth)||4)===i+1?' selected':''}>${mn}</option>`).join('')}</select>`:'')
-        +`${lab('target')}${num(s.id,'target',s.target,'optional','Revenue target',84)}`;
-      hint=`${money(F.full)} per year \u00b7 ${money(F.actual)} so far this year`;
+        +`${lab('target')}${num(s.id,'target',s.target,'optional','Revenue target',84)}`
+        +`<div style="flex-basis:100%;display:flex;align-items:center;gap:7px;flex-wrap:wrap;">${lab('from')}<input class="inp" type="date" style="width:140px;padding:5px 8px;" value="${s.startDate||''}" aria-label="Starts" onchange="updateRevStream('${s.id}','startDate',this.value)">${lab('until')}<input class="inp" type="date" style="width:140px;padding:5px 8px;" value="${s.endDate||''}" aria-label="Ends" onchange="updateRevStream('${s.id}','endDate',this.value)">${lab(s.endDate?'':'no end date')}</div>`;
+      hint=`${money(F.full)} this financial year \u00b7 ${money(F.actual)} so far${s.endDate?' \u00b7 ends '+escHtml(fmtD(s.endDate)):''}`;
     }else{
       det=`${lab('\u00a3')}${num(s.id,'amount',s.amount,'0','Amount',92)}${lab('on')}<input class="inp" type="date" style="width:140px;padding:5px 8px;" value="${s.date||''}" aria-label="Date received" onchange="updateRevStream('${s.id}','date',this.value)">`;
       hint=F.full>0?(F.actual>0?'Received this year':'Expected this year'):'Not in the selected financial year';
@@ -4710,12 +4716,16 @@ function renderRevStreamList(){
       <select class="sel" style="width:104px;padding:5px 5px;font-size:.75rem;" aria-label="Type" onchange="updateRevStream('${s.id}','kind',this.value)">${Object.keys(FIN_REV_KINDS).map(x=>`<option value="${x}"${k===x?' selected':''}>${FIN_REV_KINDS[x]}</option>`).join('')}</select>
       <button class="tb del" onclick="deleteRevStream('${s.id}')" title="Remove" aria-label="Remove stream"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 01-2 2H8a2 2 0 01-2-2L5 6"/></svg></button></div>
     <div style="display:flex;align-items:center;gap:7px;flex-wrap:wrap;">${det}</div>
-    ${hint||F.funding?`<div style="font-size:.66rem;color:var(--muted);margin-top:4px;">${hint}${F.funding?(hint?' \u00b7 ':'')+'Investment: not counted as revenue or taxed':''}</div>`:''}
+    ${hint||F.funding?`<div style="font-size:.66rem;color:var(--muted);margin-top:4px;">${hint}${F.funding?(hint?' \u00b7 ':'')+'Funding: will end, shown with and without':''}</div>`:''}
   </div>`;}).join('');
-  return rows+`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;">
-    <span>Revenue, ${getFYLabel(fy)}</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${money(totalRevenue())}</span></div>`
-    +(totalFunding()>0?`<div style="display:flex;justify-content:space-between;padding:4px 0 0;font-size:.76rem;color:var(--text2);"><span>Investment (funding, not revenue)</span><span style="font-family:'DM Mono',monospace;">${money(totalFunding())}</span></div>`:'');
+  const fund=totalFunding(),core=totalRevenueCore(),fe=finFundingEnd();
+  return rows+`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;"><span>Revenue, ${getFYLabel(fy)}${fund>0?(fundingOn()?' (with funding)':' (without funding)'):''}</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${money(totalRevenue())}</span></div>`
+    +(fund>0?`<div style="display:flex;justify-content:space-between;padding:4px 0 0;font-size:.76rem;color:var(--text2);"><span>Without funding</span><span style="font-family:'DM Mono',monospace;">${money(core)}</span></div>
+    <div style="display:flex;justify-content:space-between;padding:2px 0 0;font-size:.76rem;color:var(--text2);"><span>Funding${fe?(fe.over?' (ended '+escHtml(fmtD(fe.end))+')':' (ends '+escHtml(fmtD(fe.end))+(fe.months<=24?', about '+fe.months+' month'+(fe.months===1?'':'s')+' left':'')+')'):''}</span><span style="font-family:'DM Mono',monospace;">${money(fund)}</span></div>
+    <label style="display:flex;align-items:center;gap:8px;font-size:.76rem;margin-top:9px;cursor:pointer;"><input type="checkbox" id="rs-fund-on" ${fundingOn()?'checked':''} onchange="setFundingOn(this.checked)"> Include funding in revenue, profit and tax</label>
+    <div style="font-size:.66rem;color:var(--muted);margin-top:3px;">Funding such as investment is normally not taxable income. Ask your accountant before relying on the tax figures with it included.</div>`:'');
 }
+function setFundingOn(v){S.finance.fundingOn=!!v;save();if(typeof V!=='undefined'&&V==='finance')reCalcFin();const l=document.getElementById('rev-stream-list');if(l)l.innerHTML=renderRevStreamList();}
 
 function updateRevStream(id,field,val){
   const s=(S.finance.revenueStreams||[]).find(x=>x.id===id);
@@ -6428,21 +6438,41 @@ function _finFyClock(fy,todayIso){
 }
 function finStreamKind(s){return s&&(s.kind==='recurring'||s.kind==='oneoff')?s.kind:'total';}
 function finStreamIsFunding(s){return !!s&&s.cat==='Investment';}
+function _finPayIdx(s){const f=s.freq==='Annual'?'A':s.freq==='Quarterly'?'Q':'M';return f==='M'?[1,2,3,4,5,6,7,8,9,10,11,12]:f==='Q'?[1,4,7,10]:[_finFyMonthIdx(parseInt(s.payMonth)||4)];}
+function _finIdxMonthStart(fy,i){const cm=(3+i-1)%12;return new Date(fy+(cm<3?1:0),cm,1);}
+/* A recurring stream pays in the months of its schedule that fall inside the optional From / Until dates (the whole month counts). */
+function _finRecurringPays(s,fy){
+  const from=s.startDate?new Date(s.startDate+'T00:00:00'):null,until=s.endDate?new Date(s.endDate+'T00:00:00'):null;
+  return _finPayIdx(s).filter(i=>{const ms=_finIdxMonthStart(fy,i),me=new Date(ms.getFullYear(),ms.getMonth()+1,0);return(!from||me>=from)&&(!until||ms<=until);});
+}
 function finStreamFigures(s,fy,todayIso){
   const k=finStreamKind(s),a=parseFloat(s.amount)||0,c=_finFyClock(fy,todayIso);
   let actual=a,full=a;
   if(k==='recurring'){
-    const mult=FIN_MULT[s.freq]||12;full=a*mult;
-    const periods=s.freq==='Annual'?(c.m>=_finFyMonthIdx(parseInt(s.payMonth)||4)?1:0):s.freq==='Quarterly'?Math.ceil(c.m/3):c.m;
-    actual=a*periods;
+    const pays=_finRecurringPays(s,fy);full=a*pays.length;actual=a*pays.filter(i=>i<=c.m).length;
   }else if(k==='oneoff'){
     const inFY=isInFY(s.date,fy);full=inFY?a:0;actual=inFY&&c.state!=='future'&&(!s.date||s.date<=c.today)?a:0;
   }
   const t=parseFloat(s.target)||0,target=t>0?t:(k==='total'?0:full);
   return{kind:k,actual,full,target,funding:finStreamIsFunding(s)};
 }
+/* Funding runs out: the latest end date among funding streams (recurring with an Until date, or one-offs), and how many months are left from today. */
+function finFundingEnd(todayIso){
+  const today=todayIso||_localToday(),t=new Date(today+'T00:00:00');let end='';
+  (S.finance.revenueStreams||[]).forEach(s=>{if(!finStreamIsFunding(s))return;const k=finStreamKind(s);const d=k==='recurring'?s.endDate:k==='oneoff'?s.date:'';if(d&&d>end)end=d;});
+  if(!end)return null;const e=new Date(end+'T00:00:00');
+  const months=Math.max(0,(e.getFullYear()-t.getFullYear())*12+e.getMonth()-t.getMonth());
+  return{end,months,over:e<t};
+}
 function _finStreamsFy(){const fy=S.finance.finYear;return (S.finance.revenueStreams||[]).map(s=>({s,f:finStreamFigures(s,fy)}));}
+function fundingOn(){return S.finance.fundingOn!==false;}   // default: funding is included in revenue, with the without-funding figure shown beside it
 function totalFunding(){return _finStreamsFy().filter(x=>x.f.funding).reduce((a,x)=>a+x.f.full,0);}
+function totalRevenueCore(){return _finStreamsFy().filter(x=>!x.f.funding).reduce((a,x)=>a+x.f.full,0);}
+
+function _finFundNote(){
+  const fund=totalFunding();if(!(fund>0))return'';const fe=finFundingEnd(),core=totalRevenueCore();
+  return `<div style="font-size:.66rem;color:var(--muted);margin-top:3px;line-height:1.4;">${fundingOn()?'incl. '+_finMoney(fund)+' funding':'funding left out ('+_finMoney(fund)+')'} \u00b7 <b style="color:var(--text2);">${_finMoney(core)}</b> without${fe?(fe.over?' \u00b7 funding ended':' \u00b7 funding ends '+escHtml(fmtD(fe.end))):''}</div>`;
+}
 /* ── Finance year plan: revenue targets and cost budget compared with what has actually happened so far ──
    Pure calculation (finPlanCalc) plus one card on the Budget tab. Reads existing data only:
    revenue streams (+ their new "target"), recurring and one-off costs, event expenses and the category budgets. */
@@ -6481,9 +6511,11 @@ function finPlanCalc(fy,todayIso){
     return{id:s.id,name:s.name,cat:s.cat,kind:F.kind,freq:s.freq,date:s.date||'',amount:parseFloat(s.amount)||0,actual:F.actual,full:F.full,target:F.target,funding:F.funding,
       state:(F.kind!=='oneoff'&&!F.funding&&F.target>0)?(F.actual>=exp?'ahead':F.actual>=exp*.85?'watch':'behind'):''};});
   const streams=all.filter(x=>!x.funding),funding=all.filter(x=>x.funding);
-  const revTarget=streams.reduce((a,x)=>a+x.target,0),revActual=streams.reduce((a,x)=>a+x.actual,0);
+  const coreTarget=streams.reduce((a,x)=>a+x.target,0),coreActual=streams.reduce((a,x)=>a+x.actual,0);
+  const fundTarget=funding.reduce((a,x)=>a+x.full,0),fundActual=funding.reduce((a,x)=>a+x.actual,0),inc=fundingOn();
+  const revTarget=coreTarget+(inc?fundTarget:0),revActual=coreActual+(inc?fundActual:0);
   const costBudget=rows.reduce((a,r)=>a+r.budget,0)+evBud,costSpent=rows.reduce((a,r)=>a+r.spent,0)+evSpent;
-  return{fy,state,frac,months:m,streams,funding,rows,ev,revTarget,revActual,costBudget,costSpent,planned:revTarget-costBudget};
+  return{fy,state,frac,months:m,streams,funding,rows,ev,revTarget,revActual,coreTarget,coreActual,fundTarget,fundActual,fundingIncluded:inc,costBudget,costSpent,planned:revTarget-costBudget};
 }
 function _finPlanTag(s,rev){
   if(!s)return'';
@@ -6497,15 +6529,15 @@ function _finPlanHtml(){
   const revRows=P.streams.length?P.streams.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${s.target>0?money(s.target):'<em>no target</em>'}</span><span class="fp-s">${_finPlanTag(s.state,true)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No revenue streams yet.</div>';
   const allCost=P.rows.concat(P.ev.budget>0||P.ev.spent>0||P.ev.full>0?[P.ev]:[]);
   const costRows=allCost.length?allCost.map(r=>`<div class="fp-row fp-c"><span class="fp-n">${escHtml(r.cat)}${r.events?' <small>from event pages</small>':''}</span><span class="fp-v">${money(r.spent)}</span><span class="fp-v fp-t">${r.budget>0?money(r.budget):'<em>no budget</em>'}</span><span class="fp-v fp-f">${money(r.full)}</span><span class="fp-s">${_finPlanTag(r.state,false)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No costs yet.</div>';
-  return `<div class="card" style="margin-bottom:14px;" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue targets</button></div><div class="card-bd">
+  return `<div class="card" style="margin-bottom:14px;" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${P.funding.length?`<span class="fp-seg" role="group" aria-label="Funding"><button type="button" class="${P.fundingIncluded?'on':''}" onclick="setFundingOn(true)">With funding</button><button type="button" class="${P.fundingIncluded?'':'on'}" onclick="setFundingOn(false)">Without</button></span>`:''}<button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue streams</button></span></div><div class="card-bd">
   <p class="fp-help">Set targets and budgets once. Revenue and costs below are compared with them as the year goes on. ${P.state==='now'?pc+'% of the year has passed.':P.state==='done'?'This year is complete.':'This year has not started.'}</p>
   <div class="fin-grid4" style="margin-bottom:12px;">
-    <div class="fin-metric"><div class="flbl2">Revenue target</div><div class="fval blue">${money(P.revTarget)}</div><div class="fp-sub">${money(P.revActual)} so far${P.revTarget>0?' · '+Math.round(P.revActual/P.revTarget*100)+'%':''}</div></div>
+    <div class="fin-metric"><div class="flbl2">Revenue target${P.funding.length?(P.fundingIncluded?' (with funding)':' (without funding)'):''}</div><div class="fval blue">${money(P.revTarget)}</div><div class="fp-sub">${money(P.revActual)} so far${P.revTarget>0?' · '+Math.round(P.revActual/P.revTarget*100)+'%':''}</div>${P.funding.length?`<div class="fp-sub"><b style="color:var(--text2);">${money(P.coreTarget)}</b> without funding · ${money(P.coreActual)} so far</div>`:''}</div>
     <div class="fin-metric"><div class="flbl2">Cost budget</div><div class="fval">${money(P.costBudget)}</div><div class="fp-sub">${money(P.costSpent)} spent so far</div></div>
     <div class="fin-metric"><div class="flbl2">Planned profit</div><div class="fval ${P.planned>=0?'green':'red'}">${money(P.planned)}</div><div class="fp-sub">target minus budget</div></div>
     <div class="fin-metric"><div class="flbl2">Year passed</div><div class="fval" style="font-size:.95rem;">${pc}%</div><div class="fin-fybar"><s style="width:${pc}%"></s></div></div></div>
   <div class="fp-grp"><div class="fp-hd"><span class="fp-n">Revenue</span><span class="fp-v">So far</span><span class="fp-v">Target</span><span class="fp-s">Pace</span></div>${revRows}</div>
-  ${P.funding.length?`<div class="fp-grp"><div class="fp-hd"><span class="fp-n">Funding <small>not revenue, not taxed</small></span><span class="fp-v">Received</span><span class="fp-v">Expected</span><span class="fp-s"></span></div>${P.funding.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${money(s.full)}</span><span class="fp-s"></span></div>`).join('')}</div>`:''}
+  ${P.funding.length?`<div class="fp-grp"><div class="fp-hd"><span class="fp-n">Funding <small>${P.fundingIncluded?'included above':'left out of the totals'}</small></span><span class="fp-v">Received</span><span class="fp-v">Expected</span><span class="fp-s"></span></div>${P.funding.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${money(s.full)}</span><span class="fp-s"></span></div>`).join('')}${(()=>{const fe=finFundingEnd();return fe?`<div class="fp-help" style="margin:6px 0 0;">${fe.over?'Funding ended':'Funding ends'} <b>${escHtml(fmtD(fe.end))}</b>${!fe.over?' · about '+fe.months+' month'+(fe.months===1?'':'s')+' left':''}. Revenue without it: <b>${money(P.coreTarget)}</b> for the year.</div>`:`<div class="fp-help" style="margin:6px 0 0;">Set an end date on a recurring funding stream to see when it runs out.</div>`;})()}</div>`:''}
   <div class="fp-grp"><div class="fp-hd fp-c"><span class="fp-n">Costs</span><span class="fp-v">Spent so far</span><span class="fp-v">Budget</span><span class="fp-v fp-f">Full year</span><span class="fp-s">Pace</span></div>${costRows}</div>
   <p class="fp-help" style="margin:10px 0 0;">Spent so far counts recurring costs as they fall due (yearly bills on the month you choose), one-off costs by date, and event expenses from each event page. Edit category budgets below.</p>
   </div></div>`;
@@ -10122,7 +10154,7 @@ ${_finSubHtml(tab)}
 <div class="fin-view${tab==='overview'?' active':''}" id="fin-overview">
   ${_finBankHtml()}
   <div class="fin-grid4">
-    <div class="fin-metric"><div class="flbl2">Revenue</div><div class="fval blue">${fmtGBP(rev)}</div></div>
+    <div class="fin-metric"><div class="flbl2">Revenue</div><div class="fval blue">${fmtGBP(rev)}</div>${_finFundNote()}</div>
     <div class="fin-metric"><div class="flbl2">Total Expenses</div><div class="fval red">${fmtGBP(allExp)}</div></div>
     <div class="fin-metric"><div class="flbl2">Pre-tax Profit</div><div class="fval ${profit>0?'green':'red'}">${fmtS(profit)}</div></div>
     <div class="fin-metric"><div class="flbl2">Corp Tax (est.)</div><div class="fval red">${fmtGBP(ct.tax)}</div></div>
