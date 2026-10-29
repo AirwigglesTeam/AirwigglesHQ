@@ -1483,6 +1483,21 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .st-fold>summary:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
 .st-meta{font-size:.68rem;color:var(--muted);font-weight:400;}
 .st-in{padding:0 16px 14px;}
+
+/* Task hover card (Timeline, Calendar, ongoing dots) */
+#cowork-tooltip.tt-task{max-width:min(320px,calc(100vw - 24px));min-width:220px;}
+.tt-ok{color:var(--green);}.tt-late{color:var(--red);font-weight:600;}
+.cwtt-row.tt-part{margin-top:5px;padding-top:5px;border-top:1px solid var(--border);}
+.cwtt-row.tt-part b{color:var(--text);font-weight:600;}
+.tt-subs{margin-top:7px;padding-top:6px;border-top:1px solid var(--border);}
+.tt-subhd{display:flex;justify-content:space-between;gap:10px;font-size:.58rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:3px;}
+.tt-sub{display:flex;align-items:baseline;gap:6px;font-size:.68rem;color:var(--text2);line-height:1.45;padding:1px 0;}
+.tt-sub .tt-ck{width:10px;flex:none;color:var(--muted);font-size:.62rem;}
+.tt-sub .tt-sn{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.tt-sub .tt-sm{flex:none;font-size:.6rem;color:var(--muted);font-family:'DM Mono',monospace;}
+.tt-sub.done{color:var(--muted);}.tt-sub.done .tt-sn{text-decoration:line-through;}.tt-sub.done .tt-ck{color:var(--green);}
+.tt-sub.focus{color:var(--text);font-weight:700;}.tt-sub.focus .tt-ck{color:var(--acc);}
+.tt-more{font-size:.62rem;color:var(--muted);padding-top:2px;}
 </style>
 </head>
 <body>
@@ -3037,7 +3052,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=100;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=101;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6116,7 +6131,7 @@ function mcCollect(sc,days){
 }
 function _mcChip(t,today){
   const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
-  return '<div class="mcal-chip'+(t.done?' done':'')+(over?' over':'')+'" data-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' title="'+escHtml(t.name)+'" onclick="event.stopPropagation();openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span>'+escHtml(t.name)+'</span></div>';
+  return '<div class="mcal-chip'+(t.done?' done':'')+(over?' over':'')+'" data-task="'+t.id+'" data-tip-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' onclick="event.stopPropagation();openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span>'+escHtml(t.name)+'</span></div>';
 }
 function _mcDayDetail(iso,data,today,sc){
   const d=data[iso]||{tasks:[],cw:[],marks:[]};
@@ -6127,7 +6142,7 @@ function _mcDayDetail(iso,data,today,sc){
   d.marks.forEach(m=>{h+='<div class="mcal-row"><i style="background:'+(m.p.color||'var(--acc)')+'"></i> '+escHtml(m.p.name)+' '+(m.kind==='start'?'starts':'ends')+'</div>';});
   d.tasks.slice().sort((a,b)=>(a.done-b.done)||a.name.localeCompare(b.name)).forEach(t=>{
     const p=getProject(t.projectId);const over=!t.done&&t.endDate&&t.endDate<today;
-    h+='<div class="mcal-row mcal-trow'+(t.done?' done':'')+'" data-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' onclick="openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span class="mcal-tn">'+escHtml(t.name)+'</span>'+(sc?'':'<span class="mcal-muted">'+escHtml(p?p.name:'')+'</span>')+(over?'<span class="mcal-late">overdue</span>':'')+((t.assignees||[]).length?'<span class="mcal-avs">'+(t.assignees||[]).slice(0,3).map(id=>avHtml(id,16)).join('')+'</span>':'')+(t.done?'':'<span class="mcal-mvw" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-xs" onclick="mcPick(this)" title="Move to another date">Move</button><input type="date" class="mcal-mv" value="'+(t.endDate||t.startDate||'')+'" onchange="mcMove(\''+t.id+'\',this.value)" tabindex="-1" aria-label="New date"></span>')+'</div>';
+    h+='<div class="mcal-row mcal-trow'+(t.done?' done':'')+'" data-task="'+t.id+'" data-tip-task="'+t.id+'"'+(t.done?'':' data-mcdrag="'+t.id+'"')+' onclick="openModal(\'task\',\''+t.id+'\')"><i style="background:'+(p&&p.color||'var(--acc)')+'"></i><span class="mcal-tn">'+escHtml(t.name)+'</span>'+(sc?'':'<span class="mcal-muted">'+escHtml(p?p.name:'')+'</span>')+(over?'<span class="mcal-late">overdue</span>':'')+((t.assignees||[]).length?'<span class="mcal-avs">'+(t.assignees||[]).slice(0,3).map(id=>avHtml(id,16)).join('')+'</span>':'')+(t.done?'':'<span class="mcal-mvw" onclick="event.stopPropagation()"><button class="btn btn-ghost btn-xs" onclick="mcPick(this)" title="Move to another date">Move</button><input type="date" class="mcal-mv" value="'+(t.endDate||t.startDate||'')+'" onchange="mcMove(\''+t.id+'\',this.value)" tabindex="-1" aria-label="New date"></span>')+'</div>';
   });
   return h+'</div>';
 }
@@ -6253,6 +6268,75 @@ function renderProjectCalendar(p){
 }
 function pvSet(pid,k){window._pvOpen=window._pvOpen||{};window._pvOpen[pid]=(window._pvOpen[pid]===k)?'':k;const h=document.querySelector('[data-pcal="'+pid+'"]');const p=getProject(pid);if(h&&p){h.innerHTML=renderProjectCalendar(p);setTimeout(scrollProjGantts,20);}else render();}
 function pcToggle(pid){pvSet(pid,'cal');}
+/* ── Task hover card ──
+   One card for every place a task is drawn on a timeline or calendar: Timeline rows and bars, Calendar chips and day rows,
+   and the due-date dots on ongoing projects. Hovering shows the task, when it is due, who has it, and how it fits with its
+   parent and subtasks. Any element with data-tip-task="<task id>" gets the card (handled by one delegated listener). */
+const _TT_LINES=9;
+function _ttWhen(t){
+  if(t.done)return{txt:'Done',cls:'ok'};
+  const e=t.endDate||t.startDate;if(!e)return{txt:'No date set',cls:''};
+  const diff=Math.round((Date.parse(e)-Date.parse(_localToday()))/864e5);
+  if(diff<0)return{txt:Math.abs(diff)+' day'+(diff===-1?'':'s')+' overdue',cls:'late'};
+  return{txt:diff===0?'Due today':'Due in '+diff+' day'+(diff===1?'':'s'),cls:''};
+}
+function _ttRange(t){const s=t.startDate,e=t.endDate;if(s&&e&&s!==e)return fmtD(s)+' → '+fmtD(e);return fmtD(e||s||'');}
+function _ttWho(t){return(t.assignees||[]).map(id=>getMember(id)).filter(Boolean).map(m=>String(m.name||'').split(' ')[0]).join(', ');}
+function _ttTop(t){let r=t,n=0;while(r.parentId&&n++<10){const p=getTask(r.parentId);if(!p)break;r=p;}return r;}
+function _ttTree(root,focusId,out,depth){
+  S.tasks.filter(x=>x.parentId===root.id&&!x.recurNext).forEach(k=>{
+    out.push({t:k,d:depth,focus:k.id===focusId});
+    if(depth<2)_ttTree(k,focusId,out,depth+1);
+  });
+}
+function taskTipHtml(t,opt){
+  opt=opt||{};
+  const p=getProject(t.projectId),top=_ttTop(t),isSub=top.id!==t.id;
+  const w=_ttWhen(t),who=_ttWho(t),rng=_ttRange(t);
+  let h='<div class="cwtt-title">'+(t.done?'<span class="tt-ok">✓</span> ':'')+escHtml(t.name)+'</div>';
+  if(p)h+='<div class="cwtt-row"><span style="width:7px;height:7px;border-radius:50%;background:'+escHtml(p.color||'var(--acc)')+';display:inline-block;margin-top:5px;flex-shrink:0;"></span><span>'+escHtml(p.name)+'</span></div>';
+  h+='<div class="cwtt-row"><span>'+(rng?escHtml(rng)+' · ':'')+'<span class="tt-'+w.cls+'">'+escHtml(w.txt)+'</span></span></div>';
+  h+='<div class="cwtt-row"><span>'+escHtml(t.priority||'Medium')+' priority · '+(who?escHtml(who):'Unassigned')+'</span></div>';
+  const lines=[];_ttTree(top,t.id,lines,0);
+  if(isSub)h+='<div class="cwtt-row tt-part"><span>Part of <b>'+escHtml(top.name)+'</b></span></div>';
+  if(lines.length){
+    const done=lines.filter(l=>l.t.done).length;
+    h+='<div class="tt-subs"><div class="tt-subhd"><span>Subtasks</span><span>'+done+'/'+lines.length+' done</span></div>';
+    // keep the hovered subtask visible even when the list is long
+    let shown=lines.slice(0,_TT_LINES);
+    const fi=lines.findIndex(l=>l.focus);
+    if(fi>=_TT_LINES)shown=lines.slice(0,_TT_LINES-1).concat([lines[fi]]);
+    shown.forEach(l=>{
+      const m=l.t,wh=_ttWho(m),dt=m.endDate||m.startDate;
+      h+='<div class="tt-sub'+(l.focus?' focus':'')+(m.done?' done':'')+'" style="padding-left:'+(l.d*11)+'px;"><span class="tt-ck">'+(m.done?'✓':'○')+'</span><span class="tt-sn">'+escHtml(m.name)+'</span><span class="tt-sm">'+escHtml(dt?fmtD(dt).replace(/\s\d{4}$/,''):(wh||''))+'</span></div>';
+    });
+    if(lines.length>shown.length)h+='<div class="tt-more">+ '+(lines.length-shown.length)+' more</div>';
+    h+='</div>';
+  }
+  if(!isSub&&!lines.length&&t.description)h+='<div class="cwtt-row"><span>'+escHtml(String(t.description).slice(0,120))+(String(t.description).length>120?'…':'')+'</span></div>';
+  return h;
+}
+function showTaskTip(e,id){
+  const tip=el('cowork-tooltip');if(!tip)return;
+  const t=getTask(id);if(!t){hideCoworkTip();return;}
+  tip.innerHTML=taskTipHtml(t);tip.classList.add('tt-task');tip.classList.add('visible');_posCoworkTip(e,tip);
+}
+(function(){
+  let cur=null;
+  const find=e=>{const n=e.target&&e.target.closest?e.target.closest('[data-tip-task]'):null;return n;};
+  document.addEventListener('mouseover',e=>{
+    const n=find(e);
+    if(n===cur)return;
+    cur=n;
+    if(n)showTaskTip(e,n.getAttribute('data-tip-task'));else hideCoworkTip();
+  });
+  document.addEventListener('mousemove',e=>{
+    if(!cur)return;
+    const tip=el('cowork-tooltip');if(tip&&tip.classList.contains('visible'))_posCoworkTip(e,tip);
+  });
+  document.addEventListener('mouseout',e=>{if(!e.relatedTarget&&cur){cur=null;hideCoworkTip();}});
+  document.addEventListener('click',()=>{if(cur){cur=null;hideCoworkTip();}},true);
+})();
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -7630,6 +7714,7 @@ function _tdotTasks(pid,d){return S.tasks.filter(t=>t.projectId===pid&&!t.done&&
 function showTaskDotTip(e,pid,d){
   const tip=el('cowork-tooltip');if(!tip)return;
   const ts=_tdotTasks(pid,d);if(!ts.length)return;
+  if(ts.length===1){showTaskTip(e,ts[0].id);return;}
   const p=getProject(pid);
   const diff=Math.round((Date.parse(d)-Date.parse(_localToday()))/864e5);
   const when=diff<0?Math.abs(diff)+' day'+(diff===-1?'':'s')+' overdue':diff===0?'Due today':'Due in '+diff+' day'+(diff===1?'':'s');
@@ -7642,13 +7727,13 @@ function showTaskDotTip(e,pid,d){
     h+='<div class="cwtt-row"><span>Priority: '+escHtml(t.priority||'Medium')+(who(t)?' · '+escHtml(who(t)):' · Unassigned')+'</span></div>';
     if(t.description)h+='<div class="cwtt-row"><span>'+escHtml(String(t.description).slice(0,120))+(String(t.description).length>120?'…':'')+'</span></div>';
   }else{
-    ts.slice(0,6).forEach(t=>{h+='<div class="cwtt-row"><span>• '+escHtml(t.name)+(who(t)?' <span style="color:var(--muted);">('+escHtml(who(t))+')</span>':'')+'</span></div>';});
+    ts.slice(0,6).forEach(t=>{const sk=S.tasks.filter(x=>x.parentId===t.id);h+='<div class="cwtt-row"><span>• '+escHtml(t.name)+(sk.length?' <span style="color:var(--muted);">['+sk.filter(x=>x.done).length+'/'+sk.length+' subtasks]</span>':'')+(who(t)?' <span style="color:var(--muted);">('+escHtml(who(t))+')</span>':'')+'</span></div>';});
     if(ts.length>6)h+='<div class="cwtt-row"><span style="color:var(--muted);">+ '+(ts.length-6)+' more</span></div>';
   }
   tip.innerHTML=h;tip.classList.add('visible');_posCoworkTip(e,tip);
 }
 function tdotClick(pid,d){hideCoworkTip();const ts=_tdotTasks(pid,d);if(ts.length===1)openModal('task',ts[0].id);else if(ts.length)openDetail(pid);}
-function hideCoworkTip(){const tip=el('cowork-tooltip');if(tip)tip.classList.remove('visible');}
+function hideCoworkTip(){const tip=el('cowork-tooltip');if(tip){tip.classList.remove('visible');tip.classList.remove('tt-task');}}
 
 function showPhaseTip(e,phase,status,daysLine,dateRange){
   const tip=el('cowork-tooltip');if(!tip)return;
@@ -8995,7 +9080,7 @@ function _renderGanttInner(projects,fullPage=false,opts){
     const top=_perp?[]:S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(opts.all?_hasDated(t,0):_dated(t)))
       .sort((a,b)=>((a.endDate||a.startDate)<(b.endDate||b.startDate)?-1:(a.endDate||a.startDate)>(b.endDate||b.startDate)?1:0));   // dated tasks only, soonest first
     rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')">${opts.all?'':`<button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button>`}<div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${escHtml(p.name)}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${dotHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
-    const _trow=(t,depth)=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" style="left:${tb.l}px;width:${tb.w}px;height:${depth?9:11}px;background:${p.color}${depth?'12':'18'};border:1px solid ${p.color}${depth?'28':'35'};"><div class="gbar-fill" style="width:${tc}%;background:${p.color}${depth?'60':'80'};"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub"${depth?` style="padding-left:${14+depth*12}px;"`:''}><span class="grow-lbl-name" style="font-size:${depth?'.64':'.68'}rem;color:${depth?'var(--muted)':'var(--text2)'};">${escHtml(t.name)}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;
+    const _trow=(t,depth)=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" data-tip-task="${t.id}" style="left:${tb.l}px;width:${tb.w}px;height:${depth?9:11}px;background:${p.color}${depth?'12':'18'};border:1px solid ${p.color}${depth?'28':'35'};"><div class="gbar-fill" style="width:${tc}%;background:${p.color}${depth?'60':'80'};"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub" data-tip-task="${t.id}"${depth?` style="padding-left:${14+depth*12}px;"`:''}><span class="grow-lbl-name" style="font-size:${depth?'.64':'.68'}rem;color:${depth?'var(--muted)':'var(--text2)'};">${escHtml(t.name)}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;
       if(opts.all&&depth<3)_kids(t.id).filter(k=>_hasDated(k,0)).sort((x,y)=>String(x.endDate||x.startDate||'9').localeCompare(String(y.endDate||y.startDate||'9'))).forEach(k=>_trow(k,depth+1));};
     if(isExp)top.forEach(t=>_trow(t,0));
   });
