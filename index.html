@@ -1558,6 +1558,36 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .fp-seg button{all:unset;cursor:pointer;padding:4px 10px;font-size:.68rem;font-weight:600;color:var(--text2);background:var(--surface2);}
 .fp-seg button.on{background:var(--teal-dim);color:var(--acc);}
 .fp-seg button:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
+
+/* Finance events pill */
+.fin-evc{margin-bottom:10px;}
+.fin-evc>summary{list-style:none;cursor:pointer;padding:13px 16px;display:block;}
+.fin-evc>summary::-webkit-details-marker{display:none;}
+.fe-top{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:9px;}
+.fe-dot{width:8px;height:8px;border-radius:50%;flex:none;}
+.fe-name{font-weight:700;font-size:.9rem;}
+.fe-tag{font-size:.58rem;font-weight:700;padding:2px 8px;border-radius:99px;border:1px solid var(--border);color:var(--text2);text-transform:capitalize;}
+.fe-dates{margin-left:auto;font-size:.68rem;color:var(--muted);}
+.fe-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;}
+.fe-k{display:block;font-size:.56rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+.fe-val{font-family:'DM Mono',monospace;font-size:.86rem;font-weight:600;}.fe-val small{font-family:inherit;color:var(--muted);font-weight:400;font-size:.62rem;}
+.fp-hbar{height:5px;border-radius:99px;background:var(--surface3);overflow:hidden;margin-top:10px;}
+.fp-hbar s{display:block;height:100%;border-radius:99px;background:var(--yellow);}.fp-hbar.over s{background:var(--red);}
+.fe-body{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px;padding:4px 16px 12px;border-top:1px solid var(--border2);}
+.fe-h{font-size:.6rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin:10px 0 4px;}
+.fe-line{display:flex;align-items:center;gap:8px;padding:5px 0;border-bottom:1px solid var(--border2);font-size:.76rem;}
+.fe-line:last-child{border-bottom:0;}.fe-n{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;}.fe-n small{font-weight:400;color:var(--muted);}
+.fe-m{color:var(--muted);font-size:.64rem;white-space:nowrap;}.fe-v{font-family:'DM Mono',monospace;white-space:nowrap;}
+.fe-none{font-size:.72rem;color:var(--muted);padding:6px 0;}
+.fe-foot{padding:0 16px 12px;}
+.fin-evo{margin-top:6px;}
+.fin-evo>summary{list-style:none;cursor:pointer;display:flex;align-items:center;gap:9px;padding:12px 16px;font-size:.8rem;font-weight:600;}
+.fin-evo>summary::-webkit-details-marker{display:none;}
+.fin-evo>summary::before{content:"";width:6px;height:6px;border-right:2px solid var(--acc);border-bottom:2px solid var(--acc);transform:rotate(-45deg);transition:transform .15s;}
+.fin-evo[open]>summary::before{transform:rotate(45deg);}
+.fin-evo .meta{margin-left:auto;font-size:.68rem;color:var(--muted);font-weight:400;}
+.fp-lk{font-size:.55rem;font-weight:700;color:var(--acc);border:1px solid var(--acc);border-radius:99px;padding:1px 6px;vertical-align:1px;}
+@media (max-width:640px){.fe-grid{grid-template-columns:repeat(2,minmax(0,1fr));}.fe-dates{margin-left:0;flex-basis:100%;}.fe-body{grid-template-columns:minmax(0,1fr);gap:0;}}
 </style>
 </head>
 <body>
@@ -3112,7 +3142,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=108;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=109;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4691,8 +4721,12 @@ function openRevenueStreams(){
 
 function renderRevStreamList(){
   const streams=S.finance.revenueStreams||[];
-  if(!streams.length)return'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;">No revenue streams yet.</div>';
+  const noMan=!streams.length;
   const fy=S.finance.finYear,money=_finMoney;
+  const LK=finLinked(fy);
+  const linkedHtml=`<div class="rs-linked" style="padding:4px 0 10px;border-bottom:1px solid var(--border2);margin-bottom:2px;"><div style="font-size:.66rem;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);font-weight:700;margin-bottom:6px;">Linked from your event pages</div>`
+    +[['sponsor','Paid sponsorship','confirmed sponsor fees'],['events','Event income','income ticked received']].map(([k,n,d])=>`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;padding:3px 0;"><span style="flex:1;min-width:130px;font-size:.8rem;font-weight:600;">${n} <span style="font-weight:400;color:var(--muted);font-size:.68rem;">${d}</span></span><span style="font-family:'DM Mono',monospace;font-size:.78rem;">${money(LK[k].actual)}</span>${LK[k].extra>0?`<span style="font-size:.66rem;color:var(--muted);">+${money(LK[k].extra)} projected</span>`:''}<span style="font-size:.7rem;color:var(--muted);">target</span><input class="amt-inp" type="number" min="0" step="100" inputmode="decimal" value="${finLinkTarget(k)||''}" style="width:84px;" placeholder="optional" aria-label="${n} target" onchange="setLinkTarget('${k}',this.value)"></div>`).join('')
+    +`<div style="font-size:.66rem;color:var(--muted);margin-top:4px;">Read-only. Change fees and income on the event pages. Counts events starting in ${getFYLabel(fy)}.</div>${_finLinkedNote()}</div>`;
   const num=(id,f,v,ph,al,w)=>`<input class="amt-inp" type="number" min="0" step="0.01" inputmode="decimal" value="${v||''}" style="width:${w||92}px;" placeholder="${ph}" aria-label="${al}" onchange="updateRevStream('${id}','${f}',parseFloat(this.value)||0)">`;
   const lab=t=>`<span style="font-size:.7rem;color:var(--muted);">${t}</span>`;
   const rows=streams.map(s=>{
@@ -4719,7 +4753,7 @@ function renderRevStreamList(){
     ${hint||F.funding?`<div style="font-size:.66rem;color:var(--muted);margin-top:4px;">${hint}${F.funding?(hint?' \u00b7 ':'')+'Funding: will end, shown with and without':''}</div>`:''}
   </div>`;}).join('');
   const fund=totalFunding(),core=totalRevenueCore(),fe=finFundingEnd();
-  return rows+`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;"><span>Revenue, ${getFYLabel(fy)}${fund>0?(fundingOn()?' (with funding)':' (without funding)'):''}</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${money(totalRevenue())}</span></div>`
+  return linkedHtml+(noMan?'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;">No other revenue streams yet. Add recurring, one-off or running-total income below.</div>':'')+rows+`<div style="display:flex;justify-content:space-between;padding:9px 0 0;font-weight:700;font-size:.82rem;"><span>Revenue, ${getFYLabel(fy)}${fund>0?(fundingOn()?' (with funding)':' (without funding)'):''}</span><span style="font-family:'DM Mono',monospace;color:var(--acc);">${money(totalRevenue())}</span></div>`
     +(fund>0?`<div style="display:flex;justify-content:space-between;padding:4px 0 0;font-size:.76rem;color:var(--text2);"><span>Without funding</span><span style="font-family:'DM Mono',monospace;">${money(core)}</span></div>
     <div style="display:flex;justify-content:space-between;padding:2px 0 0;font-size:.76rem;color:var(--text2);"><span>Funding${fe?(fe.over?' (ended '+escHtml(fmtD(fe.end))+')':' (ends '+escHtml(fmtD(fe.end))+(fe.months<=24?', about '+fe.months+' month'+(fe.months===1?'':'s')+' left':'')+')'):''}</span><span style="font-family:'DM Mono',monospace;">${money(fund)}</span></div>
     <label style="display:flex;align-items:center;gap:8px;font-size:.76rem;margin-top:9px;cursor:pointer;"><input type="checkbox" id="rs-fund-on" ${fundingOn()?'checked':''} onchange="setFundingOn(this.checked)"> Include funding in revenue, profit and tax</label>
@@ -6467,7 +6501,7 @@ function finFundingEnd(todayIso){
 function _finStreamsFy(){const fy=S.finance.finYear;return (S.finance.revenueStreams||[]).map(s=>({s,f:finStreamFigures(s,fy)}));}
 function fundingOn(){return S.finance.fundingOn!==false;}   // default: funding is included in revenue, with the without-funding figure shown beside it
 function totalFunding(){return _finStreamsFy().filter(x=>x.f.funding).reduce((a,x)=>a+x.f.full,0);}
-function totalRevenueCore(){return _finStreamsFy().filter(x=>!x.f.funding).reduce((a,x)=>a+x.f.full,0);}
+function totalRevenueCore(){return _finStreamsFy().filter(x=>!x.f.funding).reduce((a,x)=>a+x.f.full,0)+finLinkedTotal();}   // manual streams + sponsor fees and event income from the event pages
 
 function _finFundNote(){
   const fund=totalFunding();if(!(fund>0))return'';const fe=finFundingEnd(),core=totalRevenueCore();
@@ -6510,12 +6544,19 @@ function finPlanCalc(fy,todayIso){
     const F=finStreamFigures(s,fy,today),exp=F.target*frac;
     return{id:s.id,name:s.name,cat:s.cat,kind:F.kind,freq:s.freq,date:s.date||'',amount:parseFloat(s.amount)||0,actual:F.actual,full:F.full,target:F.target,funding:F.funding,
       state:(F.kind!=='oneoff'&&!F.funding&&F.target>0)?(F.actual>=exp?'ahead':F.actual>=exp*.85?'watch':'behind'):''};});
-  const streams=all.filter(x=>!x.funding),funding=all.filter(x=>x.funding);
+  const manual=all.filter(x=>!x.funding),funding=all.filter(x=>x.funding);
+  // sponsor fees and event income come from the event pages (read-only), counted once confirmed / received
+  const LK=finLinked(fy),lkRows=[['sponsor','Paid sponsorship'],['events','Event income']].map(([k,name])=>{
+    const actual=LK[k].actual,extra=LK[k].extra,target=finLinkTarget(k),exp=target*frac;
+    return{id:'link-'+k,name,linked:true,kind:'linked',actual,extra,full:actual,target,funding:false,state:target>0?(actual>=exp?'ahead':actual>=exp*.85?'watch':'behind'):''};
+  }).filter(x=>x.actual>0||x.extra>0||x.target>0);
+  const streams=lkRows.concat(manual);
   const coreTarget=streams.reduce((a,x)=>a+x.target,0),coreActual=streams.reduce((a,x)=>a+x.actual,0);
+  const projExtra=lkRows.reduce((a,x)=>a+x.extra,0);
   const fundTarget=funding.reduce((a,x)=>a+x.full,0),fundActual=funding.reduce((a,x)=>a+x.actual,0),inc=fundingOn();
   const revTarget=coreTarget+(inc?fundTarget:0),revActual=coreActual+(inc?fundActual:0);
   const costBudget=rows.reduce((a,r)=>a+r.budget,0)+evBud,costSpent=rows.reduce((a,r)=>a+r.spent,0)+evSpent;
-  return{fy,state,frac,months:m,streams,funding,rows,ev,revTarget,revActual,coreTarget,coreActual,fundTarget,fundActual,fundingIncluded:inc,costBudget,costSpent,planned:revTarget-costBudget};
+  return{fy,state,frac,months:m,streams,funding,rows,ev,revTarget,revActual,coreTarget,coreActual,projExtra,fundTarget,fundActual,fundingIncluded:inc,costBudget,costSpent,planned:revTarget-costBudget};
 }
 function _finPlanTag(s,rev){
   if(!s)return'';
@@ -6525,18 +6566,18 @@ function _finPlanTag(s,rev){
 function _finPlanHtml(){
   const fy=S.finance.finYear,P=finPlanCalc(fy),pc=Math.round(P.frac*100);
   const money=_finMoney;
-  const kindNote=s=>s.kind==='recurring'?' <small>'+money(s.amount)+' '+({Monthly:'monthly',Quarterly:'quarterly',Annual:'yearly'}[s.freq]||'monthly')+'</small>':s.kind==='oneoff'?' <small>one-off'+(s.date?', '+escHtml(fmtD(s.date)):'')+'</small>':'';
+  const kindNote=s=>s.linked?' <span class="fp-lk">linked</span>'+(s.extra>0?' <small>+'+money(s.extra)+' projected</small>':''):s.kind==='recurring'?' <small>'+money(s.amount)+' '+({Monthly:'monthly',Quarterly:'quarterly',Annual:'yearly'}[s.freq]||'monthly')+'</small>':s.kind==='oneoff'?' <small>one-off'+(s.date?', '+escHtml(fmtD(s.date)):'')+'</small>':'';
   const revRows=P.streams.length?P.streams.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${s.target>0?money(s.target):'<em>no target</em>'}</span><span class="fp-s">${_finPlanTag(s.state,true)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No revenue streams yet.</div>';
   const allCost=P.rows.concat(P.ev.budget>0||P.ev.spent>0||P.ev.full>0?[P.ev]:[]);
   const costRows=allCost.length?allCost.map(r=>`<div class="fp-row fp-c"><span class="fp-n">${escHtml(r.cat)}${r.events?' <small>from event pages</small>':''}</span><span class="fp-v">${money(r.spent)}</span><span class="fp-v fp-t">${r.budget>0?money(r.budget):'<em>no budget</em>'}</span><span class="fp-v fp-f">${money(r.full)}</span><span class="fp-s">${_finPlanTag(r.state,false)}</span></div>`).join(''):'<div style="font-size:.76rem;color:var(--muted);">No costs yet.</div>';
   return `<div class="card" style="margin-bottom:14px;" id="fin-plan"><div class="card-hd"><span class="card-title">Year plan · ${getFYLabel(fy)}</span><span style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;">${P.funding.length?`<span class="fp-seg" role="group" aria-label="Funding"><button type="button" class="${P.fundingIncluded?'on':''}" onclick="setFundingOn(true)">With funding</button><button type="button" class="${P.fundingIncluded?'':'on'}" onclick="setFundingOn(false)">Without</button></span>`:''}<button class="btn btn-ghost btn-xs" onclick="openRevenueStreams()">Edit revenue streams</button></span></div><div class="card-bd">
   <p class="fp-help">Set targets and budgets once. Revenue and costs below are compared with them as the year goes on. ${P.state==='now'?pc+'% of the year has passed.':P.state==='done'?'This year is complete.':'This year has not started.'}</p>
   <div class="fin-grid4" style="margin-bottom:12px;">
-    <div class="fin-metric"><div class="flbl2">Revenue target${P.funding.length?(P.fundingIncluded?' (with funding)':' (without funding)'):''}</div><div class="fval blue">${money(P.revTarget)}</div><div class="fp-sub">${money(P.revActual)} so far${P.revTarget>0?' · '+Math.round(P.revActual/P.revTarget*100)+'%':''}</div>${P.funding.length?`<div class="fp-sub"><b style="color:var(--text2);">${money(P.coreTarget)}</b> without funding · ${money(P.coreActual)} so far</div>`:''}</div>
+    <div class="fin-metric"><div class="flbl2">Revenue target${P.funding.length?(P.fundingIncluded?' (with funding)':' (without funding)'):''}</div><div class="fval blue">${money(P.revTarget)}</div><div class="fp-sub">${money(P.revActual)} so far${P.revTarget>0?' · '+Math.round(P.revActual/P.revTarget*100)+'%':''}</div>${P.projExtra>0?`<div class="fp-sub">+${money(P.projExtra)} projected (sponsors in talks, expected income)</div>`:''}${P.funding.length?`<div class="fp-sub"><b style="color:var(--text2);">${money(P.coreTarget)}</b> without funding · ${money(P.coreActual)} so far</div>`:''}</div>
     <div class="fin-metric"><div class="flbl2">Cost budget</div><div class="fval">${money(P.costBudget)}</div><div class="fp-sub">${money(P.costSpent)} spent so far</div></div>
     <div class="fin-metric"><div class="flbl2">Planned profit</div><div class="fval ${P.planned>=0?'green':'red'}">${money(P.planned)}</div><div class="fp-sub">target minus budget</div></div>
     <div class="fin-metric"><div class="flbl2">Year passed</div><div class="fval" style="font-size:.95rem;">${pc}%</div><div class="fin-fybar"><s style="width:${pc}%"></s></div></div></div>
-  <div class="fp-grp"><div class="fp-hd"><span class="fp-n">Revenue</span><span class="fp-v">So far</span><span class="fp-v">Target</span><span class="fp-s">Pace</span></div>${revRows}</div>
+  <div class="fp-grp"><div class="fp-hd"><span class="fp-n">Revenue</span><span class="fp-v">So far</span><span class="fp-v">Target</span><span class="fp-s">Pace</span></div>${revRows}${_finLinkedNote()}</div>
   ${P.funding.length?`<div class="fp-grp"><div class="fp-hd"><span class="fp-n">Funding <small>${P.fundingIncluded?'included above':'left out of the totals'}</small></span><span class="fp-v">Received</span><span class="fp-v">Expected</span><span class="fp-s"></span></div>${P.funding.map(s=>`<div class="fp-row"><span class="fp-n">${escHtml(s.name)}${kindNote(s)}</span><span class="fp-v">${money(s.actual)}</span><span class="fp-v fp-t">${money(s.full)}</span><span class="fp-s"></span></div>`).join('')}${(()=>{const fe=finFundingEnd();return fe?`<div class="fp-help" style="margin:6px 0 0;">${fe.over?'Funding ended':'Funding ends'} <b>${escHtml(fmtD(fe.end))}</b>${!fe.over?' · about '+fe.months+' month'+(fe.months===1?'':'s')+' left':''}. Revenue without it: <b>${money(P.coreTarget)}</b> for the year.</div>`:`<div class="fp-help" style="margin:6px 0 0;">Set an end date on a recurring funding stream to see when it runs out.</div>`;})()}</div>`:''}
   <div class="fp-grp"><div class="fp-hd fp-c"><span class="fp-n">Costs</span><span class="fp-v">Spent so far</span><span class="fp-v">Budget</span><span class="fp-v fp-f">Full year</span><span class="fp-s">Pace</span></div>${costRows}</div>
   <p class="fp-help" style="margin:10px 0 0;">Spent so far counts recurring costs as they fall due (yearly bills on the month you choose), one-off costs by date, and event expenses from each event page. Edit category budgets below.</p>
@@ -6607,6 +6648,63 @@ function saveEvIncome(pid,id){
 }
 function deleteEvIncome(pid,id){const p=getProject(pid);if(!p)return;saveWithUndo('Delete income');p.income=(p.income||[]).filter(x=>x.id!==id);saveNow();closeModal();render();}
 function toggleEvIncome(pid,id){const p=getProject(pid);const i=p&&(p.income||[]).find(x=>x.id===id);if(!i)return;i.received=!i.received;save();render();}
+/* ── Finance: linked revenue (from event pages) and the Events pill ──
+   Reads evMoney() (sponsor fees + event income + expenses). An event belongs to the financial year of its start date;
+   events without a start date are listed but kept out of the year totals. */
+function _finEvFyOf(p){return p.startDate?isInFY(p.startDate,S.finance.finYear):null;}   // true / false / null (no date)
+function finLinked(fy){
+  const o={sponsor:{actual:0,extra:0},events:{actual:0,extra:0}};
+  (S.projects||[]).forEach(p=>{
+    if(!isEvt(p)||!p.startDate||!isInFY(p.startDate,fy))return;
+    const m=evMoney(p);o.sponsor.actual+=m.fees.confirmed;o.sponsor.extra+=m.fees.prospect;o.events.actual+=m.inc.received;o.events.extra+=m.inc.expected;
+  });
+  return o;
+}
+function finLinkTarget(k){return parseFloat((S.finance.linkTargets||{})[k])||0;}
+function setLinkTarget(k,v){if(!S.finance.linkTargets)S.finance.linkTargets={};S.finance.linkTargets[k]=parseFloat(v)||0;save();if(typeof V!=='undefined'&&V==='finance')reCalcFin();const l=document.getElementById('rev-stream-list');if(l)l.innerHTML=renderRevStreamList();}
+function finLinkedTotal(){const L=finLinked(S.finance.finYear);return L.sponsor.actual+L.events.actual;}
+/* manual streams that probably duplicate the linked lines */
+function finLinkedDupes(){return (S.finance.revenueStreams||[]).filter(s=>(s.cat==='Sponsorship'||s.cat==='Events')&&!finStreamIsFunding(s)&&finStreamFigures(s,S.finance.finYear).full>0);}
+function _finLinkedNote(){
+  const L=finLinked(S.finance.finYear);if(!(L.sponsor.actual+L.events.actual+L.sponsor.extra+L.events.extra>0))return'';
+  const d=finLinkedDupes();
+  return d.length?`<div style="font-size:.7rem;color:var(--yellow);margin:8px 0 0;line-height:1.45;">Check for double counting: you also have manual ${d.map(s=>'“'+escHtml(s.name)+'”').join(', ')} in the Sponsorship/Events categories. Sponsor fees and event income are already added from your event pages, so remove or lower the manual amount if it is the same money.</div>`:'';
+}
+function _finEventsHtml(){
+  const fy=S.finance.finYear,money=_finMoney;
+  const list=(S.projects||[]).filter(p=>(parseFloat(p.budget)||0)>0||(p.expenses||[]).length||(isEvt(p)&&((p.income||[]).length||_evFeeSponsors(p).length)));
+  const rows=list.map(p=>({p,m:evMoney(p),fy:_finEvFyOf(p)}));
+  const cur=rows.filter(r=>r.fy===true).sort((a,b)=>(a.p.startDate||'').localeCompare(b.p.startDate||'')),oth=rows.filter(r=>r.fy!==true).sort((a,b)=>(b.p.startDate||'').localeCompare(a.p.startDate||''));
+  const sum=(a,f)=>a.reduce((x,r)=>x+f(r),0);
+  const bud=sum(cur,r=>r.m.budget),sp=sum(cur,r=>r.m.spent),rev=sum(cur,r=>r.m.revenue),proj=sum(cur,r=>r.m.projected),res=rev-sp;
+  const over=cur.filter(r=>r.m.budget>0&&r.m.spent>r.m.budget).length;
+  const card=r=>{
+    const p=r.p,m=r.m,pct=m.budget>0?Math.min(100,Math.round(m.spent/m.budget*100)):0,isOver=m.budget>0&&m.spent>m.budget,res=m.revenue-m.spent;
+    const dates=p.startDate?escHtml(fmtD(p.startDate))+(p.endDate&&p.endDate!==p.startDate?' → '+escHtml(fmtD(p.endDate)):''):'No start date';
+    const ex=(p.expenses||[]).map(e=>`<div class="fe-line"><span class="fe-n">${escHtml(e.name)}</span><span class="fe-m">${escHtml(e.category||'')}${e.date?' · '+escHtml(fmtD(e.date)):''}</span><span class="fe-v">${money(e.amount)}</span></div>`).join('')||'<div class="fe-none">No expenses yet.</div>';
+    const fees=isEvt(p)?_evFeeSponsors(p).map(sp=>{const s=getSponsor(sp.id);const ci=SP_STAGES.findIndex(x=>x.id===_spStage(sp));if(!s||ci<2)return'';return `<div class="fe-line"><span class="fe-n">${escHtml(s.name)} <small>fee</small></span><span class="fe-m">${ci>=3?'confirmed':'in talks'}</span><span class="fe-v" style="color:${ci>=3?'var(--green)':'var(--muted)'}">${money(sp.fee)}</span></div>`;}).join(''):'';
+    const inc=(p.income||[]).map(i=>`<div class="fe-line"><span class="fe-n">${escHtml(i.name)}</span><span class="fe-m">${i.received?'received':'expected'}${i.date?' · '+escHtml(fmtD(i.date)):''}</span><span class="fe-v" style="color:${i.received?'var(--green)':'var(--muted)'}">${money(i.amount)}</span></div>`).join('');
+    return `<details class="card fin-evc"><summary>
+      <div class="fe-top"><span class="fe-dot" style="background:${escHtml(p.color||'var(--acc)')}"></span><span class="fe-name">${escHtml(p.name)}</span>${p.status&&p.status!=='active'?`<span class="fe-tag">${escHtml(p.status)}</span>`:''}${isOver?'<span class="fe-tag" style="color:var(--red);border-color:var(--red);">Over budget</span>':''}<span class="fe-dates">${dates}</span></div>
+      <div class="fe-grid"><div><span class="fe-k">Spent${m.budget>0?' / budget':''}</span><span class="fe-val" style="color:${isOver?'var(--red)':'var(--text)'}">${money(m.spent)}${m.budget>0?' <small>/ '+money(m.budget)+'</small>':''}</span></div>
+      <div><span class="fe-k">Income</span><span class="fe-val" style="color:var(--green)">${money(m.revenue)}${m.projected>m.revenue?' <small>of '+money(m.projected)+' projected</small>':''}</span></div>
+      <div><span class="fe-k">Result so far</span><span class="fe-val" style="color:${res>=0?'var(--green)':'var(--red)'}">${res<0?'-':''}${money(Math.abs(res))}</span></div></div>
+      ${m.budget>0?`<div class="fp-hbar${isOver?' over':''}"><s style="width:${pct}%"></s></div>`:''}</summary>
+      <div class="fe-body"><div><div class="fe-h">Expenses</div>${ex}</div><div><div class="fe-h">Income</div>${(fees+inc)||'<div class="fe-none">No income yet.</div>'}</div></div>
+      <div class="fe-foot"><button class="btn btn-ghost btn-xs" onclick="openDetail('${p.id}')">Open ${escHtml(p.name)} →</button></div></details>`;
+  };
+  const noDate=oth.filter(r=>r.fy===null).length;
+  return `<div style="max-width:900px;">
+  <div class="fin-grid4" style="margin-bottom:12px;">
+    <div class="fin-metric"><div class="flbl2">Budgeted</div><div class="fval blue">${money(bud)}</div><div class="fp-sub">${getFYLabel(fy)}</div></div>
+    <div class="fin-metric"><div class="flbl2">Spent</div><div class="fval ${bud>0&&sp>bud?'red':'yellow'}">${money(sp)}</div><div class="fp-sub">${over?over+' event'+(over===1?'':'s')+' over budget':'none over budget'}</div></div>
+    <div class="fin-metric"><div class="flbl2">Income</div><div class="fval green">${money(rev)}</div><div class="fp-sub">${proj>rev?money(proj)+' projected':'confirmed and received'}</div></div>
+    <div class="fin-metric"><div class="flbl2">Result so far</div><div class="fval ${res>=0?'green':'red'}">${res<0?'-':''}${money(Math.abs(res))}</div><div class="fp-sub">income minus spent</div></div></div>
+  <p class="fp-help">Spending, sponsor fees and income are read from each event page. Open an event to change them. An event belongs to the year it starts in.</p>
+  ${cur.length?cur.map(card).join(''):'<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.78rem;">No events with a budget, expenses or income in this financial year yet.</div></div>'}
+  ${oth.length?`<details class="card fold fin-evo"><summary>Other years and events without a start date <span class="meta">${oth.length}${noDate?' · '+noDate+' undated, not counted in the totals':''}</span></summary><div style="padding:0 12px 12px;">${oth.map(card).join('')}</div></details>`:''}
+  </div>`;
+}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -10232,56 +10330,7 @@ ${_finSubHtml(tab)}
 </div>
 
 <div class="fin-view${tab==='projects'?' active':''}" id="fin-projects">
-  ${(()=>{
-    const projsWithExp=S.projects.filter(p=>(p.expenses||[]).length>0||(p.budget||0)>0);
-    const projsWithBudget=S.projects.filter(p=>(p.budget||0)>0);
-    const totalBudgeted=projsWithBudget.reduce((a,p)=>a+(p.budget||0),0);
-    const totalSpent=projExpTotal();
-    const overProjs=projsWithBudget.filter(p=>{const spent=(p.expenses||[]).reduce((a,e)=>a+e.amount,0);return spent>(p.budget||0);});
-    return'<div style="max-width:780px;">'
-    // Summary strip
-    +'<div class="fin-grid4" style="margin-bottom:16px;">'
-    +'<div class="fin-metric"><div class="flbl2">Total Budgeted</div><div class="fval blue">'+fmtGBP(totalBudgeted)+'</div></div>'
-    +'<div class="fin-metric"><div class="flbl2">Total Spent</div><div class="fval '+(totalSpent>totalBudgeted&&totalBudgeted>0?'red':'yellow')+'">'+fmtGBP(totalSpent)+'</div></div>'
-    +'<div class="fin-metric"><div class="flbl2">Remaining</div><div class="fval '+(totalBudgeted-totalSpent<0&&totalBudgeted>0?'red':'green')+'">'+fmtGBP(totalBudgeted-totalSpent)+'</div></div>'
-    +'<div class="fin-metric"><div class="flbl2">Over Budget</div><div class="fval '+(overProjs.length>0?'red':'green')+'">'+overProjs.length+' project'+(overProjs.length!==1?'s':'')+'</div></div>'
-    +'</div>'
-    // Per-project variance card
-    +(projsWithExp.length===0?'<div class="card"><div class="card-bd" style="color:var(--muted);font-size:.78rem;">No project expenses or budgets set yet. Add expenses inside projects, or set a budget in the project editor.</div></div>'
-    :'<div class="card" style="margin-bottom:16px;">'
-    +'<div class="card-hd"><span class="card-title">Budget vs Actual — Per Project</span></div>'
-    +'<div class="card-bd" style="padding:0;">'
-    +'<div style="display:grid;grid-template-columns:1fr 90px 90px 90px 120px;padding:7px 16px;background:var(--surface2);border-bottom:1px solid var(--border2);">'
-    +'<div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;">Project</div>'
-    +'<div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right;">Budget</div>'
-    +'<div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right;">Spent</div>'
-    +'<div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;text-align:right;">Remaining</div>'
-    +'<div style="font-size:.6rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.06em;padding-left:10px;">Variance</div>'
-    +'</div>'
-    +S.projects.filter(p=>(p.expenses||[]).length>0||(p.budget||0)>0).map(p=>{
-      const spent=(p.expenses||[]).reduce((a,e)=>a+e.amount,0);
-      const budget=p.budget||0;
-      const hasB=budget>0;
-      const rem=budget-spent;
-      const over=hasB&&spent>budget;
-      const pct=hasB?Math.min(100,Math.round(spent/budget*100)):0;
-      return'<div style="padding:10px 16px;border-bottom:1px solid rgba(255,255,255,.04);">'
-        +'<div style="display:grid;grid-template-columns:1fr 90px 90px 90px 120px;align-items:center;gap:4px;margin-bottom:'+(hasB?'6':'0')+'px;">'
-        +'<div style="display:flex;align-items:center;gap:7px;min-width:0;">'
-        +'<div style="width:7px;height:7px;border-radius:50%;background:'+p.color+';flex-shrink:0;"></div>'
-        +'<span style="font-size:.8rem;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(p.name)+'</span>'
-        +'</div>'
-        +'<div style="font-family:\'DM Mono\',monospace;font-size:.74rem;text-align:right;color:var(--text2);">'+(hasB?fmtGBP(budget):'—')+'</div>'
-        +'<div style="font-family:\'DM Mono\',monospace;font-size:.74rem;text-align:right;color:'+(over?'var(--red)':'var(--yellow)')+';">'+(spent>0?fmtGBP(spent):'—')+'</div>'
-        +'<div style="font-family:\'DM Mono\',monospace;font-size:.74rem;text-align:right;color:'+(over?'var(--red)':hasB?'var(--green)':'var(--muted)')+';">'+(hasB?fmtGBP(rem):'—')+'</div>'
-        +'<div style="padding-left:10px;">'+(hasB?'<div style="height:4px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:'+pct+'%;background:'+(over?'var(--red)':p.color)+';border-radius:99px;transition:width .3s;"></div></div><div style="font-size:.58rem;color:'+(over?'var(--red)':'var(--muted)')+';margin-top:2px;">'+(over?'Over by '+fmtGBP(Math.abs(rem)):pct+'% used')+'</div>':'<span style="font-size:.65rem;color:var(--muted);">No budget set</span>')+'</div>'
-        +'</div>'
-        +((p.expenses||[]).length>0?('<div style="padding-left:14px;">'+(p.expenses||[]).map(e=>'<div style="display:flex;align-items:center;gap:6px;padding:3px 0;border-bottom:1px solid rgba(255,255,255,.03);"><span style="flex:1;font-size:.72rem;color:var(--text2);">'+escHtml(e.name)+'</span><span style="font-size:.62rem;color:var(--muted);">'+( e.category||'General')+'</span><span style="font-family:\'DM Mono\',monospace;font-size:.7rem;color:var(--yellow);">'+fmtGBP(e.amount)+'</span></div>').join('')+'</div>'):'')
-        +'</div>';
-    }).join('')
-    +'</div></div>')
-    +'</div>';
-  })()}
+  ${_finEventsHtml()}
 </div>
 
 <div class="fin-view${tab==='savings'?' active':''}" id="fin-savings">
