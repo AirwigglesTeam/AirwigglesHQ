@@ -1427,7 +1427,7 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .sp-seg.on::after{background:var(--c);}
 .sp-sub{font-size:.62rem;color:var(--muted);}
 .sp-val{font-family:'DM Mono',monospace;font-size:.7rem;color:var(--yellow);white-space:nowrap;}
-.sp-det{background:var(--surface);border-bottom:1px solid var(--border);padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:18px 28px;}
+.sp-det{background:var(--surface);border-bottom:1px solid var(--border);padding:14px;display:grid;grid-template-columns:repeat(auto-fit,minmax(min(240px,100%),1fr));gap:18px 28px;}
 .sp-h{margin:0 0 8px;font-size:.62rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);}
 .sp-n{font-weight:500;text-transform:none;letter-spacing:0;}
 .sp-sb{border:1px solid var(--border);font-size:.62rem;font-weight:700;padding:3px 9px;border-radius:20px;cursor:pointer;background:transparent;color:var(--muted);min-height:26px;white-space:nowrap;}
@@ -1438,6 +1438,23 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .ev-tk.on::before{content:"\2713";background:var(--acc);border-color:var(--acc);}
 .ev-tk.g.on{color:var(--green);}
 .ev-tk.g.on::before{background:var(--green);border-color:var(--green);}
+
+/* ── Event page on a phone: sponsor rows become cards, bigger tap targets, nothing scrolls sideways ── */
+@media(max-width:760px){
+  .sp-table{min-width:0;}
+  .sp-head{display:none;}
+  .sp-row{grid-template-columns:1fr 1fr;gap:8px 12px;padding:10px 12px;}
+  .sp-row .sp-name,.sp-row .sp-stage,.sp-row .sp-act{grid-column:1 / -1;}
+  .sp-row .sp-type{grid-column:1 / -1;}
+  .sp-row .sp-cell[data-l]:not(.sp-stage):not(.sp-type)::before{content:attr(data-l);display:block;font-size:.56rem;font-weight:700;letter-spacing:.07em;text-transform:uppercase;color:var(--muted);margin-bottom:2px;}
+  .sp-act .btn{width:100%;min-height:40px;}
+  .sp-seg{height:24px;}
+  .sp-seg::after{top:9px;}
+  .sp-det{grid-template-columns:1fr;padding:12px;}
+  .sp-sb{min-height:34px;padding:4px 12px;}
+  .ev-tk{min-height:36px;}
+  .ev-card-hd .btn{min-height:34px;}
+}
 </style>
 </head>
 <body>
@@ -2954,7 +2971,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=92;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=93;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8280,7 +8297,7 @@ function renderDetail(id){
 
 
 <!-- OBJECTIVES / QUICK LINKS / EXPENSES: three narrow cards side by side -->
-<div class="ev-trio" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">
+<div class="ev-trio" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(min(300px,100%),1fr));gap:16px;align-items:start;margin-bottom:18px;">
 ${_adm?'':`<!-- EVENT OKRs -->
 <div class="ev-card" id="detail-okr-${p.id}">
   <div class="ev-card-hd">
