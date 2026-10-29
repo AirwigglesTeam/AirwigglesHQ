@@ -1596,6 +1596,14 @@ body.mcal-dragging *{cursor:grabbing !important;}
 .ff-leg{display:flex;flex-wrap:wrap;gap:6px 16px;margin-top:11px;font-size:.72rem;color:var(--text2);}
 .ff-k{display:inline-flex;align-items:center;gap:6px;}.ff-k b{width:8px;height:8px;border-radius:50%;}.ff-k em{font-style:normal;font-family:'DM Mono',monospace;color:var(--text);}
 .ff-warn{margin-top:10px;font-size:.72rem;color:var(--red);}
+
+/* Finance review card */
+.fin-review{margin-bottom:14px;}
+.fin-review .card-hd{gap:8px;}
+.fin-review .big{font-size:1rem;font-weight:700;}.fin-review .mut{color:var(--muted);font-size:.72rem;}
+.fin-review .pill{font-size:.6rem;font-weight:700;padding:2px 9px;border-radius:99px;border:1px solid var(--border);}
+.fin-review .pill.ok{color:var(--acc);border-color:var(--acc);}.fin-review .pill.warn{color:var(--yellow);border-color:var(--yellow);}.fin-review .pill.bad{color:var(--red);border-color:var(--red);}
+.fr-row{display:flex;align-items:center;gap:12px;flex-wrap:wrap;}.fr-main{flex:1;min-width:200px;}
 </style>
 </head>
 <body>
@@ -3150,7 +3158,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=111;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=112;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4154,6 +4162,7 @@ function _applyDefaults(){
   if(!S.finance.finAuth)S.finance.finAuth=false;
   if(!S.finance.assets)S.finance.assets=[];
   if(!Array.isArray(S.finance.links))S.finance.links=[];
+  if(!Array.isArray(S.finance.reviews))S.finance.reviews=[];
   if(!Array.isArray(S.finance.bank))S.finance.bank=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=3?n.getFullYear():n.getFullYear()-1;}
   if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
@@ -6742,6 +6751,103 @@ function _finFlowHtml(){
   const leg=seg.map(s=>`<span class="ff-k"><b style="background:${s[2]}"></b>${s[0]} <em>${money(s[1])}</em></span>`).join('');
   return`<div class="card fin-flow" id="fin-flow"><div class="card-hd"><span class="card-title">Where the money goes</span><span style="font-size:.7rem;color:var(--muted);">${getFYLabel(S.finance.finYear)} · of ${money(P.rev)} revenue</span></div><div class="card-bd"><div class="ff-bar">${bar}</div><div class="ff-leg">${leg}</div>${P.profit<0?`<div class="ff-warn">Costs including team pay are higher than revenue, so there is nothing for tax, savings or dividends.</div>`:''}</div></div>`;
 }
+/* ── Finance review: a scheduled meeting (like a co-working day) tied to each quarter end ──
+   S.finance.reviews = [{id,title,date,startTime,endTime,notes,objectives,members}]
+   Quarters follow the financial year (ends 31 March): quarter ends are 30 Jun, 30 Sep, 31 Dec, 31 Mar.
+   A review belongs to the latest quarter end before its date. Recommended date = the first Monday after quarter end;
+   due by = the Friday of that week. A review counts as held once its date has passed. */
+const FR_AGENDA='Bank balances · Budget vs actual · Events · Team pay · Savings · Next quarter forecast';
+function _frD(iso){return new Date(iso+'T12:00:00Z');}
+function _frIso(d){return d.toISOString().slice(0,10);}
+function _frAdd(iso,n){const d=_frD(iso);d.setUTCDate(d.getUTCDate()+n);return _frIso(d);}
+function _frToday(){return typeof toISO==='function'?toISO(new Date()):_frIso(new Date());}
+function finQuarterEnds(fromYear,toYear){   // financial year Y runs 1 Apr Y to 31 Mar Y+1
+  const o=[];for(let y=fromYear;y<=toYear;y++)o.push(y+'-06-30',y+'-09-30',y+'-12-31',(y+1)+'-03-31');return o;
+}
+function _frQuarterOf(qe){const m=+qe.slice(5,7),y=+qe.slice(0,4);const fy=m===3?y-1:y;const q=m===6?1:m===9?2:m===12?3:4;return{q,fy,label:'Q'+q+' '+getFYLabel(fy)};}
+function finReviewRecommended(qe){const dow=_frD(qe).getUTCDay();const add=((8-dow)%7)||7;return _frAdd(qe,add);}   // first Monday after qe
+function finReviewDueBy(qe){return _frAdd(finReviewRecommended(qe),4);}
+function _frQeFor(date){let best='';finQuarterEnds(+date.slice(0,4)-2,+date.slice(0,4)+1).forEach(q=>{if(q<date&&q>best)best=q;});return best;}
+function finReviews(){return (S.finance.reviews||[]).slice().sort((a,b)=>(a.date||'').localeCompare(b.date||'')||(a.startTime||'').localeCompare(b.startTime||''));}
+function finReviewHeld(r,today){return !!r.date&&r.date<(today||_frToday());}
+/* state: {kind:'overdue'|'due'|'next'|'scheduled', qe, qLabel, recommended, dueBy, review, days, last} */
+function finReviewState(today){
+  today=today||_frToday();
+  const revs=finReviews(),yr=+today.slice(0,4);
+  const qes=finQuarterEnds(yr-1,yr+2),cur=qes.filter(q=>q<=today).pop();
+  const last=revs.filter(r=>finReviewHeld(r,today)).pop()||null;
+  const upcoming=revs.find(r=>!finReviewHeld(r,today));
+  if(upcoming){const qe=_frQeFor(upcoming.date);
+    return{kind:'scheduled',qe,qLabel:_frQuarterOf(qe).label,recommended:finReviewRecommended(qe),dueBy:finReviewDueBy(qe),review:upcoming,days:Math.round((_frD(upcoming.date)-_frD(today))/864e5),last};}
+  // nothing booked: the latest finished quarter needs a review unless one has been held for it
+  const covered=revs.some(r=>_frQeFor(r.date)===cur);
+  const qe=covered?qes[qes.indexOf(cur)+1]:cur;
+  const rec=finReviewRecommended(qe),due=finReviewDueBy(qe);
+  const kind=due<today?'overdue':(qe<=today?'due':'next');
+  return{kind,qe,qLabel:_frQuarterOf(qe).label,recommended:rec,dueBy:due,review:null,days:Math.round((_frD(today)-_frD(due))/864e5),last};
+}
+function _frFmt(iso){return _frD(iso).toLocaleDateString('en-GB',{weekday:'short',day:'numeric',month:'short',timeZone:'UTC'});}
+function _frPill(S_){
+  const k=S_.kind;
+  if(k==='scheduled')return `<span class="pill ok">Scheduled</span>`;
+  if(k==='overdue')return `<span class="pill bad">Overdue by ${S_.days} day${S_.days===1?'':'s'}</span>`;
+  return `<span class="pill warn">Not scheduled</span>`;
+}
+function _finReviewCardHtml(){
+  const s=finReviewState(),r=s.review;
+  const head=r
+    ?`<div class="big">${escHtml(r.title||'Finance review')}</div><div class="mut">${_frFmt(r.date)}${r.startTime?' · '+r.startTime+(r.endTime?'–'+r.endTime:''):''}${r.notes?' · '+escHtml(r.notes):''} · ${s.days===0?'today':s.days===1?'tomorrow':'in '+s.days+' days'}</div>`
+    :`<div class="big">${s.kind==='overdue'?'Review was due by ':'Next review due by '}${_frFmt(s.dueBy)}</div><div class="mut">For ${s.qLabel} · recommended date ${_frFmt(s.recommended)}</div>`;
+  const btn=r?`<button class="btn btn-ghost btn-xs" onclick="openModal('financeReview','${r.id}')">Edit</button>`
+    :`<button class="btn btn-acc btn-xs" onclick="openModal('financeReview',null)">Schedule review</button>`;
+  return `<div class="card fin-review" id="fin-review"><div class="card-hd"><span class="card-title">Finance review</span>${_frPill(s)}<span style="margin-left:auto;font-size:.68rem;color:var(--muted);">Quarterly</span></div><div class="card-bd"><div class="fr-row"><div class="fr-main">${head}${s.last?`<div class="mut" style="margin-top:3px;">Last review: ${_frFmt(s.last.date)}</div>`:''}</div>${btn}</div></div></div>`;
+}
+function financeReviewModalHtml(id){
+  const d=id?(S.finance.reviews||[]).find(x=>x.id===id):null;
+  const s=finReviewState(),sel=d?.members||[];
+  const date=d?.date||s.recommended;
+  const qe=_frQeFor(date),ql=qe?_frQuarterOf(qe).label:'';
+  return`<div class="mo-box" style="max-width:460px;">
+<div class="mo-hd"><span class="mo-title">${d?'Edit finance review':'Schedule finance review'}</span><button class="mo-close" onclick="closeModal()">×</button></div>
+<div class="mo-body">
+  <div class="field"><label class="flbl">Title</label><input class="inp" id="fr-title" value="${escHtml(d?.title||('Finance review · '+ql))}"></div>
+  <div style="font-size:.7rem;color:var(--muted);margin:-4px 0 10px;">Recommended: <b style="color:var(--text2);">${_frFmt(s.recommended)}</b>, the first Monday after the quarter ends.</div>
+  <div class="inp-row">
+    <div class="field"><label class="flbl">Date *</label>${dpHtml('fr-date',date)}</div>
+    <div class="field"><label class="flbl">Start time</label><input class="inp" type="time" id="fr-start" value="${d?.startTime||'10:00'}"></div>
+    <div class="field"><label class="flbl">End time</label><input class="inp" type="time" id="fr-end" value="${d?.endTime||'12:00'}"></div>
+  </div>
+  <div class="field"><label class="flbl">Location</label><input class="inp" id="fr-notes" value="${escHtml(d?.notes||'')}" placeholder="Office address, Google Meet link…"></div>
+  <div class="field"><label class="flbl">Agenda</label><textarea class="txta" id="fr-objectives" style="min-height:72px;resize:vertical;">${escHtml(d?d.objectives||'':FR_AGENDA)}</textarea></div>
+  <div class="field"><label class="flbl">Invite members</label>
+    <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;">${(S.members||[]).map(m=>{const on=sel.includes(m.id);return`<div data-frm="${m.id}" onclick="toggleFrMember('${m.id}',this)" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:${on?'var(--teal-dim)':'var(--surface2)'};border:1.5px solid ${on?'var(--acc)':'var(--border)'};border-radius:8px;cursor:pointer;"><span style="font-size:.78rem;font-weight:500;">${escHtml(m.name)}</span><span style="font-size:.65rem;margin-left:auto;color:var(--acc);">${on?'✓':''}</span></div>`;}).join('')}</div>
+  </div>
+  <input type="hidden" id="fr-members" value="${sel.join(',')}">
+  <div id="fr-err" style="display:none;color:var(--red);font-size:.74rem;margin-top:6px;">Please choose a date.</div>
+</div>
+<div class="mo-ft">${d?`<button class="btn btn-danger btn-sm" onclick="deleteFinanceReview('${d.id}')">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="saveFinanceReview('${d?.id||''}')">${d?'Save':'Save & invite'}</button></div></div>`;
+}
+function toggleFrMember(id,elBtn){
+  const inp=document.getElementById('fr-members');if(!inp)return;
+  const cur=inp.value?inp.value.split(',').filter(Boolean):[],i=cur.indexOf(id);
+  if(i>=0)cur.splice(i,1);else cur.push(id);
+  const on=i<0;elBtn.style.background=on?'var(--teal-dim)':'var(--surface2)';elBtn.style.borderColor=on?'var(--acc)':'var(--border)';
+  const t=elBtn.querySelector('span:last-child');if(t)t.textContent=on?'✓':'';
+  inp.value=cur.join(',');
+}
+function saveFinanceReview(eid){
+  const date=dpVal('fr-date');
+  if(!date){const e=document.getElementById('fr-err');if(e)e.style.display='block';return;}
+  const g=i=>document.getElementById(i);
+  const rv={id:eid||uid(),title:g('fr-title').value.trim()||'Finance review',date,startTime:g('fr-start').value||'10:00',endTime:g('fr-end').value||'12:00',notes:g('fr-notes').value.trim(),objectives:g('fr-objectives').value.trim(),members:(g('fr-members').value||'').split(',').filter(Boolean)};
+  saveWithUndo(eid?'Edit finance review':'Schedule finance review');
+  if(!S.finance.reviews)S.finance.reviews=[];
+  const i=S.finance.reviews.findIndex(x=>x.id===eid);
+  if(i>=0)S.finance.reviews[i]=rv;else S.finance.reviews.push(rv);
+  save();closeModal();render();
+  if(rv.members.length&&!eid)setTimeout(()=>showCoworkInviteModal(rv,'Finance review'),200);
+}
+function deleteFinanceReview(id){saveWithUndo('Delete finance review');S.finance.reviews=(S.finance.reviews||[]).filter(x=>x.id!==id);saveNow();closeModal();render();}
 /* ════ EXPANDED TEAM SECTION ════
    A full-width view of the whole team on the dashboard: workload distribution and one card per person.
    Everything is read from data the app already holds (tasks, hours log, co-working days, member objectives, profile lists). */
@@ -10277,6 +10383,7 @@ function renderFinance(){
 </div>
 
 ${_finLinksHtml()}
+${_finReviewCardHtml()}
 <div class="st-tabs fin-pills">${_finPillsHtml(tab)}
   <select class="fsel" style="margin-left:auto;font-size:.72rem;" onchange="S.finance.finYear=parseInt(this.value);save();render();">
     ${getFinYears().map(y=>`<option value="${y}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}</option>`).join('')}
@@ -11655,6 +11762,7 @@ function openModal(type,data){
     case'prizeDelivery':html=prizeDeliveryModalHtml(data);break;
     case'prizeMessageChooser':html=prizeMessageChooserHtml(data);break;
     case'coworkDay':html=coworkDayModalHtml(data);break;
+    case'financeReview':html=financeReviewModalHtml(data);break;
   }
   mc.innerHTML=`<div class=\"mo\" onclick=\"if(event.target.classList.contains('mo'))closeModal()\">${html}</div>`;
   if(type==='taskTmpl')renderTtBuf();
@@ -12414,8 +12522,8 @@ function toggleCwMember(id,elBtn){
   if(info)info.style.display=cur.length>0?'block':'none';
 }
 
-function showCoworkInviteModal(day){
-  const title=encodeURIComponent(day.title||'Co-working Day');
+function showCoworkInviteModal(day,label){
+  const title=encodeURIComponent(day.title||label||'Co-working Day');
   const date=(day.date||'').replace(/-/g,'');
   const start=date+(day.startTime||'0900').replace(':','')+'00Z';
   const end=date+(day.endTime||'1700').replace(':','')+'00Z';
@@ -12429,7 +12537,7 @@ function showCoworkInviteModal(day){
   mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:380px;">
 <div class="mo-hd"><span class="mo-title">Add to Calendar</span><button class="mo-close" onclick="closeModal()">×</button></div>
 <div class="mo-body" style="display:flex;flex-direction:column;gap:10px;">
-  <p style="font-size:.82rem;color:var(--text2);margin:0;">Co-working day saved! Add it to a calendar:</p>
+  <p style="font-size:.82rem;color:var(--text2);margin:0;">${escHtml(label||'Co-working day')} saved! Add it to a calendar:</p>
   <a href="${gcUrl}" target="_blank" class="btn btn-acc" style="text-align:center;text-decoration:none;" onclick="closeModal()">Open in Google Calendar</a>
   <a href="${icsUrl}" download="${escHtml(decodeURIComponent(title))}.ics" class="btn btn-ghost" style="text-align:center;text-decoration:none;" onclick="setTimeout(()=>URL.revokeObjectURL('${icsUrl}'),5000);closeModal()">Download .ics file</a>
 </div>
