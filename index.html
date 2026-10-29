@@ -2187,6 +2187,31 @@ function create(env){
     o.n=o.untick.length+o.reopen.length+o.del.length;
     return o;
   }
+  /* Does this remote write come from a copy that never saw our newest state? (An older tab/device/build writing over newer work.)
+     A genuine later write always carries our newest write id in its lineage and a higher sequence number. */
+  function isRegression(R){
+    const h=H[0];
+    if(!h||!h.wid)return false;
+    const m=R.meta;
+    if(!m.wid)return true;                                            // old build: no writer id at all
+    if(m.wid===h.wid||(m.lineage||[]).indexOf(h.wid)>=0)return false;   // descends from what we know: a real later change
+    return (m.seq||0)<=(h.seq||0);
+  }
+  /* Put back what a stale write would have reversed (ticks, reopened events, deleted items); everything else in the merge stands. */
+  function protect(Lp,M,rv){
+    const fix=(k,isRev)=>{
+      const arr=Array.isArray(M[k])?M[k]:(M[k]=[]);
+      const idx=new Map();arr.forEach((x,i)=>{if(hasId(x))idx.set(x.id,i);});
+      for(const x of (Lp[k]||[])){
+        if(!hasId(x))continue;
+        const i=idx.get(x.id);
+        if(i===undefined){arr.push(clone(x));if(M._tomb)delete M._tomb[k+':'+x.id];}
+        else if(isRev(x,arr[i]))arr[i]=clone(x);
+      }
+    };
+    fix('tasks',(t,m)=>t.done&&!m.done);
+    fix('projects',(p,m)=>p.status==='completed'&&m.status==='active');
+  }
   function mergeStep(R){
     if(env.prepare)env.prepare();          // normalise live state (defaults) so it compares like-for-like with remote
     noteDeletes();
@@ -2202,7 +2227,7 @@ function create(env){
       if(fx.n){R.proj=fx.proj;R.str=null;restored=fx.n;}
     }
     const rs=R.str||(R.str=stable(R.proj));
-    let M=null,changed=false,needWrite=false,changes=null;
+    let M=null,changed=false,needWrite=false,changes=null,prot=null;
     if(b===null){                         // no shared history at all: remote is the truth
       M=applyTombs(clone(R.proj));
     }else{
@@ -2218,7 +2243,13 @@ function create(env){
       if(M&&R.keep){M=clone(Lp);M._tomb=mergeTomb(Lp._tomb,R.proj._tomb);applyTombs(M);}   // user chose to keep this device's data over the incoming change
       else if(M&&env.onHold&&!R.approved&&stable(M)!==ls){
         const rv=reversals(Lp,M);
-        if(rv.n>=BRAKE_N)return{held:true,rev:rv,changed:false,needWrite:false,changes:null};
+        if(rv.n>=BRAKE_N){
+          if(isRegression(R)){
+            protect(Lp,M,rv);
+            prot={n:rv.n,untick:rv.untick.length,reopen:rv.reopen.length,del:rv.del.length,by:R.meta.by,byName:R.meta.byName,client:R.meta.client,seq:R.meta.seq,known:H[0]&&H[0].seq};
+            if(!R.protStashed){R.protStashed=true;try{env.stash&&env.stash(JSON.stringify(R.proj),'Older server copy (replaced)');}catch(_){}}
+          }else return{held:true,rev:rv,changed:false,needWrite:false,changes:null};
+        }
       }
     }
     LOG('merge',{rWid:R.meta.wid,rSeq:R.meta.seq,anc:b===null?'none':(H.findIndex(c=>c.proj===b)),H:H.map(c=>c.wid&&c.wid.slice(0,4)+'@'+c.seq),local:(Lp.tasks||[]).map(t=>t.id).join(','),remote:(R.proj.tasks||[]).map(t=>t.id).join(',')});
@@ -2232,7 +2263,7 @@ function create(env){
     seqNow=Math.max(seqNow,R.meta.seq||0);
     pushH({wid:R.meta.wid,seq:R.meta.seq||0,proj:R.proj});
     if(restored){needWrite=true;try{env.onLegacy&&env.onLegacy({restored});}catch(e){}}
-    return{changed,needWrite,changes};
+    return{changed,needWrite,changes,prot};
   }
 
   /* One sync cycle: fetch → merge → (write if needed). */
@@ -2252,6 +2283,7 @@ function create(env){
       }
       const r=mergeStep(R);
       if(r.held){holdIt(R,r.rev);return;}
+      if(r.prot){try{env.onProtect&&env.onProtect(r.prot);}catch(e){console.error(e);}}
       if(r.changed){try{env.onApplied({by:R.meta.by,byName:R.meta.byName,client:R.meta.client,seq:R.meta.seq,changes:r.changes||[]});}catch(e){console.error(e);}}
       if(!r.needWrite){persistNow();env.status('synced');return;}
     }
@@ -2428,7 +2460,10 @@ function create(env){
           H=hist;seqNow=Math.max(seqNow,stored.sq||0);
           const r=mergeStep(R);
           if(r.held)holdIt(R,r.rev);
-          else if(r.needWrite)schedule(0);
+          else{
+            if(r.prot){try{env.onProtect&&env.onProtect(r.prot);}catch(e){console.error(e);}}
+            if(r.needWrite)schedule(0);
+          }
           try{if(env.onLoadReport&&(stored.sq||0)>(R.meta.seq||0))env.onLoadReport({stashed:false,rollback:true});}catch(_){}
         }else{
           // no trustworthy history → server is the truth; keep any local copy as an orphan backup
@@ -2595,10 +2630,10 @@ function _pfWriteStored(rec){
   try{_pfNoteStore(false);}catch(_){}
   return false;
 }
-function _pfStash(str){            // a local copy that lost to the server on first contact — keep it restorable
+function _pfStash(str,label){            // a copy that lost out (or was replaced) — keep it restorable
   try{
     let b=JSON.parse(localStorage.getItem(PF_BACKUP_KEY)||'[]');
-    b.push({ts:new Date().toISOString(),data:str,label:'Unsynced local copy'});
+    b.push({ts:new Date().toISOString(),data:str,label:label||'Unsynced local copy'});
     localStorage.setItem(PF_BACKUP_KEY,JSON.stringify(b.slice(-PF_MAX_BACKUPS)));
   }catch(_){}
 }
@@ -2657,10 +2692,11 @@ const PF=PFSync.create({
     _lastSavedAt=new Date().toISOString();_saveCount++;
     _lastSavePayloadCounts={tasks:(S.tasks||[]).length,projects:(S.projects||[]).length,members:(S.members||[]).length,labels:(S.labels||[]).length};
     _pfConn('synced');
-    if(_saveCount%5===0)_saveHistorySnapshot('Auto #'+_saveCount);
+    if(_saveCount%15===0&&Date.now()-(+localStorage.getItem('pf_last_auto_snap')||0)>10*60*1000){try{localStorage.setItem('pf_last_auto_snap',String(Date.now()));}catch(_){}_saveHistorySnapshot('Auto #'+_saveCount);}
     _dailySnapshotIfDue();
   },
   onLoadReport:info=>_pfLoadReport(info),
+  onProtect:info=>_pfOnProtect(info),
   onHold:info=>_pfOnHold(info),
   clientId:_myClientId,
   debounceMs:500,
@@ -2971,7 +3007,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=93;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=94;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -3261,9 +3297,9 @@ async function renderPBHistoryList(keep){
   const snaps=_histRows;
   const total=_histState.listErr?null:await _histCount();
   const warn=_histState.listErr?'<div class="pf-warn">Could not read server snapshots: '+escHtml(_histState.listErr)+'. <a href="#" onclick="renderPBHistoryList();return false;">Retry</a><br>If this says timed out or HTTP 502, the server is struggling to read the snapshot table (each snapshot is a full copy of your data). Try <b>Clean up old snapshots</b>, or delete old records in the PocketBase admin (workspace_history).</div>':'';
-  const clean=(total!==null&&total>70)?'<div class="pf-warn">The server holds <b>'+total+'</b> snapshots. <button class="btn btn-acc btn-xs" onclick="_histCleanup()">Clean up old snapshots</button></div>':'';
+  const clean=(total!==null&&total>45)?'<div class="pf-warn">The server holds <b>'+total+'</b> snapshots. <button class="btn btn-acc btn-xs" onclick="_histCleanup()">Clean up old snapshots</button></div>':'';
   if(snaps.length===0){
-    el3.innerHTML=warn+warn2+clean+(warn?'':'<div style="color:var(--muted);font-size:.78rem;">No snapshots yet. One is saved at the start of each session, once a day, and every 5 changes.</div>');
+    el3.innerHTML=warn+warn2+clean+(warn?'':'<div style="color:var(--muted);font-size:.78rem;">No snapshots yet. One is saved at the start of each session, once a day, and every 15 saves (at most one per 10 minutes).</div>');
     return;
   }
   const badge=t=>t==='daily'?'Daily':t==='session'?'Session start':'Auto';
@@ -3278,6 +3314,7 @@ async function renderPBHistoryList(keep){
       </div>
       <button class="btn btn-acc btn-xs" onclick="rcFromServer('${s.id}')" title="See what differs and restore only what you pick">Compare</button>
       <button class="btn btn-ghost btn-xs" onclick="restoreHistorySnapshot('${s.id}')" title="Replace everything with this snapshot">Restore all</button>
+      <button class="btn btn-ghost btn-xs" onclick="_histDeleteOne('${s.id}',this)" title="Delete this snapshot">Delete</button>
     </div>`;
   }).join('')+(_histMoreAvail?'<div style="padding:8px 0;"><button class="btn btn-ghost btn-xs" onclick="_histMore()">Show older</button></div>':'');
 }
@@ -3304,12 +3341,13 @@ async function _saveHistorySnapshot(label='Auto',manual){
   try{
     const itemCount=(S.projects||[]).length+(S.tasks||[]).length+(S.members||[]).length+(S.sponsors||[]).length;
     const rec={workspace:PB_WORKSPACE,saved_at:new Date().toISOString(),label,data:JSON.stringify({...S,finance:{...S.finance,finAuth:false}}),item_count:itemCount};
-    const post=o=>fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records',{method:'POST',headers:{Authorization:_pbToken,'Content-Type':'application/json'},body:JSON.stringify(o)},45000);
+    const post=o=>fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?fields=id',{method:'POST',headers:{Authorization:_pbToken,'Content-Type':'application/json'},body:JSON.stringify(o)},45000);
     let r=await post(rec);
     if(!r.ok&&r.status===400){                       // collection may lack the optional "workspace" column: retry without it
       const first=await _histErr(r);const o2={...rec};delete o2.workspace;r=await post(o2);
       if(!r.ok){_histState.lastErr=first+' | retry: '+await _histErr(r);return false;}
     }else if(!r.ok){_histState.lastErr=await _histErr(r);return false;}
+    try{const j=await r.json();if(j&&j.id){const a=_snapIds();a.push({id:j.id,t:_histTier(label),ts:Date.now()});_snapSave(a);}}catch(_){}
     _histState.lastOk=new Date().toISOString();_histState.lastErr=null;
     _pruneHistory();
     return true;
@@ -3355,9 +3393,35 @@ async function _histOldestId(filter){                // the oldest single record
   }
   return null;
 }
-async function _histDelete(id){try{const d=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+id,{method:'DELETE',headers:{Authorization:_pbToken}},15000);return d.ok||d.status===404;}catch(_){return false;}}
+/* Delete one snapshot. The server can be slow to delete a large row, and a timed-out DELETE often still lands, so: long timeout,
+   up to 3 tries with a pause, and "404 = already gone" counts as success. */
+async function _histDelete(id,tries){
+  for(let i=0;i<(tries||3);i++){
+    try{const d=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+id,{method:'DELETE',headers:{Authorization:_pbToken}},60000);if(d.ok||d.status===404)return true;if(d.status===401||d.status===403||d.status===400)return false;}catch(_){}
+    await new Promise(r=>setTimeout(r,1500*(i+1)));
+  }
+  return false;
+}
+/* Snapshot ids this device created: lets pruning delete by id with no queries at all (queries read ~270 KB per row). */
+const _SNAP_KEY='pf_snap_ids';
+const _snapIds=()=>{try{const a=JSON.parse(localStorage.getItem(_SNAP_KEY)||'[]');return Array.isArray(a)?a:[];}catch(_){return[];}};
+const _snapSave=a=>{try{localStorage.setItem(_SNAP_KEY,JSON.stringify(a.slice(-150)));}catch(_){}};
+async function _pruneKnown(){
+  const cap={rolling:PB_MAX_HISTORY,daily:PB_MAX_DAILY,session:PB_MAX_SESSION};
+  let all=_snapIds(),out=0;
+  for(const t of Object.keys(cap)){
+    const mine=all.filter(x=>x.t===t);
+    for(let i=0;i<mine.length-cap[t];i++){
+      if(!await _histDelete(mine[i].id,2))return out;
+      all=all.filter(x=>x.id!==mine[i].id);_snapSave(all);out++;
+    }
+  }
+  return out;
+}
+let _pruneN=0;
 async function _pruneHistory(){
   try{
+    await _pruneKnown();
     if(_histDown())return;
     const cap={rolling:PB_MAX_HISTORY,daily:PB_MAX_DAILY,session:PB_MAX_SESSION};
     for(const t of Object.keys(cap)){
@@ -3368,29 +3432,39 @@ async function _pruneHistory(){
   }catch(e){}
 }
 /* Clean up: the server may hold hundreds of old snapshots (pruning used to fail silently). Delete the oldest ones, a few at a time, keeping the newest 60. */
+async function _histDeleteOne(id,btn){
+  if(btn){btn.disabled=true;btn.textContent='Deleting…';}
+  const ok=await _histDelete(id,3);
+  if(ok){_snapSave(_snapIds().filter(x=>x.id!==id));_histRows=_histRows.filter(x=>x.id!==id);renderPBHistoryList(true);}
+  else{if(btn){btn.disabled=false;btn.textContent='Delete';}showToast('The server did not confirm the delete. Try again in a moment.',5000);}
+}
 async function _histCleanup(btn){
   const KEEP=60;
   const total=await _histCount();
   if(total===null){alert('Could not count the snapshots on the server right now.');return;}
   if(total<=KEEP){alert('Only '+total+' snapshots are stored — nothing to clean up.');return;}
   if(!confirm('The server holds '+total+' snapshots. Delete the oldest '+(total-KEEP)+' and keep the newest '+KEEP+'? Your live data is not touched.'))return;
-  let deleted=0,stop=false;
+  let deleted=0,fails=0;
   const info=document.getElementById('pb-history-list');
-  while(!stop&&total-deleted>KEEP){
+  const skip=new Set();
+  while(total-deleted>KEEP&&fails<4){
     let ids=[];
-    try{
-      const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=@rowid&perPage=5&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},20000);
-      const r2=r.ok?r:await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=saved_at&perPage=5&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},20000);
-      if(!r2.ok)break;ids=((await r2.json()).items||[]).map(x=>x.id);
-    }catch(_){break;}
-    if(!ids.length)break;
+    for(let t=0;t<2&&!ids.length;t++){
+      try{
+        const r=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=@rowid&perPage=4&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},45000);
+        const r2=r.ok?r:await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records?sort=saved_at&perPage=4&skipTotal=1&fields=id',{headers:{Authorization:_pbToken},cache:'no-store'},45000);
+        if(r2.ok)ids=((await r2.json()).items||[]).map(x=>x.id).filter(x=>!skip.has(x));
+      }catch(_){}
+      if(!ids.length)await new Promise(r=>setTimeout(r,2000));
+    }
+    if(!ids.length){fails++;continue;}
     for(const id of ids){
-      if(total-deleted<=KEEP){stop=true;break;}
-      try{const d=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+id,{method:'DELETE',headers:{Authorization:_pbToken}},20000);if(d.ok||d.status===404)deleted++;else{stop=true;break;}}catch(_){stop=true;break;}
-      if(deleted%5===0&&info)info.innerHTML='<div style="color:var(--muted);font-size:.78rem;">Cleaning up… deleted '+deleted+' of '+(total-KEEP)+'</div>';
+      if(total-deleted<=KEEP)break;
+      if(await _histDelete(id,3)){deleted++;fails=0;_snapSave(_snapIds().filter(x=>x.id!==id));}else{fails++;skip.add(id);if(fails>=4)break;}
+      if(info)info.innerHTML='<div style="color:var(--muted);font-size:.78rem;">Cleaning up… deleted '+deleted+' of '+(total-KEEP)+'</div>';
     }
   }
-  showToast('Deleted '+deleted+' old snapshot'+(deleted!==1?'s':'')+(deleted<total-KEEP?' (stopped early: the server was slow, run it again later)':'')+'. Click Load server snapshots to refresh.',8000);
+  showToast('Deleted '+deleted+' old snapshot'+(deleted!==1?'s':'')+(deleted<total-KEEP?' (stopped early: the server did not answer, press Clean up again in a minute)':'')+'. Click Load server snapshots to refresh.',8000);
   _histLoaded=false;renderPBHistoryList();      // no automatic re-list right after deleting: the server is busy; reload it by hand
 }
 /* daily + session snapshots (best effort, never block the app) */
@@ -6381,6 +6455,11 @@ function _pfLoadReport(info){
   }
 }
 
+/* an older copy overwrote newer work on the server: it was caught and healed automatically */
+function _pfOnProtect(info){
+  try{_pfNoteErr('Older copy detected on the server (seq '+info.seq+' vs '+info.known+(info.byName?', from '+info.byName:'')+(info.client?', client '+String(info.client).slice(0,6):'')+'): '+info.n+' reversal(s) blocked');}catch(_){}
+  showToast('An older copy of the workspace had overwritten the server. Your newer data was kept and written back'+(info.byName?' (older copy came from '+info.byName+')':'')+'. The older copy is saved under Backups.',10000);
+}
 /* ── brake: an incoming sync that would un-tick / reopen / delete several things at once waits for a decision ── */
 function _pfOnHold(info){
   let b=document.getElementById('pf-hold');if(b)b.remove();
