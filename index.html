@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self' 'unsafe-inline'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-iKnnY1tjoL7uNuViP5n/Tc7YcOg/LqwfEt9i1VN+1K8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1886,9 +1886,13 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 /* bulk-select checkbox: shown while hovered, focused or ticked (was done with mouseenter/mouseleave handlers) */
 .ti-bulk-cb{opacity:0}
 .ti-bulk-cb:hover,.ti-bulk-cb:focus-visible,.ti-bulk-cb:checked{opacity:1}
+
+@keyframes pf-boot-note{to{opacity:1}}
 </style>
 </head>
 <body>
+<!-- safety net: if the browser refuses to start the app script (for example a proxy altered the page, so its hash no longer matches the security policy) the script never removes this note and it fades in after 4 seconds -->
+<div id="boot-note" role="alert" style="position:fixed;left:16px;right:16px;bottom:16px;z-index:99999;max-width:460px;margin:0 auto;padding:12px 14px;border-radius:10px;background:#1c1c1c;color:#f2f2f2;font:13px/1.45 system-ui,sans-serif;border:1px solid #62D0AA;opacity:0;pointer-events:none;animation:pf-boot-note 0s linear 4s forwards"><b>ProjectFlow has not started.</b> The browser refused to run it because the page does not match its security policy (something between the server and this device may have changed it). Try a hard refresh; if this stays, tell your admin.</div>
 
 <!-- PASSWORD -->
 <div id="pw-screen">
@@ -2278,6 +2282,7 @@ inlineSubKey:()=>inlineSubKey,
 inlineSubOpen:()=>inlineSubOpen,
 isub_toggleMember:()=>isub_toggleMember,
 isub_togglePhase:()=>isub_togglePhase,
+jsq:()=>jsq,
 keyBlur:()=>keyBlur,
 keyClick:()=>keyClick,
 laneOver:()=>laneOver,
@@ -2435,6 +2440,7 @@ setStreamTarget:()=>setStreamTarget,
 setTaskSortThen:()=>setTaskSortThen,
 setTmplTab:()=>setTmplTab,
 showActivity:()=>showActivity,
+showBlockedAlert:()=>showBlockedAlert,
 showCoworkTip:()=>showCoworkTip,
 showForgotPanel:()=>showForgotPanel,
 showPhaseTip:()=>showPhaseTip,
@@ -2506,9 +2512,11 @@ toggleNavVis:()=>toggleNavVis,
 togglePanel:()=>togglePanel,
 togglePhaseSection:()=>togglePhaseSection,
 togglePressed:()=>togglePressed,
+toggleProdDelivered:()=>toggleProdDelivered,
 toggleProjOkr:()=>toggleProjOkr,
 toggleSpPrio:()=>toggleSpPrio,
 toggleSpProducts:()=>toggleSpProducts,
+toggleSponsorFlag:()=>toggleSponsorFlag,
 toggleSponsorsExpanded:()=>toggleSponsorsExpanded,
 toggleTeamYearly:()=>toggleTeamYearly,
 toggleUpdAll:()=>toggleUpdAll,
@@ -2668,7 +2676,14 @@ const PF_H=(()=>{
       else if(el.hasAttribute('data-on'+e)&&!(done&&done.has(e)))text=el.getAttribute('data-on'+e);
       if(text===null)continue;
       const f=getCompiled(text);
-      if(!f){if(inline){const k=e+': '+text.slice(0,120);left.set(k,(left.get(k)||0)+1);}continue;}
+      if(!f){
+        if(inline){
+          const k=e+': '+text.slice(0,120);
+          if(!left.has(k)){try{_pfNoteErr('Button not wired: '+k,'handlers');}catch(_){}}   // under the strict policy this button would do nothing: leave a trace in the error log
+          left.set(k,(left.get(k)||0)+1);
+        }
+        continue;
+      }
       el.addEventListener(e,ev=>{
         try{f(el,ev);}
         catch(err){try{_pfWarn('handler on'+e,err);}catch(_){}console.error(err);}
@@ -3006,10 +3021,28 @@ const isObj=v=>v!==null&&typeof v==='object'&&!Array.isArray(v);
 /* Keys that would reach Object.prototype if used as a property name while merging data from the server. They are never
    legitimate workspace fields, so they are dropped on the way in and skipped everywhere keys are copied. */
 const BADK=k=>k==='__proto__'||k==='constructor'||k==='prototype';
+/* Fields the app prints into styles, class names, input values and handler arguments instead of as plain text. Whatever comes in from the
+   server, an import or a restored snapshot is cleaned once, here: a colour must be a #hex colour, and the fixed-choice / number / date fields lose the
+   characters that can break out of an attribute or a style (< > " ' ` \ ; { }). Real values never contain them, so nothing legitimate changes. */
+const COLOR_K=/^(?:color|colour|clr|[a-z]+Colou?r)$/;
+const CHOICE_K=/^(?:status|stage|type|lane|kStatus|priority|phase|freq|cat|category|initials|icon|d|on|date|dueDate|startDate|endDate|startTime|endTime|version|state|kind|tier|mode|repeat|unit|currency|weekday|amount|price|cost|qty|quantity|hours|rate|count|pct|order|pos|every|budget|spent|fee)$/;
+const ID_K=/^(?:id|[a-zA-Z]+Id)$/,ID_ARR_K=/^(?:[a-zA-Z]+Ids|assignees|labels|blockedBy|bookmarks|children|deps)$/;   // ids are printed inside handler arguments and ids: they also lose & (an entity can turn back into a quote)
+const HEXCOL=/^#[0-9a-f]{3,8}$/i,BADCH=/[<>"'`\\;{}]/,BADID=/[<>"'`\\;{}&]/;
 function scrub(v,d){
   d=d||0;if(!v||typeof v!=='object'||d>60)return v;
   if(Array.isArray(v)){for(const x of v)scrub(x,d+1);return v;}
-  for(const k of Object.keys(v)){if(BADK(k)){delete v[k];continue;}scrub(v[k],d+1);}
+  for(const k of Object.keys(v)){
+    if(BADK(k)){delete v[k];continue;}
+    const x=v[k];
+    if(typeof x==='string'){
+      if(COLOR_K.test(k)){if(x!==''&&!HEXCOL.test(x.trim()))v[k]='#62D0AA';}
+      else if(ID_K.test(k)){if(BADID.test(x))v[k]=x.replace(/[<>"'`\\;{}&]/g,'');}
+      else if(CHOICE_K.test(k)&&BADCH.test(x))v[k]=x.replace(/[<>"'`\\;{}]/g,'');
+    }else{
+      if(Array.isArray(x)&&ID_ARR_K.test(k)){for(let i=0;i<x.length;i++)if(typeof x[i]==='string'&&BADID.test(x[i]))x[i]=x[i].replace(/[<>"'`\\;{}&]/g,'');}
+      scrub(x,d+1);
+    }
+  }
   return v;
 }
 const hasId=x=>isObj(x)&&(typeof x.id==='string'||typeof x.id==='number');
@@ -4211,7 +4244,8 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=141;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
+const PF_BUILD=143;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4732,7 +4766,7 @@ async function restoreHistorySnapshot(id){
   if(!_pbToken||!id)return;
   if(!confirm('Restore this snapshot? Your current data will be overwritten. This cannot be undone.'))return;
   try{
-    const r=await fetch(PB_URL+'/api/collections/workspace_history/records/'+id,
+    const r=await fetch(PB_URL+'/api/collections/workspace_history/records/'+encodeURIComponent(id),
       {headers:{Authorization:_pbToken}});
     if(!r.ok)throw new Error('Failed to fetch snapshot');
     const snap=await r.json();
@@ -6937,7 +6971,7 @@ async function postDigest(auto){
 }
 async function _postDigest(auto){
   const url=S.slackWebhook;const st=el('digest-st');
-  if(!url){if(st){st.textContent='Add a Slack webhook first.';st.style.color='var(--red)';}return false;}
+  if(!url||!_slackUrlOk(url)){if(st){st.textContent='Add a Slack webhook first.';st.style.color='var(--red)';}return false;}
   if(st){st.textContent='Sending…';st.style.color='var(--muted)';}
   try{
     // Same shape as the Test button: no custom headers, so the browser sends a simple request (Slack webhooks do not answer CORS pre-checks)
@@ -6951,7 +6985,7 @@ function digestAutoToggle(on){if(!S.settings)S.settings={};S.settings.digestAuto
 /* Mondays: the first person to open ProjectFlow posts it; digestLast is synced so nobody posts twice. */
 function maybeAutoDigest(){
   try{
-    if(!S.slackWebhook||!S.settings||!S.settings.digestAuto)return;
+    if(!S.slackWebhook||!_slackUrlOk(S.slackWebhook)||!S.settings||!S.settings.digestAuto)return;
     const now=new Date();if(now.getDay()!==1||now.getHours()<8)return;
     const iso=toISO(now);if(S.settings.digestLast===iso)return;
     postDigest(true).then(ok=>{if(ok){S.settings.digestLast=iso;save();}});   // only mark as sent once it really went out
@@ -8193,6 +8227,7 @@ function rcApply(sel){
 /* ── the panel ── */
 function rcOpen(snap,label){
   if(!snap||typeof snap!=='object'||!Array.isArray(snap.tasks)&&!Array.isArray(snap.projects)){alert('That does not look like a ProjectFlow backup.');return;}
+  PFSync.scrub(snap);   // a backup is outside data too: clean it before any of its values can be copied into the workspace
   window._rc={snap,label,rows:rcDiff(snap)};
   rcRender();
 }
@@ -8228,7 +8263,7 @@ function rcRestoreSelected(){
 /* entry points */
 function rcFromLocal(ts){const b=listLocalBackups().find(x=>x.ts===ts);if(!b)return;let s;try{s=JSON.parse(b.data);}catch(_){alert('That backup could not be read.');return;}rcOpen(s,(b.label?b.label+' · ':'')+new Date(b.ts).toLocaleString('en-GB'));}
 async function rcFromServer(id){
-  try{const r=await fetch(PB_URL+'/api/collections/workspace_history/records/'+id,{headers:{Authorization:_pbToken}});if(!r.ok)throw new Error('fetch failed');
+  try{const r=await fetch(PB_URL+'/api/collections/workspace_history/records/'+encodeURIComponent(id),{headers:{Authorization:_pbToken}});if(!r.ok)throw new Error('fetch failed');
     const rec=await r.json();const s=typeof rec.data==='string'?JSON.parse(rec.data):rec.data;rcOpen(s,'server snapshot · '+new Date(rec.saved_at).toLocaleString('en-GB'));}
   catch(e){alert('Could not load that snapshot: '+e.message);}
 }
@@ -8400,6 +8435,7 @@ function spPayInfo(sp){
 }
 /* confirmed sponsor fees on an event that have not been marked paid yet */
 function spAwaiting(p){const m=evMoney(p);return Math.max(0,m.fees.confirmed-m.fees.paid);}
+//@act toggleSponsorFlag toggleProdDelivered   (these names reach _spTick as text, so the build cannot see them in an onclick= attribute)
 function _spTick(on,label,onclick,green){
   return '<button type="button" class="ev-tk'+(green?' g':'')+(on?' on':'')+'" aria-pressed="'+(!!on)+'" onclick="event.stopPropagation();'+onclick+'">'+label+'</button>';
 }
@@ -9682,7 +9718,7 @@ function renderTaskRow(t,depth=0,showProj=false){
   <!-- Right metadata zone — fixed-width cells, each fully visible or fully hidden -->
   <div class="ti-meta-zone">
   <div class="ti-col ti-col-labels">
-    ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phaseBg(t.phase)};color:${phaseColor(t.phase)};white-space:nowrap;">${t.phase}</span>`:''}
+    ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phaseBg(t.phase)};color:${phaseColor(t.phase)};white-space:nowrap;">${escHtml(t.phase)}</span>`:''}
     ${effectiveLabels(t).map(id=>lcHtml(id)).join('')}
   </div>
   <div class="ti-col ti-col-proj">
@@ -10420,7 +10456,7 @@ function renderDetail(id){
       <div style="display:flex;flex-wrap:wrap;align-items:center;gap:9px;min-width:0;">
         <div style="width:11px;height:11px;border-radius:50%;background:${p.color};flex-shrink:0;"></div>
         <h1 class="detail-title" style="margin:0;">${escHtml(p.name)}</h1>
-        <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${p.priority||'Medium'}</span>
+        <span class="badge bd-${(p.priority||'Medium').toLowerCase()}">${escHtml(p.priority||'Medium')}</span>
         ${isEvt(p)?'':`<span style="font-size:.62rem;font-weight:700;color:var(--text2);padding:2px 8px;background:var(--surface3);border-radius:4px;">${PROJ_TYPES[projType(p)].label/*sec-ok: fixed text*/}</span>`}
         <span style="font-family:'DM Mono',monospace;font-size:.68rem;color:${p.color};border:1px solid ${p.color}55;border-radius:20px;padding:2px 9px;white-space:nowrap;">${comp}%${_adm?' · '+top.length+' tasks':' complete'}</span>
         ${p.status==='completed'?`<span style="display:inline-flex;align-items:center;gap:5px;padding:2px 10px;background:rgba(31,186,122,.12);border:1.5px solid var(--green);border-radius:20px;font-size:.68rem;font-weight:700;color:var(--green);"><svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><polyline points="20 6 9 17 4 12"/></svg>Completed</span>`:''}
@@ -10537,6 +10573,7 @@ ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?renderEvent
 </div>`;
 }
 
+//@act showBlockedAlert toggleDone   (chosen inside ${...} when the card is built, so the build cannot see them in an onclick= attribute)
 /* ════ PHASE SECTIONS (project detail) ════ */
 /* ════ NOW / NEXT / LATER board (Ongoing projects) ════ */
 function lnCard(t){
@@ -11205,7 +11242,7 @@ function renderCampaign(){
         <div style="flex:1;min-width:0;">
           <div style="font-size:.8rem;font-weight:600;color:${t.done?'var(--muted)':'var(--text)'};text-decoration:${t.done?'line-through':'none'};line-height:1.35;margin-bottom:4px;">${escHtml(t.name)}</div>
           <div style="display:flex;flex-wrap:wrap;gap:4px;align-items:center;">
-            ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phBg};color:${phC};">${t.phase}</span>`:''}
+            ${t.phase?`<span style="font-size:.6rem;padding:1px 6px;border-radius:3px;font-weight:700;background:${phBg};color:${phC};">${escHtml(t.phase)}</span>`:''}
             ${proj?`<span style="font-size:.6rem;padding:1px 5px;border-radius:3px;background:${proj.color}22;color:${proj.color};font-weight:600;">${escHtml(proj.name)}</span>`:''}
             ${t.endDate?`<span style="font-size:.6rem;color:${od?'var(--red)':'var(--muted)'};">${od?'⚠ ':''}${fmtD(t.endDate)}</span>`:''}
             ${ch.length>0?`<span style="font-size:.6rem;color:var(--muted);">${comp}% (${ch.filter(c=>c.done).length}/${ch.length})</span>`:''}
@@ -11258,7 +11295,7 @@ function renderCampaign(){
     <span style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;">Project</span>
     <div style="display:flex;gap:5px;flex-wrap:wrap;">
       <span class="pill-opt${!cf.project?' active':''}" style="${!cf.project?'background:var(--teal-dim);border-color:var(--acc);color:var(--acc);':''}" onclick="setCampaignFilter('project','')">All</span>
-      ${allProjs.map(p=>{const act=cf.project===p.id;return`<span class="pill-opt${act?' active':''}" style="${act?'background:'+safeColor(p.color)+'22;border-color:'+safeColor(p.color)+';color:'+safeColor(p.color)+';':'border-color:'+safeColor(p.color)+'33;'}" onclick="toggleCampaignFilter('project','${p.id}')"""+k+r"""','${p.id}')"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${p.color};margin-right:4px;vertical-align:middle;flex-shrink:0;"></span>${escHtml(p.name)}</span>`;}).join('')}
+      ${allProjs.map(p=>{const act=cf.project===p.id;return`<span class="pill-opt${act?' active':''}" style="${act?'background:'+safeColor(p.color)+'22;border-color:'+safeColor(p.color)+';color:'+safeColor(p.color)+';':'border-color:'+safeColor(p.color)+'33;'}" onclick="toggleCampaignFilter('project','${p.id}')"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${p.color};margin-right:4px;vertical-align:middle;flex-shrink:0;"></span>${escHtml(p.name)}</span>`;}).join('')}
     </div>
   </div>`:''}
 
@@ -11266,14 +11303,14 @@ function renderCampaign(){
     <span style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;">Phase</span>
     <div style="display:flex;gap:5px;flex-wrap:wrap;">
       <span class="pill-opt${!cf.phase?' active':''}" style="${!cf.phase?'background:var(--teal-dim);border-color:var(--acc);color:var(--acc);':''}" onclick="setCampaignFilter('phase','')">All</span>
-      ${PHASES.map(ph=>{const act=cf.phase===ph;const n=phaseCounts[ph]||0;return`<span class="pill-opt${act?' active':''}" style="border:2px solid ${phaseColor(ph)};background:${act?phaseColor(ph):'transparent'};color:${act?'#111':phaseColor(ph)};font-weight:${act?'700':'500'};transition:all .15s;" onclick="toggleCampaignFilter('phase','${ph}')"""+k+r"""','${ph}')">${act?'✓ ':''}${ph}${n?` <span style="font-family:'DM Mono',monospace;font-size:.58rem;opacity:${act?'1':'.7'};">${n}</span>`:''}</span>`;}).join('')}
+      ${PHASES.map(ph=>{const act=cf.phase===ph;const n=phaseCounts[ph]||0;return`<span class="pill-opt${act?' active':''}" style="border:2px solid ${phaseColor(ph)};background:${act?phaseColor(ph):'transparent'};color:${act?'#111':phaseColor(ph)};font-weight:${act?'700':'500'};transition:all .15s;" onclick="toggleCampaignFilter('phase','${ph}')">${act?'✓ ':''}${ph}${n?` <span style="font-family:'DM Mono',monospace;font-size:.58rem;opacity:${act?'1':'.7'};">${n}</span>`:''}</span>`;}).join('')}
     </div>
   </div>
 
   ${S.members.length>0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
     <span style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;">Member</span>
     <div class="av-toggle-grid" style="gap:5px;">
-      ${S.members.map(m=>{const act=cf.member===m.id;return`<div class="av-toggle${act?' active':''}" style="padding:3px 8px 3px 4px;" onclick="toggleCampaignFilter('member','${m.id}')"""+k+r"""','${m.id}')">${avHtml(m.id,18)}<span style="font-size:.71rem;">${escHtml(m.name.split(' ')[0])}</span></div>`;}).join('')}
+      ${S.members.map(m=>{const act=cf.member===m.id;return`<div class="av-toggle${act?' active':''}" style="padding:3px 8px 3px 4px;" onclick="toggleCampaignFilter('member','${m.id}')">${avHtml(m.id,18)}<span style="font-size:.71rem;">${escHtml(m.name.split(' ')[0])}</span></div>`;}).join('')}
     </div>
   </div>`:``}
 
@@ -11301,7 +11338,7 @@ function renderTemplates(){
   ${spType?`<span style="font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:4px;background:${spType.color}22;color:${spType.color};white-space:nowrap;flex-shrink:0;">${escHtml(spType.label)}</span>`:''}
 </div>
 <div class="tmpl-desc">${escHtml(tmpl.description||'')}</div>
-<div style="margin-bottom:11px;">${(tmpl.tasks||[]).slice(0,5).map(t=>`<div class="ttp"><span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${t.priority||'Medium'}</span>${escHtml(t.name)}${t.subtasks?.length?` (${t.subtasks.length} subtasks)`:''}</div>`).join('')}${(tmpl.tasks||[]).length>5?`<div style="font-size:.65rem;color:var(--muted);padding:3px 0;">+${tmpl.tasks.length-5} more tasks</div>`:''}</div>
+<div style="margin-bottom:11px;">${(tmpl.tasks||[]).slice(0,5).map(t=>`<div class="ttp"><span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${escHtml(t.priority||'Medium')}</span>${escHtml(t.name)}${t.subtasks?.length?` (${t.subtasks.length} subtasks)`:''}</div>`).join('')}${(tmpl.tasks||[]).length>5?`<div style="font-size:.65rem;color:var(--muted);padding:3px 0;">+${tmpl.tasks.length-5} more tasks</div>`:''}</div>
 <div style="display:flex;gap:7px;flex-wrap:wrap;align-items:center;">
   ${!tmpl.sponsorType?`<button class="btn btn-acc btn-sm" onclick="applyTmpl('${tmpl.id}')">Use</button>`:''}
   <button class="btn btn-ghost btn-sm" onclick="openModal('taskTmpl','${tmpl.id}')">Edit</button>
@@ -11317,10 +11354,10 @@ function renderTemplates(){
     <div class="tmpl-name">${escHtml(tmpl.name)}</div>
     ${tmpl.description?`<div class="tmpl-desc" style="margin-top:3px;">${escHtml(tmpl.description)}</div>`:''}
   </div>
-  <span class="badge bd-${(tmpl.priority||'medium').toLowerCase()}" style="flex-shrink:0;">${tmpl.priority||'Medium'}</span>
+  <span class="badge bd-${(tmpl.priority||'medium').toLowerCase()}" style="flex-shrink:0;">${escHtml(tmpl.priority||'Medium')}</span>
 </div>
 <div style="margin-bottom:10px;">
-  ${(tmpl.tasks||[]).slice(0,5).map(t=>`<div class="ttp"><span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${t.priority||'Medium'}</span>${escHtml(t.name)}${(t.subtasks||[]).length?` <span style="color:var(--muted);font-size:.65rem;">(${t.subtasks.length} sub)</span>`:''}</div>`).join('')}
+  ${(tmpl.tasks||[]).slice(0,5).map(t=>`<div class="ttp"><span class="badge bd-${(t.priority||'Medium').toLowerCase()}">${escHtml(t.priority||'Medium')}</span>${escHtml(t.name)}${(t.subtasks||[]).length?` <span style="color:var(--muted);font-size:.65rem;">(${t.subtasks.length} sub)</span>`:''}</div>`).join('')}
   ${(tmpl.tasks||[]).length>5?`<div style="font-size:.65rem;color:var(--muted);padding:3px 0;">+${tmpl.tasks.length-5} more tasks</div>`:''}
   ${(tmpl.tasks||[]).length===0?`<div style="font-size:.72rem;color:var(--muted);">No tasks saved</div>`:''}
 </div>
@@ -12145,7 +12182,7 @@ function generateFinanceReport(){
     <div class="grid4" style="margin-bottom:16px;">
       <div class="metric"><div class="metric-label">Corp. Tax (${ct.rate})</div><div class="metric-val amber">${fmtGBP(ct.tax)}</div></div>
       <div class="metric"><div class="metric-label">Net Profit</div><div class="metric-val ${net>=0?'green':'red'}">${fmtS(net)}</div></div>
-      <div class="metric"><div class="metric-label">Savings (${sv.rate}%)</div><div class="metric-val blue">${fmtGBP(savAmt)}</div></div>
+      <div class="metric"><div class="metric-label">Savings (${Number(sv.rate)||0}%)</div><div class="metric-val blue">${fmtGBP(savAmt)}</div></div>
       <div class="metric"><div class="metric-label">Profit for Payout</div><div class="metric-val green">${fmtGBP(pfp)}</div></div>
     </div>
     <h2>2 — Revenue vs Expenses</h2>
@@ -12160,7 +12197,7 @@ function generateFinanceReport(){
         <tr class="tr-total"><td>Gross Profit</td><td class="right ${profit>=0?'green':'red'}">${fmtS(profit)}</td><td>${bar(Math.abs(profit),rev,profit>=0?'#62D0AA':'#e05c3a')}</td></tr>
         <tr><td class="muted">Corporation Tax (${escHtml(ct.label)})</td><td class="right amber">- ${fmtGBP(ct.tax)}</td><td>${bar(ct.tax,rev,'#f59e0b')}</td></tr>
         <tr class="tr-total"><td>Net Profit</td><td class="right ${net>=0?'green':'red'}">${fmtS(net)}</td><td>${bar(Math.abs(net),rev,net>=0?'#62D0AA':'#e05c3a')}</td></tr>
-        <tr><td class="muted">Savings Reserve (${sv.rate}%)</td><td class="right blue">- ${fmtGBP(savAmt)}</td><td>${bar(savAmt,rev,'#3d82f0')}</td></tr>
+        <tr><td class="muted">Savings Reserve (${Number(sv.rate)||0}%)</td><td class="right blue">- ${fmtGBP(savAmt)}</td><td>${bar(savAmt,rev,'#3d82f0')}</td></tr>
         <tr class="tr-total"><td style="color:#62D0AA;">Dividend Pool</td><td class="right green">${fmtGBP(pfp)}</td><td>${bar(pfp,rev,'#62D0AA')}</td></tr>
       </table>
     </div>
@@ -12176,7 +12213,7 @@ function generateFinanceReport(){
         <div style="margin-top:12px;">
           ${catSlices.sort((a,b)=>b.v-a.v).map(s=>`<div class="flex" style="margin-bottom:5px;">
             <span class="dot" style="background:${s.c};"></span>
-            <span style="flex:1;font-size:.75rem;">${s.k}</span>
+            <span style="flex:1;font-size:.75rem;">${escHtml(s.k)}</span>
             <span style="font-family:'Courier New',monospace;font-size:.75rem;">${fmtGBP(s.v)}</span>
           </div>`).join('')}
         </div>
@@ -12201,7 +12238,7 @@ function generateFinanceReport(){
       <tr><th>Name</th><th>Category</th><th>Frequency</th><th class="right">Amount</th><th class="right">Annualised</th></tr>
       ${S.finance.recurring.length===0?'<tr><td colspan="5" class="muted">No recurring expenses</td></tr>':
         S.finance.recurring.map(e=>`<tr>
-          <td>${escHtml(e.name)}</td><td class="muted">${e.cat}</td><td class="muted">${e.freq}</td>
+          <td>${escHtml(e.name)}</td><td class="muted">${escHtml(e.cat)}</td><td class="muted">${escHtml(e.freq)}</td>
           <td class="right">${fmtGBP(e.amount)}</td><td class="right">${fmtGBP(finAnn(e))}</td>
         </tr>`).join('')}
       ${S.finance.recurring.length>0?`<tr class="tr-total"><td colspan="4">Total annualised</td><td class="right green">${fmtGBP(rec)}</td></tr>`:''}
@@ -12210,7 +12247,7 @@ function generateFinanceReport(){
     <div class="card"><table>
       <tr><th>Name</th><th>Category</th><th class="right">Amount</th></tr>
       ${S.finance.oneoff.length===0?'<tr><td colspan="3" class="muted">No one-off expenses</td></tr>':
-        S.finance.oneoff.map(e=>`<tr><td>${escHtml(e.name)}</td><td class="muted">${e.cat}</td><td class="right">${fmtGBP(e.amount)}</td></tr>`).join('')}
+        S.finance.oneoff.map(e=>`<tr><td>${escHtml(e.name)}</td><td class="muted">${escHtml(e.cat)}</td><td class="right">${fmtGBP(e.amount)}</td></tr>`).join('')}
       ${S.finance.oneoff.length>0?`<tr class="tr-total"><td colspan="2">Total</td><td class="right green">${fmtGBP(oo)}</td></tr>`:''}
     </table></div>
   </div>`;
@@ -12296,7 +12333,7 @@ function generateFinanceReport(){
           <table>
             <tr><th>Shareholder</th><th class="right">Share %</th><th class="right">Amount</th></tr>
             ${ALL_SHARES.map(s=>`<tr>
-              <td>${escHtml(s.name)} <span class="pill ${s.type==='A'?'pill-a':'pill-b'}">${s.type}</span></td>
+              <td>${escHtml(s.name)} <span class="pill ${s.type==='A'?'pill-a':'pill-b'}">${escHtml(s.type)}</span></td>
               <td class="right">${(s.w/allTotal*100).toFixed(0)}%</td>
               <td class="right ${p2Pool>0?'green':'muted'}">${p2Pool>0?fmtGBP(p2Pool*(s.w/allTotal)):'—'}</td>
             </tr>`).join('')}
@@ -12310,7 +12347,7 @@ function generateFinanceReport(){
       ${ALL_SHARES.map(s=>{
         const p1=A_SHARES.find(x=>x.name===s.name)?p1Pool*(A_SHARES.find(x=>x.name===s.name).w/aTotal):0;
         const p2=p2Pool*(s.w/allTotal);
-        return`<tr><td>${escHtml(s.name)}</td><td><span class="pill ${s.type==='A'?'pill-a':'pill-b'}">${s.type}</span></td>
+        return`<tr><td>${escHtml(s.name)}</td><td><span class="pill ${s.type==='A'?'pill-a':'pill-b'}">${escHtml(s.type)}</span></td>
           <td class="right">${p1>0?fmtGBP(p1):'—'}</td><td class="right">${p2>0?fmtGBP(p2):'—'}</td>
           <td class="right green">${fmtGBP(p1+p2)}</td></tr>`;}).join('')}
       <tr class="tr-total"><td colspan="4">Total dividends</td><td class="right green">${fmtGBP(Object.values(divs).reduce((a,b)=>a+b,0))}</td></tr>
@@ -12653,7 +12690,7 @@ function renderSettings(){
 <div class="st-panel" data-st="slack" style="display:${_stT==='slack'?'':'none'}">
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 01-2 2H7l-4 4V5a2 2 0 012-2h14a2 2 0 012 2z"/></svg> Slack Integration</div>
-  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Connect a Slack webhook for task reminders. <a href="https://api.slack.com/messaging/webhooks" target="_blank" style="color:var(--acc);">Learn how →</a></p>
+  <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Connect a Slack webhook for task reminders. <a href="https://api.slack.com/messaging/webhooks" target="_blank" rel="noopener noreferrer" style="color:var(--acc);">Learn how →</a></p>
   <div class="field"><label class="flbl">Webhook URL</label><input class="inp" id="slack-inp" type="url" placeholder="https://hooks.slack.com/services/..." value="${escHtml(S.slackWebhook)}"></div>
   <div class="field" style="margin-top:10px;"><label class="flbl">App URL <span style="font-weight:400;color:var(--muted);">(used in Slack message deep links)</span></label><input class="inp" id="slack-appurl-inp" type="url" placeholder="https://pb.airwiggles.com" value="${escHtml(S.settings?.appUrl||'')}"></div>
   <div style="display:flex;gap:8px;margin-top:10px;align-items:center;">
@@ -13478,7 +13515,7 @@ function taskModalHtml(data){
     <input type="hidden" id="recur-sw" data-on="${escHtml(recurOn?'1':'0')}">
   </div>
 
-  ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${st.priority}</span>${escHtml(st.name)}${st.subtasks?.length?`<span style="color:var(--muted);font-size:.65rem;">(${st.subtasks.length} sub)</span>`:''}</div>`).join('')}</div>`:''}
+  ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${escHtml(st.priority)}</span>${escHtml(st.name)}${st.subtasks?.length?`<span style="color:var(--muted);font-size:.65rem;">(${st.subtasks.length} sub)</span>`:''}</div>`).join('')}</div>`:''}
 
 </div>
 <div class="mo-ft">
@@ -13583,7 +13620,7 @@ function showCoworkInviteModal(day,label){
 <div class="mo-hd"><span class="mo-title">Add to Calendar</span><button class="mo-close" onclick="closeModal()">×</button></div>
 <div class="mo-body" style="display:flex;flex-direction:column;gap:10px;">
   <p style="font-size:.82rem;color:var(--text2);margin:0;">${escHtml(label||'Co-working day')} saved! Add it to a calendar:</p>
-  <a href="${escHtml(safeUrl(gcUrl))}" target="_blank" class="btn btn-acc" style="text-align:center;text-decoration:none;" onclick="closeModal()">Open in Google Calendar</a>
+  <a href="${escHtml(safeUrl(gcUrl))}" target="_blank" rel="noopener noreferrer" class="btn btn-acc" style="text-align:center;text-decoration:none;" onclick="closeModal()">Open in Google Calendar</a>
   <a href="${escHtml(icsUrl)}" download="${escHtml(decodeURIComponent(title))}.ics" class="btn btn-ghost" style="text-align:center;text-decoration:none;" onclick="revokeLater('${icsUrl}');closeModal()">Download .ics file</a>
 </div>
 <div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Skip</button></div>
@@ -13863,7 +13900,7 @@ function labelModalHtml(id){
     +'</div>'
     +'</div>'
     +'<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-    +'<button class="btn btn-acc" onclick="saveLabel(\''+( l?.id||'')+'\')">'+( l?'Save':'Create')+'</button></div>'
+    +'<button class="btn btn-acc" onclick="saveLabel(\''+jsq(l?l.id:'')+'\')">'+( l?'Save':'Create')+'</button></div>'
     +'</div>';
 }
 
@@ -14063,7 +14100,7 @@ async function memberModalHtml(id){
     +'<input type="hidden" id="mm-clr" value="'+(m?.color||COLORS[0])+'"></div>'
     +'</div>'
     +'<div class="mo-ft"><button class="btn btn-ghost" onclick="closeModal()">Cancel</button>'
-    +'<button class="btn btn-acc" onclick="saveMember(\''+( m?.id||'')+'\')">'+( m?'Save changes':'Add member')+'</button>'
+    +'<button class="btn btn-acc" onclick="saveMember(\''+jsq(m?m.id:'')+'\')">'+( m?'Save changes':'Add member')+'</button>'
     +'</div></div>';
 }
 
@@ -14439,11 +14476,11 @@ function renderTtBuf(){
     <button class=\"reorder-arrow\" style=\"padding:1px 5px;font-size:9px;\" onclick=\"moveTmplT(${i},-1)\" ${i===0?'disabled':''} title=\"Move up\">\u25b2</button>
     <button class=\"reorder-arrow\" style=\"padding:1px 5px;font-size:9px;\" onclick=\"moveTmplT(${i},1)\" ${i===_ttBuf.length-1?'disabled':''} title=\"Move down\">\u25bc</button>
   </div>
-  <span class=\"badge bd-${(t.priority||'Medium').toLowerCase()}\">${t.priority||'Medium'}</span>
+  <span class=\"badge bd-${(t.priority||'Medium').toLowerCase()}\">${escHtml(t.priority||'Medium')}</span>
   <span style=\"flex:1;font-size:.82rem;font-weight:500;\">${escHtml(t.name)}</span>
   <button style=\"background:none;border:none;cursor:pointer;color:var(--muted);font-size:14px;line-height:1;padding:2px 5px;border-radius:4px;transition:color .14s;\" onmouseover=\"hoverTint(this,'color','var(--red)')\" onmouseout=\"hoverTint(this,'color','var(--muted)')\" onclick=\"rmTmplT(${i})\">\u00d7</button>
 </div>
-${t.subtasks?.length?`<div style=\"padding-left:18px;margin-bottom:7px;\">${t.subtasks.map((s,si)=>`<div style=\"display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.74rem;color:var(--text2);\">\u00b7 <span class=\"badge bd-${(s.priority||'Medium').toLowerCase()}\">${s.priority}</span>${escHtml(s.name)}<button style=\"background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;margin-left:auto;\" onclick=\"rmTmplSub(${i},${si})\">\u00d7</button></div>`).join('')}</div>`:''}
+${t.subtasks?.length?`<div style=\"padding-left:18px;margin-bottom:7px;\">${t.subtasks.map((s,si)=>`<div style=\"display:flex;align-items:center;gap:6px;padding:3px 0;font-size:.74rem;color:var(--text2);\">\u00b7 <span class=\"badge bd-${(s.priority||'Medium').toLowerCase()}\">${escHtml(s.priority)}</span>${escHtml(s.name)}<button style=\"background:none;border:none;cursor:pointer;color:var(--muted);font-size:11px;margin-left:auto;\" onclick=\"rmTmplSub(${i},${si})\">\u00d7</button></div>`).join('')}</div>`:''}
 <div style=\"display:flex;gap:6px;align-items:center;margin-top:4px;padding-left:18px;\">
   <input class=\"inp\" id=\"tt-sub-name-${i}\" placeholder=\"Subtask name\u2026\" style=\"flex:1;padding:5px 8px;font-size:.74rem;\" onkeydown=\"if(event.key==='Enter'){event.preventDefault();commitTmplSub(${i});}\">
   <select class=\"sel\" id=\"tt-sub-prio-${i}\" style=\"width:90px;padding:5px 22px 5px 7px;font-size:.72rem;\">${['High','Medium','Low'].map(p=>`<option>${p}</option>`).join('')}</select>
@@ -14775,7 +14812,6 @@ let dndTaskId=null,dndProjId=null;
 function initPWA(){
   const manifest={name:'ProjectFlow',short_name:'ProjectFlow',start_url:location.href,display:'standalone',theme_color:'#62D0AA',background_color:'#141414'};
   try{const b=new Blob([JSON.stringify(manifest)],{type:'application/manifest+json'});el('pwa-manifest').href=URL.createObjectURL(b);}catch(e){}
-  if('serviceWorker' in navigator){const sw=`const V='pf-v2';self.addEventListener('install',e=>e.waitUntil(caches.open(V).then(c=>c.add('/'))));self.addEventListener('fetch',e=>e.respondWith(caches.match(e.request).then(r=>r||fetch(e.request).catch(()=>caches.match('/')))));`;try{const b=new Blob([sw],{type:'text/javascript'});navigator.serviceWorker.register(URL.createObjectURL(b)).catch(()=>{});}catch(e){}}
 }
 
 if(!window._spExpanded)window._spExpanded={};
@@ -15584,6 +15620,8 @@ const _CURRENCY_SYMBOLS={
 const _rateCache={};
 // Fetch GBP rate for a given currency, and USD rate, caching results 1hr
 async function _fetchRate(from){
+  from=String(from||'').toUpperCase();
+  if(!/^[A-Z]{3}$/.test(from))from='GBP';          // a currency code is exactly three letters; anything else never reaches the URL
   if(from==='GBP')return{gbp:1,usd:1.27};
   const cached=_rateCache[from];
   if(cached&&Date.now()-cached.ts<3600000)return cached;
@@ -16458,9 +16496,13 @@ function catLabel(cat){
 }
 
 /* Slack webhook */
+/* a webhook is a secret address on Slack's own host; anything else is refused (the policy also only allows hooks.slack.com) */
+function _slackUrlOk(u){return typeof u==='string'&&/^https:\/\/hooks\.slack\.com\/(services|workflows|triggers)\/[A-Za-z0-9\/_-]+$/.test(u);}
 function saveSlack(){
   const inp=el('slack-inp');if(!inp)return;
-  S.slackWebhook=inp.value.trim();
+  const v=inp.value.trim();
+  if(v&&!_slackUrlOk(v)){const st0=el('slack-st');if(st0){st0.textContent='That is not a Slack webhook address (it starts with https://hooks.slack.com/services/).';st0.style.color='var(--red)';}return;}
+  S.slackWebhook=v;
   const appUrlInp=el('slack-appurl-inp');
   if(appUrlInp){if(!S.settings)S.settings={};S.settings.appUrl=appUrlInp.value.trim();}
   save();
@@ -16471,7 +16513,7 @@ async function testSlack(){
   if(_tsBusy)return;_tsBusy=true;setTimeout(()=>{_tsBusy=false;},4000);
   const url=S.slackWebhook;
   const st=el('slack-st');
-  if(!url){if(st){st.textContent='No webhook URL saved.';st.style.color='var(--red)';}return;}
+  if(!url||!_slackUrlOk(url)){if(st){st.textContent='No valid webhook URL saved.';st.style.color='var(--red)';}return;}
   if(st){st.textContent='Sending…';st.style.color='var(--muted)';}
   try{
     await fetch(url,{method:'POST',body:JSON.stringify({text:'✓ ProjectFlow test message from Airwiggles HQ'})});
@@ -16499,7 +16541,7 @@ function initReminderPoller(){
 
 async function _checkAndSendReminders(){
   const webhook=S.slackWebhook;
-  if(!webhook)return;
+  if(!webhook||!_slackUrlOk(webhook))return;
   const now=new Date();
   const due=S.tasks.filter(t=>{
     const r=t.slackReminder;
