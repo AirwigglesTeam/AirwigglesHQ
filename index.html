@@ -1400,6 +1400,16 @@ body.mcal-dragging *{cursor:grabbing !important;}
 #pf-update{bottom:12px;z-index:10002}
 #pf-storage{border-color:var(--red,#e5534b)!important;bottom:70px;z-index:10001}
 #pf-nudge{bottom:12px;z-index:9998}
+
+/* ── Event page: narrow cards (objectives, quick links, expenses) ── */
+.ev-card{background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow:hidden;min-width:0;}
+.ev-card-hd{display:flex;align-items:center;gap:8px;padding:9px 14px;background:var(--surface2);border-bottom:1px solid var(--border);}
+.ev-card-t{font-size:.68rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--text2);}
+.ev-card-n{font-size:.66rem;color:var(--muted);font-family:'DM Mono',monospace;}
+.ev-row{border-bottom:1px solid var(--border);}
+.ev-row:last-child{border-bottom:0;}
+.ev-pill{display:inline-flex;align-items:center;border-radius:99px;padding:1px 8px;font-size:.62rem;font-weight:600;background:var(--surface3);color:var(--text2);white-space:nowrap;flex-shrink:0;}
+.ev-pill.ok{background:rgba(31,186,122,.14);color:var(--green);}
 </style>
 </head>
 <body>
@@ -2916,7 +2926,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=89;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=90;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6839,6 +6849,7 @@ ${_dashQuickHtml()}
 function _campTopCur(){const v=window._campTop;return v==='none'?'':(v==='cal'?'cal':'tl');}
 function campTopSet(k){window._campTop=(_campTopCur()===k)?'none':k;render();}
 function campGanttToggle(){campTopSet('tl');}
+function toggleExpAll(pid){window._expAll=window._expAll||{};window._expAll[pid]=!window._expAll[pid];render();}
 function toggleProjOkr(pid){
   window._okrOpen=window._okrOpen||{};window._okrOpen[pid]=window._okrOpen[pid]===false;
   const open=window._okrOpen[pid]!==false,b=el('ev-okr-body-'+pid),i=el('okr-ico-'+pid);
@@ -8095,10 +8106,10 @@ function renderDetail(id){
   return{strip,tile:eventDateTile};
   })();
   return`<div class="fu">
-<div style="margin-bottom:16px;"><button class="btn btn-ghost btn-sm" onclick="S.detailId=null;render();">← Back</button></div>
-<div style="margin-bottom:20px;">
+<div style="margin-bottom:12px;">
   <!-- Action buttons row — sits above title, wraps naturally on mobile -->
-  <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:10px;">
+  <div style="display:flex;gap:5px;flex-wrap:wrap;align-items:center;margin-bottom:0;">
+    <button class="btn btn-ghost btn-sm" onclick="S.detailId=null;render();">← Back</button><span style="flex:1;"></span>
     ${p.status==='completed'?
       `<button class="btn btn-ghost btn-sm" onclick="reactivateProject('${p.id}')" title="Reactivate">↩ Reactivate</button>`
     :
@@ -8145,34 +8156,34 @@ function renderDetail(id){
 </div>
 
 
+<!-- OBJECTIVES / QUICK LINKS / EXPENSES: three narrow cards side by side -->
+<div class="ev-trio" style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px;align-items:start;margin-bottom:18px;">
 ${_adm?'':`<!-- EVENT OKRs -->
-<div style="margin-bottom:18px;" id="detail-okr-${p.id}">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <div style="display:flex;align-items:center;gap:10px;cursor:pointer;" onclick="toggleProjOkr('${p.id}')" role="button" aria-expanded="${(window._okrOpen||{})[p.id]!==false}">
-      <svg id="okr-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;transform:${(window._okrOpen||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
-      <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">${isEvt(p)?'Event Objectives':'Objectives'}</span></div>
+<div class="ev-card" id="detail-okr-${p.id}">
+  <div class="ev-card-hd">
+    <div style="display:flex;align-items:center;gap:8px;cursor:pointer;flex:1;min-width:0;" onclick="toggleProjOkr('${p.id}')" role="button" aria-expanded="${(window._okrOpen||{})[p.id]!==false}">
+      <svg id="okr-ico-${p.id}" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linecap="round" style="transition:transform .2s;flex-shrink:0;transform:${(window._okrOpen||{})[p.id]!==false?'rotate(0deg)':'rotate(-90deg)'}"><polyline points="6 9 12 15 18 9"/></svg>
+      <span class="ev-card-t">${isEvt(p)?'Event Objectives':'Objectives'}</span>${(p.okrs||[]).length?`<span class="ev-card-n">${(p.okrs||[]).length}</span>`:''}</div>
     <button class="btn btn-ghost btn-xs" onclick="openModal('project','${p.id}')">Edit</button>
   </div>
   <div id="ev-okr-body-${p.id}" style="display:${(window._okrOpen||{})[p.id]!==false?'block':'none'};">
   ${(()=>{
     const okrs=p.okrs||[];
-    if(okrs.length===0)return`<div style="font-size:.75rem;color:var(--muted);padding:4px 0;">No objectives set for this ${isEvt(p)?'event':'project'} yet. Use the Edit button to add them.</div>`;
-    return okrs.map(okr=>`<div style="margin-bottom:10px;padding:10px 12px;background:var(--surface2);border:1px solid var(--border);border-radius:10px;">
-      <div style="font-size:.82rem;font-weight:700;color:var(--text);margin-bottom:6px;">◈ ${okr.objective}</div>
-      ${(okr.keyResults||[]).map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:3px 0;border-left:2px solid ${kr.done?'var(--green)':'var(--border2)'};padding-left:8px;margin-bottom:3px;">
+    if(okrs.length===0)return`<div style="font-size:.75rem;color:var(--muted);padding:10px 14px;">No objectives set for this ${isEvt(p)?'event':'project'} yet. Use the Edit button to add them.</div>`;
+    return okrs.map(okr=>{const krs=okr.keyResults||[];const dn=krs.filter(k=>k.done).length;return`<div class="ev-row" style="padding:9px 14px;">
+      <div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:${krs.length?'6':'0'}px;"><span style="flex:1;min-width:0;font-size:.8rem;font-weight:700;color:var(--text);">◈ ${escHtml(okr.objective)}</span>${krs.length?`<span class="ev-pill${dn===krs.length?' ok':''}">${dn}/${krs.length}</span>`:''}</div>
+      ${krs.map(kr=>`<div style="display:flex;align-items:flex-start;gap:7px;padding:3px 0 3px 8px;margin-bottom:2px;border-left:2px solid ${kr.done?'var(--green)':'var(--border2)'};">
         <div class="ti-check${kr.done?' done':''}" onclick="toggleEventOkrKR('${p.id}','${okr.id}','${kr.id}')" style="width:13px;height:13px;flex-shrink:0;margin-top:2px;cursor:pointer;"></div>
         <span style="font-size:.75rem;color:${kr.done?'var(--muted)':'var(--text2)'};${kr.done?'text-decoration:line-through;':''}">${escHtml(kr.text)}</span>
       </div>`).join('')}
-    </div>`).join('');
+    </div>`;}).join('');
   })()}
   </div>
 </div>`}
 <!-- PROJECT QUICK LINKS -->
-<div style="margin-bottom:18px;">
-  <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:9px;">
-    <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:var(--acc);">Quick Links</span>
-    <button class="btn btn-ghost btn-xs" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>
-  </div>
+<div class="ev-card">
+  <div class="ev-card-hd"><span class="ev-card-t">Quick Links</span>${(p.quickLinks||[]).length?`<span class="ev-card-n">${(p.quickLinks||[]).length}</span>`:''}</div>
+  <div style="padding:10px 12px;">
   ${(()=>{
     const links=p.quickLinks||[];
     const hasCategories=links.some(q=>q.category);
@@ -8189,6 +8200,29 @@ ${_adm?'':`<!-- EVENT OKRs -->
         <div class="ql-grid">${grpLinks.map(qlBtn).join('')}</div>
       </div>`).join('')+`<button class="ql-btn add-ql" style="margin-top:4px;" onclick="openModal('projQuickLink','${p.id}')">+ Add link</button>`;
   })()}
+  </div>
+</div>
+${_adm?'':`<!-- EXPENSES -->
+<div class="ev-card" data-ev-expenses>
+  <div class="ev-card-hd"><span class="ev-card-t">Expenses</span>${(p.expenses||[]).length?`<span class="ev-card-n">${(p.expenses||[]).length}</span>`:''}
+    ${expTotal>0?`<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:.74rem;font-weight:600;color:${over?'var(--red)':'var(--yellow)'};">${fmtGBP(expTotal)}${hasB?' of '+fmtGBP(budget):' total'}</span>`:''}
+  </div>
+  ${hasB?`<div style="padding:9px 14px 2px;"><div style="height:4px;background:var(--surface3);border-radius:99px;overflow:hidden;"><div style="height:100%;width:${bPct}%;background:${over?'var(--red)':'var(--yellow)'};border-radius:99px;"></div></div></div>`:''}
+  ${(()=>{
+    const all=(p.expenses||[]);
+    if(!all.length)return`<div style="color:var(--muted);font-size:.73rem;padding:10px 14px;">No expenses logged yet.</div>`;
+    const showAll=!!(window._expAll||{})[p.id];const shown=showAll?all:all.slice(0,5);
+    return shown.map(e=>`<div class="ev-row" style="display:flex;align-items:center;gap:8px;padding:7px 14px;">
+      <span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:.78rem;font-weight:600;" title="${escHtml(e.name)}">${escHtml(e.name)}</span>
+      <span class="ev-pill">${escHtml(e.category||'General')}</span>
+      <span style="color:var(--muted);font-size:.64rem;white-space:nowrap;">${fmtD(e.date)}</span>
+      <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--yellow);font-weight:600;white-space:nowrap;">${fmtGBP(e.amount)}</span>
+      <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;" onclick="editProjExp('${p.id}','${e.id}')" title="Edit">✎</button>
+      <button class="del-btn" onclick="deleteProjExp('${p.id}','${e.id}')">×</button>
+    </div>`).join('')+(all.length>5?`<div style="padding:6px 14px;"><button class="btn btn-ghost btn-xs" onclick="toggleExpAll('${p.id}')">${showAll?'Show fewer':'Show all '+all.length}</button></div>`:'');
+  })()}
+  <div style="padding:8px 14px;border-top:1px solid var(--border);"><button class="btn btn-ghost btn-xs" onclick="openModal('projExp','${p.id}')">+ Add Expense</button></div>
+</div>`}
 </div>
 
 <!-- SPONSORS IN PROJECT -->
@@ -8347,26 +8381,6 @@ ${(isEvt(p)&&((p.sponsors||[]).length>0||(S.sponsors||[]).length>0))?`<div style
 
 <hr class="div">
 <div class="detail-layout">
-
-${_adm?'':`<!-- EXPENSES SECTION — compact row above tasks -->
-<div class="detail-sec" style="grid-column:1 / -1;">
-  <div class="detail-sec-title" style="display:flex;align-items:center;gap:8px;">
-    Project Expenses
-    <button class="btn btn-ghost btn-sm" onclick="openModal('projExp','${p.id}')">+ Add Expense</button>
-    ${expTotal>0?`<span style="margin-left:auto;font-family:'DM Mono',monospace;font-size:.82rem;font-weight:600;color:var(--yellow);">${fmtGBP(expTotal)} total</span>`:''}
-  </div>
-  ${(p.expenses||[]).length===0?`<div style="color:var(--muted);font-size:.73rem;">No expenses logged yet.</div>`:`
-  <div style="display:flex;flex-wrap:wrap;gap:6px;">
-  ${(p.expenses||[]).map(e=>`<div style="display:flex;align-items:center;gap:6px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;padding:5px 10px;font-size:.75rem;">
-    <span style="font-weight:600;">${escHtml(e.name)}</span>
-    <span style="color:var(--muted);font-size:.68rem;">${fmtD(e.date)}</span>
-    <span style="font-size:.68rem;color:var(--text2);background:var(--surface3);padding:1px 6px;border-radius:4px;">${e.category||'General'}</span>
-    <span style="font-family:'DM Mono',monospace;font-size:.75rem;color:var(--yellow);font-weight:600;">${fmtGBP(e.amount)}</span>
-    <button style="background:none;border:none;cursor:pointer;color:var(--muted);font-size:13px;padding:0 2px;" onclick="editProjExp('${p.id}','${e.id}')" title="Edit">✎</button>
-    <button class="del-btn" onclick="deleteProjExp('${p.id}','${e.id}')">×</button>
-  </div>`).join('')}
-  </div>`}
-</div>`}
 
 <!-- STATUS UPDATES -->
 <div class="detail-sec" style="grid-column:1 / -1;" data-status-log="${p.id}">
