@@ -1877,6 +1877,11 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .ln-tools{margin-left:auto;display:flex;align-items:center;gap:2px}
 .ln-tools .tb{opacity:.6}.ln-tools .tb:hover,.ln-tools .tb.has{opacity:1}
 @media(hover:hover){.ln-card:not(:hover):not(:focus-within) .ln-tools .tb{opacity:.35}}
+
+/* "Show more" under a long column */
+.kb-more{width:100%;margin:6px 0 0;justify-content:center;flex-shrink:0}
+.kb-col .kb-more{width:calc(100% - 20px);margin:2px 10px 10px}
+.kb-more .meta{opacity:.7;margin-left:4px}
 </style>
 </head>
 <body>
@@ -3072,16 +3077,19 @@ function _pfStash(str,label){            // a copy that lost out (or was replace
 }
 
 /* Render after a remote merge without yanking the screen from under someone who is typing */
-let _pfRenderWait=null;
+let _pfRenderWait=null,_pfRenderLate=false,_pfLastBgRender=0;
 function _pfSafeRender(){
   if(_pfRenderWait)return;
+  if(document.hidden){_pfRenderLate=true;return;}       // nobody is looking: redraw once when the tab comes back
   const t0=Date.now();
   const tryRender=()=>{
     const a=document.activeElement;
     const typing=a&&(a.tagName==='INPUT'||a.tagName==='TEXTAREA'||a.tagName==='SELECT'||a.isContentEditable);
     if(typing&&Date.now()-t0<20000){_pfRenderWait=setTimeout(tryRender,700);return;}
-    _pfRenderWait=null;
-    try{render();}catch(e){console.warn('render after sync failed',e);}
+    const gap=Date.now()-_pfLastBgRender;
+    if(gap<400){_pfRenderWait=setTimeout(tryRender,400-gap);return;}   // a burst of remote edits draws once, not once per edit
+    _pfRenderWait=null;_pfRenderLate=false;_pfLastBgRender=Date.now();
+    try{render();}catch(e){_pfWarn('redraw after sync',e);}
   };
   tryRender();
 }
@@ -3444,7 +3452,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=137;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=138;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -4319,7 +4327,10 @@ function _showSyncToast(msg){
 /* ── Visibility / connectivity ── */
 document.addEventListener('visibilitychange',()=>{
   if(document.hidden){PF.saveNow();}                 // leaving the tab: persist + push anything pending
-  else if(_pbToken){PF.requestSync(0);if(!_pbEventSource)_startPBRealtime();}
+  else{
+    if(_pfRenderLate)_pfSafeRender();                // changes arrived while hidden
+    if(_pbToken){PF.requestSync(0);if(!_pbEventSource)_startPBRealtime();}
+  }
 });
 window.addEventListener('pagehide',()=>{try{PF.flush();}catch(_){}});
 window.addEventListener('storage',e=>{if(e.key==='pf6m'){try{PF.foldSiblings();}catch(_){}}});   // another tab of this browser saved: fold its pending edits in
@@ -4432,6 +4443,7 @@ function cascadeChildrenDone(id){kids(id).forEach(c=>{c.done=true;c.kStatus='don
 
 /* ── Kanban ── */
 function applyKanbanStatusChange(task,newSt){
+  window._kbPin=task.id;
   task.kStatus=newSt;
   if(newSt==='done'){task.done=true;cascadeChildrenDone(task.id);}
   else{task.done=false;if(newSt==='blocked'){/* leave */}else{syncBlockedStatus(task.id);}}
@@ -10038,6 +10050,20 @@ function quickAddBarPhaseHtml(projectId,phase){
 
 
 
+/* Long lists draw only the first LIST_CAP cards per column (the heading still shows the full count) with a "Show more" button, so a board with
+   thousands of tasks stays quick to open and to redraw. How many extra are showing is remembered for the session. */
+const LIST_CAP=40;
+window._kbMore=window._kbMore||{};window._kbPin=window._kbPin||null;window._cpMore=window._cpMore||{};
+function _capFor(more,key){return LIST_CAP+(Object.prototype.hasOwnProperty.call(more,key)?more[key]:0);}
+/* The cards to draw: the first ones, plus (kanban) the card that was just moved or ticked so it never disappears behind "Show more". */
+function _capList(list,more,key,pin){const cap=_capFor(more,key);return list.length<=cap?list:list.filter((t,i)=>i<cap||t.id===pin);}
+function _moreBtnHtml(total,shown,more,key,fn){
+  const left=total-shown;if(left<=0)return'';
+  return`<button class="btn btn-ghost btn-sm kb-more" data-key="${escHtml(key)}" onclick="${fn}(this.dataset.key)">Show ${Math.min(LIST_CAP,left)} more <span class="meta">· ${left} not shown</span></button>`;
+}
+function _showMore(more,key){more[key]=(Object.prototype.hasOwnProperty.call(more,key)?more[key]:0)+LIST_CAP;render();}
+function kbShowMore(key){_showMore(window._kbMore,String(key));}
+function cpShowMore(key){_showMore(window._cpMore,String(key));}
 function renderKanban(){
   const projects=S.projects.filter(p=>p.status==='active');
   const {project:kProj,member:kMem,label:kLbl,phase:kPh}=S.kbFilter||{};
@@ -10096,7 +10122,7 @@ ${_kbCols().map(col=>`
     <span class="kb-cnt">${tasksByCol[col.id].length}</span>
   </div>
   <div class="kb-cards" data-status="${escHtml(col.id)}">
-    ${tasksByCol[col.id].map(t=>{
+    ${_capList(tasksByCol[col.id],window._kbMore,col.id,window._kbPin).map(t=>{
       const p=getProject(t.projectId);const comp=taskComp(t);const ch=kids(t.id).length;
       const parentTask=t.parentId?getTask(t.parentId):null;
       const kBlocked=(t.kStatus==='blocked')&&!t.done;
@@ -10125,6 +10151,7 @@ ${kBlocked?`<div class="kcard-blocked-badge"><svg width="8" height="8" viewBox="
 ${kBlocked?`<div id="kbt-${t.id}" class="kb-blocker-tip" style="display:none;"><div class="kb-blocker-tip-title">Blocked by</div>${kBlockerNames.map(n=>`<div class="kb-blocker-tip-item">${escHtml(n)}</div>`).join('')}</div>`:''}</div>`;}).join('')}
     ${tasksByCol[col.id].length===0?`<div class="kb-empty">Drop tasks here</div>`:''}
   </div>
+  ${_moreBtnHtml(tasksByCol[col.id].length,_capList(tasksByCol[col.id],window._kbMore,col.id,window._kbPin).length,window._kbMore,col.id,'kbShowMore')}
 </div>`).join('')}
 </div></div>`;
 }
@@ -10132,6 +10159,7 @@ ${kBlocked?`<div id="kbt-${t.id}" class="kb-blocker-tip" style="display:none;"><
 
 function toggleKanbanDone(id){
   const t=getTask(id);if(!t)return;
+  window._kbPin=id;
   t.done=!t.done;
   if(t.done){t.kStatus='done';}
   else{syncBlockedStatus(id);}
@@ -10442,8 +10470,9 @@ function renderCampaign(){
         <span style="font-size:.68rem;color:var(--muted);margin-left:auto;">${g.tasks.filter(t=>t.done).length}/${g.tasks.length}</span>
       </div>
       <div style="display:flex;flex-direction:column;gap:7px;">
-        ${g.tasks.map(taskCard).join('')}
+        ${_capList(g.tasks,window._cpMore,g.label.id).map(taskCard).join('')}
       </div>
+      ${_moreBtnHtml(g.tasks.length,_capList(g.tasks,window._cpMore,g.label.id).length,window._cpMore,g.label.id,'cpShowMore')}
     </div>`).join('');
 
   return`<div class="fu">
