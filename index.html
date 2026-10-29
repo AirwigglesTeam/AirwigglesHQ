@@ -3007,7 +3007,7 @@ function _pfCheckSizeOnce(){
 }
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
-const PF_BUILD=94;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=95;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -3395,12 +3395,23 @@ async function _histOldestId(filter){                // the oldest single record
 }
 /* Delete one snapshot. The server can be slow to delete a large row, and a timed-out DELETE often still lands, so: long timeout,
    up to 3 tries with a pause, and "404 = already gone" counts as success. */
+let _histDelErr='';
 async function _histDelete(id,tries){
   for(let i=0;i<(tries||3);i++){
-    try{const d=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+id,{method:'DELETE',headers:{Authorization:_pbToken}},60000);if(d.ok||d.status===404)return true;if(d.status===401||d.status===403||d.status===400)return false;}catch(_){}
+    try{
+      const d=await fetchWithTimeout(PB_URL+'/api/collections/workspace_history/records/'+id,{method:'DELETE',headers:{Authorization:_pbToken}},60000);
+      if(d.ok||d.status===404){_histDelErr='';return true;}
+      _histDelErr=await _histErr(d);
+      if(d.status===401||d.status===403||d.status===400||d.status===405)return false;   // the server is refusing, not slow: retrying cannot help
+    }catch(e){_histDelErr=(e&&e.name==='AbortError')?'no answer within 60 seconds':'request blocked or network error ('+String(e&&e.message||e)+')';}
     await new Promise(r=>setTimeout(r,1500*(i+1)));
   }
   return false;
+}
+function _histDelHelp(){
+  const e=_histDelErr||'unknown';
+  const refused=/HTTP (401|403|405)|HTTP 400/.test(e);
+  return 'Delete failed: '+e+'.'+(refused?' PocketBase is refusing deletes on workspace_history: in the PocketBase admin open that collection, API rules, and set the Delete rule to  @request.auth.id != ""':'');
 }
 /* Snapshot ids this device created: lets pruning delete by id with no queries at all (queries read ~270 KB per row). */
 const _SNAP_KEY='pf_snap_ids';
@@ -3436,7 +3447,7 @@ async function _histDeleteOne(id,btn){
   if(btn){btn.disabled=true;btn.textContent='Deleting…';}
   const ok=await _histDelete(id,3);
   if(ok){_snapSave(_snapIds().filter(x=>x.id!==id));_histRows=_histRows.filter(x=>x.id!==id);renderPBHistoryList(true);}
-  else{if(btn){btn.disabled=false;btn.textContent='Delete';}showToast('The server did not confirm the delete. Try again in a moment.',5000);}
+  else{if(btn){btn.disabled=false;btn.textContent='Delete';}showToast(_histDelHelp(),14000);}
 }
 async function _histCleanup(btn){
   const KEEP=60;
@@ -3464,6 +3475,7 @@ async function _histCleanup(btn){
       if(info)info.innerHTML='<div style="color:var(--muted);font-size:.78rem;">Cleaning up… deleted '+deleted+' of '+(total-KEEP)+'</div>';
     }
   }
+  if(deleted===0)showToast(_histDelHelp(),14000);
   showToast('Deleted '+deleted+' old snapshot'+(deleted!==1?'s':'')+(deleted<total-KEEP?' (stopped early: the server did not answer, press Clean up again in a minute)':'')+'. Click Load server snapshots to refresh.',8000);
   _histLoaded=false;renderPBHistoryList();      // no automatic re-list right after deleting: the server is busy; reload it by hand
 }
