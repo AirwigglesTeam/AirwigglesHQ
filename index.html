@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vzTPVUxzZbJ/HzEhlM6iaW7xkqVd5fz75hg6JxYRu5M='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-npYJh2q0gRn+5Fl62oATDvMXI/uXGhKNBJ4482s5bCA='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -564,6 +564,8 @@ div:hover > .proj-reorder-btns{opacity:1!important;}
 .mcard{background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:16px;}
 .mcard-top{display:flex;align-items:flex-start;gap:12px;margin-bottom:14px;}
 .mcard-stats{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;}
+.mcard-stats.s4{grid-template-columns:repeat(4,1fr);}
+.mcard-stats.s2{grid-template-columns:1fr 1fr;}
 .mstat{background:var(--surface2);border-radius:8px;padding:9px 10px;}
 .mstat-val{font-family:'Inter',sans-serif;font-size:1.15rem;font-weight:700;color:var(--acc);font-variant-numeric:tabular-nums;}
 .mstat-lbl{font-size:.6rem;color:var(--muted);margin-top:2px;text-transform:uppercase;letter-spacing:.04em;}
@@ -1125,7 +1127,7 @@ input[type="date"],input[type="datetime-local"],input[type="time"]{color-scheme:
 }
 @media(max-width:380px){
   .fin-grid4{grid-template-columns:1fr;}
-  .mcard-stats{grid-template-columns:1fr 1fr;}
+  .mcard-stats,.mcard-stats.s4{grid-template-columns:1fr 1fr;}
 }
 
 /* ── MOBILE: iOS input zoom prevention (font-size must be >=16px on touch devices) ── */
@@ -4368,7 +4370,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=152;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=153;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8342,14 +8344,14 @@ function _tmCard(m,s,idx,n){
    +'<div style="display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;"><button class="btn btn-ghost btn-xs" onclick="openMemberProfile(\''+m.id+'\')">Info</button><button class="btn btn-ghost btn-xs" onclick="openModal(\'memberTime\',\''+m.id+'\')">+ Log hours</button><button class="btn btn-ghost btn-xs" onclick="filterMemberAndExpand(\''+m.id+'\')" title="Filter the dashboard to this person">Focus</button></div></div>';
   if(s.attention.length)h+='<div style="display:flex;gap:5px;flex-wrap:wrap;margin-bottom:6px;">'+s.attention.map(a=>'<span style="font-size:.62rem;font-weight:600;padding:1px 8px;border-radius:10px;background:'+(a.red?'color-mix(in srgb,var(--red) 18%,transparent)':'var(--surface2)')+';color:'+(a.red?'var(--red)':'var(--muted)')+';">'+escHtml(a.t)+'</span>').join('')+'</div>';
   h+=_tmLbl('Areas &amp; responsibilities')+(s.resp.length?'<div style="display:flex;gap:5px;flex-wrap:wrap;">'+s.resp.map(r=>'<span style="font-size:.7rem;padding:2px 9px;border-radius:10px;background:var(--teal-dim);color:var(--acc);">'+escHtml(r.text)+'</span>').join('')+'</div>':'<div style="font-size:.74rem;color:var(--muted);">None set yet.</div>');
-  h+=_tmLbl('Workload')+'<div class="mcard-stats">'
+  h+=_tmLbl('Workload')+'<div class="mcard-stats s4">'
    +'<div class="mstat"><div class="mstat-val">'+s.open+'</div><div class="mstat-lbl">Open</div></div>'
    +'<div class="mstat"><div class="mstat-val" style="'+(s.overdue?'color:var(--red);':'')+'">'+s.overdue+'</div><div class="mstat-lbl">Overdue</div></div>'
-   +'<div class="mstat"><div class="mstat-val">'+s.dueWeek+'</div><div class="mstat-lbl">Due this week</div></div></div>';
+   +'<div class="mstat"><div class="mstat-val">'+s.dueWeek+'</div><div class="mstat-lbl">Due this week</div></div>'
+   +'<div class="mstat" title="Tasks you are assigned to that are ticked done, all time"><div class="mstat-val" style="color:var(--green);">'+s.done+'</div><div class="mstat-lbl">Done</div></div></div>';
   if(s.byProject.length)h+='<div style="margin-top:8px;display:flex;flex-direction:column;gap:3px;">'+s.byProject.slice(0,5).map(x=>'<div style="display:flex;align-items:center;gap:7px;font-size:.72rem;cursor:pointer;" onclick="openDetail(\''+x.p.id+'\')"><span style="width:8px;height:8px;border-radius:50%;background:'+escHtml(x.p.color||'var(--acc)')+';flex-shrink:0;"></span><span style="flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'+escHtml(x.p.name)+'</span><span style="font-family:\'DM Mono\',monospace;color:var(--muted);">'+x.n+'</span></div>').join('')+(s.byProject.length>5?'<div style="font-size:.64rem;color:var(--muted);">+'+(s.byProject.length-5)+' more projects</div>':'')+'</div>';
-  h+=_tmLbl('Hours &amp; co-working')+'<div class="mcard-stats">'
+  h+=_tmLbl('Hours &amp; co-working')+'<div class="mcard-stats s2">'
    +'<div class="mstat"><div class="mstat-val" style="color:var(--yellow);">'+_tmFmt(s.hoursYear)+'h</div><div class="mstat-lbl">Logged this year</div></div>'
-   +'<div class="mstat"><div class="mstat-val">'+_tmFmt(s.avgWeek)+'h</div><div class="mstat-lbl">Per week (4 wks)</div></div>'
    +'<div class="mstat"><div class="mstat-val" style="color:var(--purple);">'+s.cwAttended+'<span style="font-size:.7rem;color:var(--muted);font-weight:500;"> / '+s.cwHeld+'</span></div><div class="mstat-lbl">Co-working days</div></div></div>';
   h+=_tmLbl('Objectives &amp; key results');
   h+=s.okrs.length?s.okrs.map(o=>'<div style="background:var(--surface2);border:1px solid var(--border);border-radius:9px;padding:8px 10px;margin-bottom:6px;"><div style="display:flex;align-items:center;gap:8px;"><span style="font-size:.62rem;color:var(--acc);">◈</span><span style="flex:1;font-size:.78rem;font-weight:600;min-width:0;">'+escHtml(o.objective)+'</span>'+(o.total?'<span style="font-family:\'DM Mono\',monospace;font-size:.66rem;color:var(--muted);">'+o.done+'/'+o.total+'</span>':'')+'</div>'
