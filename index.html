@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0oL81Sw2OJ9AUKoDaRmHLnbPCt8fvmDIm1p0eGhTUYQ='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ToKAj0Bs/enkqtO8zjQkncDueuLPOaYpNMTyNt60/WQ='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2008,6 +2008,35 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .cl-row b{flex:0 0 38px;font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);font-weight:500;}
 .cl-row span{min-width:0;overflow-wrap:anywhere;}
 .cl-now{color:var(--text);}.cl-now b{color:var(--acc);}
+/* Board: shared header, filters and Status | Labels switch */
+.bd-tools{margin-left:auto;display:flex;align-items:center;gap:12px;}
+.bd-done{font-size:.72rem;color:var(--muted);}.bd-done b{font-family:'DM Mono',monospace;color:var(--green);font-weight:500;}
+.bf{display:flex;flex-direction:column;gap:10px;margin-bottom:16px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:11px;}
+.bf-top{display:flex;align-items:center;gap:8px;justify-content:flex-end;}
+.bf-toggle{display:none;}
+.bf-row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;}
+.bf-lbl{font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;}
+.bf-pills{display:flex;gap:5px;flex-wrap:wrap;min-width:0;}
+.bf-rows{display:flex;flex-direction:column;gap:9px;}
+.bf-chips{display:none;gap:6px;flex-wrap:wrap;}
+.bf-clear{border:1px solid var(--border);background:transparent;color:var(--muted);border-radius:9px;padding:6px 14px;font-size:.72rem;font-weight:600;cursor:default;opacity:.55;transition:var(--tr-ui);}
+.bf-clear.live{cursor:pointer;opacity:1;border-color:rgba(224,96,96,.5);color:#f08a8a;background:rgba(224,96,96,.08);}
+.bf-clear.live:hover{background:rgba(224,96,96,.16);}
+.bf-n{background:rgba(224,96,96,.22);border-radius:99px;padding:1px 7px;font-size:.66rem;}
+.bf-n.acc{background:var(--acc);color:var(--black);font-weight:700;}
+.bd-bar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:14px;}
+.bd-seg{display:inline-flex;background:var(--surface2);border:1px solid var(--border);border-radius:11px;padding:3px;}
+.bd-seg button{border:0;background:none;color:var(--muted);font-size:.76rem;font-weight:600;padding:7px 18px;border-radius:8px;cursor:pointer;transition:var(--tr-ui);}
+.bd-seg button.on{background:var(--surface3);color:var(--text);box-shadow:0 0 0 1px var(--border2);}
+.bd-count{margin-left:auto;font-size:.7rem;color:var(--muted);}
+@media(max-width:700px){
+  .bf-toggle{display:inline-flex;margin-right:auto;}
+  .bf-rows{display:none;}.bf.open .bf-rows{display:flex;}
+  .bf-chips{display:flex;}.bf.open .bf-chips{display:none;}
+  .bd-seg{display:flex;width:100%;}.bd-seg button{flex:1;}
+  .bd-count{margin-left:0;}
+}
+@media (pointer:coarse),(max-width:700px){.bd-seg button,.bf-clear,.bf-toggle{min-height:40px;}}
 </style>
 </head>
 <body>
@@ -2085,11 +2114,8 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
     <!-- Bookmarked projects -->
     <div id="rail-bookmarks"></div>
     <div class="rail-sep"></div>
-    <button class="rbtn" data-v="kanban" data-tip="Kanban Board" onclick="nav('kanban')">
+    <button class="rbtn" data-v="kanban" data-tip="Board" onclick="nav('kanban')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>
-    </button>
-    <button class="rbtn" data-v="campaign" data-tip="Campaign Board" onclick="nav('campaign')">
-      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="10" r="2"/><circle cx="10" cy="4" r="2"/><circle cx="16" cy="10" r="2"/><circle cx="10" cy="16" r="2"/><line x1="6" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="10" y1="6" x2="10" y2="8"/><line x1="10" y1="12" x2="10" y2="14"/></svg>
     </button>
     <button class="rbtn" data-v="finance" data-tip="Finances" onclick="nav('finance')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>
@@ -2134,9 +2160,7 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
   <nav class="pnav" id="panel-nav">
     <div class="nav-row"><div class="nitem active" data-v="dashboard" onclick="nav('dashboard')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>Dashboard</div></div>
     <div id="panel-bookmarks"></div>
-    <div class="nav-row"><div class="nitem" data-v="kanban" onclick="nav('kanban')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>Kanban Board</div></div>
-    <div class="nav-row"><div class="nitem" data-v="campaign" onclick="nav('campaign')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><circle cx="4" cy="10" r="2"/><circle cx="10" cy="4" r="2"/><circle cx="16" cy="10" r="2"/><circle cx="10" cy="16" r="2"/><line x1="6" y1="10" x2="8" y2="10"/><line x1="12" y1="10" x2="14" y2="10"/><line x1="10" y1="6" x2="10" y2="8"/><line x1="10" y1="12" x2="10" y2="14"/></svg>Campaign Board</div></div>
-    <div class="nav-row"><div class="nitem" data-v="campaign" onclick="nav('campaign')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="4" height="14" rx="1"/><rect x="8" y="3" width="4" height="14" rx="1"/><rect x="14" y="3" width="4" height="14" rx="1"/><line x1="2" y1="7" x2="18" y2="7"/></svg>Campaign Board</div></div>
+    <div class="nav-row"><div class="nitem" data-v="kanban" onclick="nav('kanban')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>Board</div></div>
     <div class="pnav-sep"></div>
     <div class="nav-row"><div class="nitem" data-v="finance" onclick="nav('finance')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>Finances</div></div>
     <div class="nav-row"><div class="nitem" data-v="sponsors" onclick="nav('sponsors')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l1.8 3.6L16 6.4l-3 2.9.7 4.1L10 11.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>Sponsors</div></div>
@@ -2291,6 +2315,8 @@ bellDesktopToggle:()=>bellDesktopToggle,
 bellOpenTask:()=>bellOpenTask,
 bellSeenAll:()=>bellSeenAll,
 bellToggle:()=>bellToggle,
+boardFiltersToggle:()=>boardFiltersToggle,
+boardGo:()=>boardGo,
 bulkAssign:()=>bulkAssign,
 bulkAssignPrompt:()=>bulkAssignPrompt,
 bulkDelete:()=>bulkDelete,
@@ -2306,9 +2332,8 @@ cancelPtEdit:()=>cancelPtEdit,
 captureFrSnap:()=>captureFrSnap,
 clearActiveMember:()=>clearActiveMember,
 clearAll:()=>clearAll,
+clearBoardFilter:()=>clearBoardFilter,
 clearBulk:()=>clearBulk,
-clearCampaignFilter:()=>clearCampaignFilter,
-clearKbFilter:()=>clearKbFilter,
 clearLogoUrl:()=>clearLogoUrl,
 clearReminder:()=>clearReminder,
 clickId:()=>clickId,
@@ -2556,14 +2581,13 @@ scResetAll:()=>scResetAll,
 scStartCapture:()=>scStartCapture,
 scrollGanttToday:()=>scrollGanttToday,
 setAccent:()=>setAccent,
+setBoardFilter:()=>setBoardFilter,
 setBrandName:()=>setBrandName,
-setCampaignFilter:()=>setCampaignFilter,
 setCatBudget:()=>setCatBudget,
 setFinTab:()=>setFinTab,
 setFinYear:()=>setFinYear,
 setFundingOn:()=>setFundingOn,
 setGlobalRate:()=>setGlobalRate,
-setKbFilter:()=>setKbFilter,
 setKbSort:()=>setKbSort,
 setLinkTarget:()=>setLinkTarget,
 setPhaseDefault:()=>setPhaseDefault,
@@ -2628,10 +2652,10 @@ tmOpenRangeCal:()=>tmOpenRangeCal,
 tmPickPhase:()=>tmPickPhase,
 tmPickPrio:()=>tmPickPrio,
 toastUndo:()=>toastUndo,
+toggleBoardFilter:()=>toggleBoardFilter,
 toggleBody:()=>toggleBody,
 toggleBookmark:()=>toggleBookmark,
 toggleBulk:()=>toggleBulk,
-toggleCampaignFilter:()=>toggleCampaignFilter,
 toggleCwMember:()=>toggleCwMember,
 toggleDevTodo:()=>toggleDevTodo,
 toggleDone:()=>toggleDone,
@@ -2644,7 +2668,6 @@ toggleGExp:()=>toggleGExp,
 toggleIntegration:()=>toggleIntegration,
 toggleKanbanDone:()=>toggleKanbanDone,
 toggleKbBlocked:()=>toggleKbBlocked,
-toggleKbFilter:()=>toggleKbFilter,
 toggleMemberKR:()=>toggleMemberKR,
 toggleNavVis:()=>toggleNavVis,
 togglePanel:()=>togglePanel,
@@ -3006,16 +3029,8 @@ function useSpTemplateDefault(){const n=document.getElementById('st-text');if(n)
 function clearActiveMember(){S.activeMember=null;save();render();}
 function setProjFilter(v){S.projFilter=v;save();render();}
 function closeDetailView(){S.detailId=null;render();}
-const _KB_KEYS=['project','member','label','phase'];
-function setKbFilter(k,v){if(_KB_KEYS.indexOf(k)<0)return;S.kbFilter[k]=v;save();render();}
-function toggleKbFilter(k,v){if(_KB_KEYS.indexOf(k)<0)return;S.kbFilter[k]=S.kbFilter[k]===v?'':v;save();render();}
-function clearKbFilter(){S.kbFilter={project:'',member:'',label:'',phase:''};save();render();}
 function setKbSort(v){S.kbSort=v;render();}
 function toggleKbBlocked(){S.kbShowBlocked=!S.kbShowBlocked;try{save();}catch(_){}render();}
-const _CP_KEYS=['project','phase','member'];
-function setCampaignFilter(k,v){if(_CP_KEYS.indexOf(k)<0)return;S.campaignFilter[k]=v;save();render();}
-function toggleCampaignFilter(k,v){if(_CP_KEYS.indexOf(k)<0)return;S.campaignFilter[k]=S.campaignFilter[k]===v?'':v;save();render();}
-function clearCampaignFilter(){S.campaignFilter={project:'',phase:'',member:''};save();render();}
 function setTmplTab(t){window._tmplTab=t;pfEnter();render();}
 function setTaskSortThen(v,where){S.taskSort=v;save();if(where==='dash')renderDashTasksInline();else render();}
 function toggleUpdAll(pid){window._updAll=window._updAll||{};window._updAll[pid]=!window._updAll[pid];render();}
@@ -3915,7 +3930,7 @@ else root.PFSync=PFSync;
 /*PFSYNC:END*/
 
 /* ── Sync glue: PocketBase transport, local persistence, UI hooks ── */
-const PF_LOCAL_KEYS=['kbSort','detailId','activeMember','projFilter','kbFilter','dashFilters','campaignFilter','taskSort','expandedTasks','expandedGantt','hideDone','kbShowBlocked'];
+const PF_LOCAL_KEYS=['kbSort','detailId','activeMember','projFilter','boardFilter','dashFilters','taskSort','expandedTasks','expandedGantt','hideDone','kbShowBlocked'];
 const PF_STORE_KEY='pf6';
 const _PB_Q='/api/collections/workspace_state/records?filter='+encodeURIComponent('(workspace="'+PB_WORKSPACE+'")')+'&perPage=1';
 const _pbTok=r=>(r.updated||'')+'|'+(r.updated_at||'');
@@ -4422,7 +4437,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=156;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=157;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -5216,9 +5231,8 @@ function _applyDefaults(){
   if(!Array.isArray(S.finance.reviews))S.finance.reviews=[];
   if(!Array.isArray(S.finance.bank))S.finance.bank=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=1?n.getFullYear():n.getFullYear()-1;}
-  if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
   if(!S.taskSort)S.taskSort='default';
-  if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
+  _bf();   // Board filters (Kanban and Campaign share one set)
   if(!S.coworkDays)S.coworkDays=[];
   S.members=(S.members||[]).filter(Boolean); // strip any null/undefined entries
   S.members.forEach(m=>{if(!m.timeLog)m.timeLog=[];if(m.isDirector===undefined)m.isDirector=false;});
@@ -5354,7 +5368,6 @@ let S={
   slackWebhook:'',detailId:null,
   activeMember:null,
   projFilter:'all',
-  kbFilter:{project:'',member:'',label:''},
   taskSort:'default',
   expandedTasks:[],expandedGantt:[],
   settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',navVisible:{dashboard:true,kanban:true,campaign:true,templates:true,finance:true,sponsors:true,settings:true},bookmarks:[]},
@@ -5362,7 +5375,7 @@ let S={
   sponsors:[],sponsorIdeas:[],sponsorMaterials:[],sponsorSends:[],
   finance:{revenue:0,recurring:[],oneoff:[],finTab:'overview'},
   dashFilters:{project:'',member:'',label:''},
-  campaignFilter:{project:'',phase:'',member:''}
+  boardFilter:{project:'',phase:'',member:'',label:''}
 };
 
 /* save(), load(), saveWithUndo(), undo(), redo() are defined above in the sync block */
@@ -5894,8 +5907,7 @@ function toggleHideDone(){
 
 function clearAllFilters(){
   S.dashFilters={project:'',member:'',label:''};
-  S.kbFilter={project:'',member:'',label:''};
-  S.campaignFilter={project:'',phase:'',member:''};
+  S.boardFilter={project:'',phase:'',member:'',label:''};
   S.activeMember=null;
   save();render();
   showToast('Filters cleared');
@@ -6016,8 +6028,8 @@ function scHelpOpen(){
     ]},
     {label:'Navigate',items:[
       {action:'dashboard',label:'Dashboard'},
-      {action:'kanban',label:'Kanban Board'},
-      {action:'campaign',label:'Campaign Board'},
+      {action:'kanban',label:'Board: Status view'},
+      {action:'campaign',label:'Board: Labels view'},
       {action:'finance',label:'Finance'},
       {action:'sponsors',label:'Sponsors'},
       {action:'templates',label:'Templates'},
@@ -6112,8 +6124,8 @@ document.addEventListener('keydown',function(e){
 function _scLabel(action){
   return{
     search:'Search',shortcuts:'Shortcuts Help',newProject:'New Project',newTask:'New Task',redo:'Redo',
-    newSponsor:'New Sponsor',undo:'Undo',dashboard:'Dashboard',kanban:'Kanban',
-    campaign:'Campaign',finance:'Finance',sponsors:'Sponsors',templates:'Templates',
+    newSponsor:'New Sponsor',undo:'Undo',dashboard:'Dashboard',kanban:'Board (Status)',
+    campaign:'Board (Labels)',finance:'Finance',sponsors:'Sponsors',templates:'Templates',
     settings:'Settings',toggleDone:'Toggle Done',clearFilters:'Clear Filters',
     prevProject:'Prev Project',nextProject:'Next Project',
   }[action]||action;
@@ -6519,7 +6531,7 @@ function applyPermissionsNav(){
   // Hide rail buttons and panel nav items for pages user can't access
   const allPages=['kanban','campaign','finance','sponsors','templates','settings'];
   allPages.forEach(page=>{
-    const allowed=canAccess(page);
+    const allowed=page==='kanban'?(canAccess('kanban')||canAccess('campaign')):canAccess(page);   // one Board item for both views
     // Rail buttons
     document.querySelectorAll(`.rbtn[data-v="${escHtml(page)}"]`).forEach(b=>{
       b.style.display=allowed?'':'none';
@@ -6744,8 +6756,9 @@ function nav(view){
   }
   if(view!=='sponsors')_spOpenId=null;
   V=view;S.detailId=null;
-  document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('active',b.dataset.v===view));
-  document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',i.dataset.v===view));
+  const _hv=view==='campaign'?'kanban':view;   // Status and Labels are one Board item
+  document.querySelectorAll('.rbtn').forEach(b=>b.classList.toggle('active',b.dataset.v===_hv));
+  document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',i.dataset.v===_hv));
   closePanel();render();
 }
 
@@ -6809,8 +6822,9 @@ document.addEventListener('touchend',e=>{const dx=e.changedTouches[0].clientX-sx
 /* Sidebar highlight follows what is on screen: a bookmarked event lights its own bookmark, not the last tab */
 function _syncRailActive(){
   const bm=S.detailId&&isBookmarked(S.detailId)?S.detailId:null;
-  document.querySelectorAll('.rbtn[data-v]').forEach(b=>b.classList.toggle('active',!bm&&b.dataset.v===V));
-  document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',!bm&&i.dataset.v===V));
+  const _hv=V==='campaign'?'kanban':V;
+  document.querySelectorAll('.rbtn[data-v]').forEach(b=>b.classList.toggle('active',!bm&&b.dataset.v===_hv));
+  document.querySelectorAll('.nitem[data-v]').forEach(i=>i.classList.toggle('active',!bm&&i.dataset.v===_hv));
   document.querySelectorAll('.rbtn-bookmark[data-proj]').forEach(b=>b.classList.toggle('active',b.dataset.proj===bm));
   document.querySelectorAll('.nitem[data-proj]').forEach(i=>i.classList.toggle('active',i.dataset.proj===bm));
   _railInd();
@@ -7304,7 +7318,7 @@ function mcGridDays(y,m){
 function mcCollect(sc,days){
   const lo=days[0],hi=days[days.length-1];
   const by={};const at=d=>by[d]||(by[d]={tasks:[],cw:[],fr:[],marks:[]});
-  const cf=sc==='camp'?(S.campaignFilter||{}):null;   // the Campaign board has its own project / phase / member filters
+  const cf=sc==='camp'?_bf():null;   // the Board's filters (project / phase / member / label)
   const mf=cf?(cf.member||null):(sc?null:S.activeMember);   // the 'my view' member filter belongs to the dashboard; a project page shows the whole project
   const projs=cf?S.projects.filter(p=>p.status==='active'&&(!cf.project||p.id===cf.project)):(sc?[getProject(sc)].filter(Boolean):S.projects.filter(p=>p.status==='active'));
   const pids=new Set(projs.map(p=>p.id));
@@ -7312,6 +7326,7 @@ function mcCollect(sc,days){
     if(!pids.has(t.projectId))return;
     if(mf&&!(t.assignees||[]).includes(mf))return;
     if(cf&&cf.phase&&t.phase!==cf.phase)return;
+    if(cf&&cf.label&&!effectiveLabels(t).includes(cf.label))return;
     const d=t.endDate||t.startDate;if(!d||d<lo||d>hi)return;
     at(d).tasks.push(t);
   });
@@ -8125,11 +8140,75 @@ function _finOverviewHtml(){
   const team=`<div class="card"><div class="hd">Team pay<span class="sp"></span>${_foGo('pay','Rates &amp; hours →')}</div><div class="bd"><div class="fo-2"><b class="mono fo-big">${m(P.teamPay)}</b><span class="mono mut">${Math.round(hrs*10)/10} hrs logged</span></div><p class="hint">Counted as a cost before tax. Hours come from the team page. Directors are paid through dividends.</p></div></div>`;
   return `<div class="fo-top2">${_finReviewCardHtml()}${_finTasksHtml()}</div>${_finBankHtml()}${strip}${_finFlowHtml()}<div class="fo-grid">${budget}${recC}${evC}${sav}${team}</div>`;
 }
+/* ── Board: Kanban (Status) and Campaign (Labels) are two views of one page ──
+   They share the header, the Timeline / Calendar, one set of filters (project, phase, member, label) with "Clear all filters",
+   and a Status | Labels switch. The view ids stay 'kanban' (Status) and 'campaign' (Labels) so permissions, links and shortcuts keep working.
+   The filters live in S.boardFilter (saved on this device only, like the old per-view filters). */
+const _BF_KEYS=['project','phase','member','label'];
+function _bf(){if(!S.boardFilter||typeof S.boardFilter!=='object'||Array.isArray(S.boardFilter))S.boardFilter={project:'',phase:'',member:'',label:''};return S.boardFilter;}
+function boardFilterCount(){const f=_bf();return _BF_KEYS.filter(k=>f[k]).length;}
+/* does a task pass the filters? `skip` leaves one filter out (used to count the phase pills) */
+function boardPass(t,skip){
+  const f=_bf(),p=getProject(t.projectId);
+  if(!p||p.status!=='active')return false;
+  if(skip!=='project'&&f.project&&t.projectId!==f.project)return false;
+  if(skip!=='phase'&&f.phase&&t.phase!==f.phase)return false;
+  if(skip!=='member'&&f.member&&!(t.assignees||[]).includes(f.member))return false;
+  if(skip!=='label'&&f.label&&!effectiveLabels(t).includes(f.label))return false;
+  return true;
+}
+function setBoardFilter(k,v){if(_BF_KEYS.indexOf(k)<0)return;_bf()[k]=String(v||'');save();render();}
+function toggleBoardFilter(k,v){if(_BF_KEYS.indexOf(k)<0)return;const f=_bf();f[k]=f[k]===v?'':String(v||'');save();render();}
+function clearBoardFilter(){S.boardFilter={project:'',phase:'',member:'',label:''};save();render();}
+function boardFiltersToggle(){window._bfOpen=!window._bfOpen;render();}
+function boardGo(v){if(v==='kanban'||v==='campaign')nav(v);}
+
+function _boardHeadHtml(tasks){
+  const done=tasks.filter(t=>t.done).length;
+  return `<div class="page-hd"><div class="page-title"><em>Board</em></div>
+  <div class="bd-tools"><span class="bd-done"><b>${done}</b> / ${tasks.length} done</span><button class="btn btn-acc btn-sm" onclick="openModal('task',null)">+ Task</button></div></div>`;
+}
+/* Timeline / Calendar (one open at a time; Timeline by default), both follow the filters */
+function _boardTopHtml(){
+  const cur=_campTopCur(),f=_bf();
+  const projs=S.projects.filter(p=>p.status==='active'&&(!f.project||p.id===f.project));
+  const tab=(k,l)=>`<button class="dtab" id="ctab-${k}" aria-expanded="${cur===k}" onclick="campTopSet('${k}')">${_dashChev(cur===k)}${l}</button>`;
+  return `<div style="margin-bottom:18px;" id="camp-top"><div class="dtabs">${tab('tl','Timeline')}${tab('cal','Calendar')}${cur==='tl'?`<button class="btn btn-ghost btn-xs" onclick="scrollGanttToday()" style="margin-left:auto;font-size:.65rem;">Today</button>`:''}</div>`
+    +(cur==='tl'?`<div id="campaign-gantt" style="background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;">${renderGantt(projs,false,{pass:t=>boardPass(t)})}</div>`:'')
+    +(cur==='cal'?`<div id="campaign-calendar" class="card"><div class="card-bd" data-mcal-host="camp">${renderMonthCal('camp')}</div></div>`:'')+`</div>`;
+}
+function _boardFiltersHtml(){
+  const f=_bf(),n=boardFilterCount(),projs=S.projects.filter(p=>p.status==='active');
+  const phaseCounts={};PHASES.forEach(ph=>{phaseCounts[ph]=S.tasks.filter(t=>t.phase===ph&&boardPass(t,'phase')).length;});
+  const row=(l,inner)=>`<div class="bf-row"><span class="bf-lbl">${l}</span><div class="bf-pills">${inner}</div></div>`;
+  const all=(k)=>`<span class="pill-opt${!f[k]?' active':''}" style="${!f[k]?'background:var(--teal-dim);border-color:var(--acc);color:var(--acc);':''}" onclick="setBoardFilter('${k}','')">All</span>`;
+  const colPill=(k,id,name,col)=>{const act=f[k]===id;return `<span class="pill-opt${act?' active':''}" style="${act?'background:'+safeColor(col)+'22;border-color:'+safeColor(col)+';color:'+safeColor(col)+';':'border-color:'+safeColor(col)+'33;'}" onclick="toggleBoardFilter('${k}','${jsq(id)}')"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${safeColor(col)};margin-right:4px;vertical-align:middle;flex-shrink:0;"></span>${escHtml(name)}</span>`;};
+  const chips=[];
+  if(f.project){const p=getProject(f.project);if(p)chips.push(['project',p.name]);}
+  if(f.phase)chips.push(['phase',f.phase]);
+  if(f.member){const m=S.members.find(x=>x.id===f.member);if(m)chips.push(['member',m.name.split(' ')[0]]);}
+  if(f.label){const l=S.labels.find(x=>x.id===f.label);if(l)chips.push(['label',l.name]);}
+  const rows=(projs.length?row('Project',all('project')+projs.map(p=>colPill('project',p.id,p.name,p.color)).join('')):'')
+    +row('Phase',all('phase')+PHASES.map(ph=>{const act=f.phase===ph,c=phaseColor(ph),cnt=phaseCounts[ph]||0;return `<span class="pill-opt${act?' active':''}" style="border:2px solid ${c};background:${act?c:'transparent'};color:${act?'#111':c};font-weight:${act?'700':'500'};transition:var(--tr-ui);" onclick="toggleBoardFilter('phase','${ph}')">${act?'✓ ':''}${escHtml(ph)}${cnt?` <span style="font-family:'DM Mono',monospace;font-size:.58rem;opacity:${act?'1':'.7'};">${cnt}</span>`:''}</span>`;}).join(''))
+    +(S.members.length?row('Member',S.members.map(m=>`<div class="av-toggle${f.member===m.id?' active':''}" style="padding:3px 8px 3px 4px;" onclick="toggleBoardFilter('member','${jsq(m.id)}')">${avHtml(m.id,18)}<span style="font-size:.71rem;">${escHtml(m.name.split(' ')[0])}</span></div>`).join('')):'')
+    +(S.labels.length?row('Label',all('label')+S.labels.map(l=>colPill('label',l.id,l.name,l.color)).join('')):'');
+  const clear=`<button class="bf-clear${n?' live':''}" onclick="clearBoardFilter()"${n?'':' disabled'}>Clear all filters${n?` <span class="bf-n">${n}</span>`:''}</button>`;
+  return `<div class="bf${window._bfOpen?' open':''}" id="board-filters">
+  <div class="bf-top"><button class="btn btn-ghost bf-toggle" onclick="boardFiltersToggle()" aria-expanded="${window._bfOpen?'true':'false'}">Filters${n?` <span class="bf-n acc">${n}</span>`:''}</button>${clear}</div>
+  ${chips.length?`<div class="bf-chips">${chips.map(([k,t])=>`<span class="pill-opt active" onclick="setBoardFilter('${k}','')" title="Remove this filter">${escHtml(t)} ✕</span>`).join('')}</div>`:''}
+  <div class="bf-rows">${rows}</div></div>`;
+}
+/* Status | Labels switch, plus whatever the current view adds (sort and blocked column for Status) */
+function _boardBarHtml(V,count,extra){
+  const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
+  return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
+}
 /* ── What's new (Settings › Advanced) ──
    A short summary of the latest releases, newest first: [release number, one plain sentence].
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters'],
   [156,'A "What\u2019s new" list in Settings, under Advanced'],
   [155,'Company: contacts (accountant, bank, solicitor) and a compliance checklist'],
   [154,'Finance has a new Company pill: details, key dates, documents, directors and shareholders'],
@@ -8139,8 +8218,7 @@ const PF_CHANGELOG=[
   [150,'The ? shortcut sheet opens properly; help overlays can be switched off in Settings'],
   [149,'Calmer screen: clearer grey text, quiet save indicator, helpful empty states'],
   [148,'Soft placeholders instead of a blank screen while loading'],
-  [147,'Deleting something shows a short Undo message'],
-  [146,'Smoother tab and screen switches']
+  [147,'Deleting something shows a short Undo message']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -11331,18 +11409,10 @@ function _moreBtnHtml(total,shown,more,key,kind){
 function _showMore(more,key){more[key]=(Object.prototype.hasOwnProperty.call(more,key)?more[key]:0)+LIST_CAP;render();}
 function listShowMore(kind,key){_showMore(kind==='cp'?window._cpMore:window._kbMore,String(key));}
 function renderKanban(){
-  const projects=S.projects.filter(p=>p.status==='active');
-  const {project:kProj,member:kMem,label:kLbl,phase:kPh}=S.kbFilter||{};
   const tasksByCol={};KB_COLS.forEach(c=>{tasksByCol[c.id]=[];});
-  // Include ALL tasks (top-level and subtasks)
-  S.tasks.filter(t=>{
-    const p=getProject(t.projectId);if(!p||p.status!=='active')return false;
-    if(kProj&&t.projectId!==kProj)return false;
-    if(kMem&&(!t.assignees||!t.assignees.includes(kMem)))return false;
-    if(kLbl&&!effectiveLabels(t).includes(kLbl))return false;
-    if(kPh&&t.phase!==kPh)return false;
-    return true;
-  }).forEach(t=>{
+  // Include ALL tasks (top-level and subtasks) that pass the Board filters
+  const boardTasks=S.tasks.filter(t=>boardPass(t));
+  boardTasks.forEach(t=>{
     let st=t.kStatus||'todo';
     if(st==='review')st='in-progress';                 // legacy "In Review" cards now live in In Progress
     if(st==='blocked'&&!S.kbShowBlocked)st='todo';     // blocked column hidden: card stays visible in To Do (still badged)
@@ -11354,32 +11424,17 @@ function renderKanban(){
     const _end=(a,b)=>a.endDate===b.endDate?0:(!a.endDate?1:(!b.endDate?-1:(a.endDate<b.endDate?-1:1)));
     _kbCols().forEach(c=>tasksByCol[c.id].sort((a,b)=>_end(a,b)||((_pr[a.priority]??4)-(_pr[b.priority]??4))||_cmpDue(a,b)));
   }
-
-  return`<div class="fu">
-<div class="page-hd"><div class="page-title">Kanban <em>Board</em></div><button class="btn btn-acc btn-sm" onclick="openModal('task',null)">+ Task</button></div>
-<div class="kb-filters">
-  <select class="fsel" onchange="setKbFilter('project',this.value)">
-    <option value="">All projects</option>
-    ${projects.map(p=>`<option value="${escHtml(p.id)}" ${kProj===p.id?'selected':''}>${escHtml(p.name)}</option>`).join('')}
-  </select>
-  <select class="fsel" onchange="setKbFilter('member',this.value)">
-    <option value="">All members</option>
-    ${S.members.map(m=>`<option value="${escHtml(m.id)}" ${kMem===m.id?'selected':''}>${escHtml(m.name)}</option>`).join('')}
-  </select>
-  <select class="fsel" onchange="setKbFilter('label',this.value)">
-    <option value="">All labels</option>
-    ${S.labels.map(l=>`<option value="${escHtml(l.id)}" ${kLbl===l.id?'selected':''}>${escHtml(l.name)}</option>`).join('')}
-  </select>
-  <select class="fsel" onchange="setKbSort(this.value)" title="Order of cards within each column">
+  const _statusExtra=`  <select class="fsel" onchange="setKbSort(this.value)" title="Order of cards within each column">
     <option value="auto" ${(S.kbSort||'auto')==='auto'?'selected':''}>Sort: due date, then priority</option>
     <option value="manual" ${S.kbSort==='manual'?'selected':''}>Sort: manual (drag to order)</option>
   </select>
-  <button class="btn btn-ghost btn-sm kb-blk-tg${S.kbShowBlocked?' on':''}" onclick="toggleKbBlocked()" title="Show or hide the Blocked column (remembered on this device)" aria-pressed="${S.kbShowBlocked?'true':'false'}">${S.kbShowBlocked?'Hide':'Show'} blocked column${S.kbShowBlocked?'':(()=>{const n=S.tasks.filter(t=>t.kStatus==='blocked'&&!t.done).length;return n?' ('+n+')':'';})()}</button>
-  <div class="kb-phase-pills">
-    ${PHASES.map(ph=>`<button class="kb-phase-pill${kPh===ph?' active':''}" onclick="toggleKbFilter('phase','${ph}')" style="border-color:${phaseColor(ph)};${kPh===ph?'background:'+phaseColor(ph)+';color:#fff;':'color:'+phaseColor(ph)+';'}">${ph}</button>`).join('')}
-  </div>
-  ${(kProj||kMem||kLbl||kPh)?`<button class="btn btn-ghost btn-sm" onclick="clearKbFilter()">Clear filters</button>`:''}
-</div>
+  <button class="btn btn-ghost btn-sm kb-blk-tg${S.kbShowBlocked?' on':''}" onclick="toggleKbBlocked()" title="Show or hide the Blocked column (remembered on this device)" aria-pressed="${S.kbShowBlocked?'true':'false'}">${S.kbShowBlocked?'Hide':'Show'} blocked column${S.kbShowBlocked?'':(()=>{const n=S.tasks.filter(t=>t.kStatus==='blocked'&&!t.done).length;return n?' ('+n+')':'';})()}</button>`;
+
+  return`<div class="fu">
+${_boardHeadHtml(boardTasks)}
+${_boardTopHtml()}
+${_boardFiltersHtml()}
+${_boardBarHtml('kanban',boardTasks.length,_statusExtra)}
 <div class="kb-wrap">
 ${_kbCols().map(col=>`
 <div class="kb-col" data-status="${escHtml(col.id)}">
@@ -11566,7 +11621,7 @@ function _renderGanttInner(projects,fullPage=false,opts){
       dotHtml=Object.keys(by).map(d=>{const off=ganttDayOffset(d);if(off===null||off<0||off>=totalDays)return'';const n=by[d].length;
         return '<div class="tdot'+(d<tdy?' od':'')+(n>1?' multi':'')+'" style="left:'+(off*_dpx()+_dpx()/2-8)+'px;--tc:'+p.color+';" onmouseenter="showTaskDotTip(event,\''+p.id+'\',\''+d+'\')" onmouseleave="hideCoworkTip()" onclick="tdotClick(\''+p.id+'\',\''+d+'\')">'+(n>1?n:'')+'</div>';}).join('');
     }
-    const top=_perp?[]:S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(opts.all?_hasDated(t,0):_dated(t)))
+    const top=_perp?[]:S.tasks.filter(t=>t.projectId===p.id&&!t.parentId&&(!opts.pass||opts.pass(t))&&(opts.all?_hasDated(t,0):_dated(t)))
       .sort((a,b)=>((a.endDate||a.startDate)<(b.endDate||b.startDate)?-1:(a.endDate||a.startDate)>(b.endDate||b.startDate)?1:0));   // dated tasks only, soonest first
     rows+=`<div class="grow"><div class="grow-lbl" onclick="openDetail('${p.id}')">${opts.all?'':`<button class="gexp" onclick="event.stopPropagation();toggleGExp('${p.id}')">${top.length>0?(isExp?'▼':'▶'):'·'}</button>`}<div style="width:7px;height:7px;border-radius:50%;background:${p.color};flex-shrink:0;"></div><span class="grow-lbl-name">${escHtml(p.name)}</span></div><div class="grow-chart" style="width:${totalW}px;position:relative;">${bHtml}${dotHtml}${phaseHtml?`<div style="position:relative;height:14px;margin-top:2px;">${phaseHtml}</div>`:''}</div></div>`;
     const _trow=(t,depth)=>{const tb=barP(t.startDate,t.endDate);const tc=taskComp(t);const tHtml=tb?`<div class="gbar" data-tip-task="${escHtml(t.id)}" style="left:${tb.l}px;width:${tb.w}px;height:${depth?9:11}px;background:${p.color}${depth?'12':'18'};border:1px solid ${p.color}${depth?'28':'35'};"><div class="gbar-fill" style="width:${tc}%;background:${p.color}${depth?'60':'80'};"></div></div>`:'';rows+=`<div class="grow"><div class="grow-lbl sub" data-tip-task="${escHtml(t.id)}"${depth?` style="padding-left:${14+depth*12}px;"`:''}><span class="grow-lbl-name" style="font-size:${depth?'.64':'.68'}rem;color:${depth?'var(--muted)':'var(--text2)'};">${escHtml(t.name)}</span><span style="font-family:'DM Mono',monospace;font-size:.58rem;color:var(--muted);">${tc}%</span></div><div class="grow-chart" style="width:${totalW}px;">${tHtml}</div></div>`;
@@ -11666,20 +11721,8 @@ ${S.labels.length===0?`<div class="empty" style="padding:20px;"><div class="empt
 
 /* ════ TEMPLATES ════ */
 function renderCampaign(){
-  // Filters stored on S.campaignFilter
-  if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
-  const cf=S.campaignFilter;
-  const allProjs=S.projects.filter(p=>p.status==='active');
-
-  // Get filtered tasks — top-level only for the board view
-  let tasks=S.tasks.filter(t=>{
-    const p=getProject(t.projectId);
-    if(!p||p.status!=='active')return false;
-    if(cf.project&&t.projectId!==cf.project)return false;
-    if(cf.phase&&t.phase!==cf.phase)return false;
-    if(cf.member&&!(t.assignees||[]).includes(cf.member))return false;
-    return true;
-  });
+  // Tasks that pass the shared Board filters (project, phase, member, label)
+  const tasks=S.tasks.filter(t=>boardPass(t));
 
   // Group by label — tasks with multiple labels appear in each group
   // Tasks with no label go into an "Uncategorised" group
@@ -11692,12 +11735,6 @@ function renderCampaign(){
     if(tLabels.length===0){noLabel.push(t);}
     else{tLabels.forEach(lid=>{if(!groups[lid])groups[lid]={label:labelMap[lid],tasks:[]};groups[lid].tasks.push(t);});}
   });
-
-  // Phase summary counts
-  const phaseCounts={};
-  PHASES.forEach(ph=>{phaseCounts[ph]=tasks.filter(t=>t.phase===ph).length;});
-  const total=tasks.length;
-  const done=tasks.filter(t=>t.done).length;
 
   const taskCard=(t)=>{
     const proj=getProject(t.projectId);
@@ -11742,51 +11779,11 @@ function renderCampaign(){
     </div>`).join('');
 
   return`<div class="fu">
-<div class="page-hd">
-  <div class="page-title"><em>Campaign Board</em></div>
-  <div style="margin-left:auto;display:flex;align-items:center;gap:6px;font-size:.72rem;color:var(--muted);">
-    <span style="font-family:'DM Mono',monospace;color:var(--green);">${done}</span>/<span style="font-family:'DM Mono',monospace;">${total}</span> done
-    ${cf.project||cf.phase||cf.member?`<button class="btn btn-ghost btn-xs" style="margin-left:4px;" onclick="clearCampaignFilter()">✕ Clear all</button>`:''}
-  </div>
-</div>
-
-<!-- Timeline / Calendar (one open at a time; Timeline by default) -->
-<div style="margin-bottom:22px;" id="camp-top">
-  ${(()=>{const cur=_campTopCur();const tab=(k,l)=>`<button class="dtab" id="ctab-${k}" aria-expanded="${cur===k}" onclick="campTopSet('${k}')">${_dashChev(cur===k)}${l}</button>`;
-    return `<div class="dtabs">${tab('tl','Timeline')}${tab('cal','Calendar')}${cur==='tl'?`<button class="btn btn-ghost btn-xs" onclick="scrollGanttToday()" style="margin-left:auto;font-size:.65rem;">Today</button>`:''}</div>`
-      +(cur==='tl'?`<div id="campaign-gantt" style="background:var(--surface);border:1px solid var(--border);border-radius:11px;overflow:hidden;">${renderGantt(allProjs)}</div>`:'')
-      +(cur==='cal'?`<div id="campaign-calendar" class="card"><div class="card-bd" data-mcal-host="camp">${renderMonthCal('camp')}</div></div>`:'');})()}
-</div>
-
-<!-- Filter bar — projects, phases, members as clickable pills -->
-<div style="display:flex;flex-direction:column;gap:10px;margin-bottom:18px;padding:12px 14px;background:var(--surface2);border:1px solid var(--border);border-radius:11px;">
-
-  ${allProjs.length>0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <span style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;">Project</span>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;">
-      <span class="pill-opt${!cf.project?' active':''}" style="${!cf.project?'background:var(--teal-dim);border-color:var(--acc);color:var(--acc);':''}" onclick="setCampaignFilter('project','')">All</span>
-      ${allProjs.map(p=>{const act=cf.project===p.id;return`<span class="pill-opt${act?' active':''}" style="${act?'background:'+safeColor(p.color)+'22;border-color:'+safeColor(p.color)+';color:'+safeColor(p.color)+';':'border-color:'+safeColor(p.color)+'33;'}" onclick="toggleCampaignFilter('project','${p.id}')"><span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:${p.color};margin-right:4px;vertical-align:middle;flex-shrink:0;"></span>${escHtml(p.name)}</span>`;}).join('')}
-    </div>
-  </div>`:''}
-
-  <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <span style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;">Phase</span>
-    <div style="display:flex;gap:5px;flex-wrap:wrap;">
-      <span class="pill-opt${!cf.phase?' active':''}" style="${!cf.phase?'background:var(--teal-dim);border-color:var(--acc);color:var(--acc);':''}" onclick="setCampaignFilter('phase','')">All</span>
-      ${PHASES.map(ph=>{const act=cf.phase===ph;const n=phaseCounts[ph]||0;return`<span class="pill-opt${act?' active':''}" style="border:2px solid ${phaseColor(ph)};background:${act?phaseColor(ph):'transparent'};color:${act?'#111':phaseColor(ph)};font-weight:${act?'700':'500'};transition:var(--tr-ui);" onclick="toggleCampaignFilter('phase','${ph}')">${act?'✓ ':''}${ph}${n?` <span style="font-family:'DM Mono',monospace;font-size:.58rem;opacity:${act?'1':'.7'};">${n}</span>`:''}</span>`;}).join('')}
-    </div>
-  </div>
-
-  ${S.members.length>0?`<div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
-    <span style="font-size:.65rem;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.07em;flex-shrink:0;width:52px;">Member</span>
-    <div class="av-toggle-grid" style="gap:5px;">
-      ${S.members.map(m=>{const act=cf.member===m.id;return`<div class="av-toggle${act?' active':''}" style="padding:3px 8px 3px 4px;" onclick="toggleCampaignFilter('member','${m.id}')">${avHtml(m.id,18)}<span style="font-size:.71rem;">${escHtml(m.name.split(' ')[0])}</span></div>`;}).join('')}
-    </div>
-  </div>`:``}
-
-</div>
-
-${orderedGroups.length===0?`<div class="empty"><div class="empty-ico">${escHtml(ICO.tag)}</div><div class="empty-txt">No tasks with labels yet.<br>Add labels to your tasks to organise by channel.</div></div>`:`
+${_boardHeadHtml(tasks)}
+${_boardTopHtml()}
+${_boardFiltersHtml()}
+${_boardBarHtml('campaign',tasks.length,'')}
+${orderedGroups.length===0?`<div class="empty"><div class="empty-ico">${escHtml(ICO.tag)}</div><div class="empty-txt">${boardFilterCount()?'No tasks match these filters.':'No tasks with labels yet.<br>Add labels to your tasks to organise by channel.'}</div>${boardFilterCount()?`<button class="btn btn-ghost btn-sm empty-act" onclick="clearBoardFilter()">Clear all filters</button>`:''}</div>`:`
 <div style="display:flex;gap:14px;overflow-x:auto;align-items:flex-start;padding-bottom:20px;">
   ${colHtml}
 </div>`}
@@ -13126,7 +13123,7 @@ function renderSettings(){
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg> Navigation</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Choose the icon for each section of the side menu and whether it is shown.</p>
-  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Kanban Board'},{v:'campaign',l:'Campaign Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Finances'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>{
+  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Finances'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>{
     const view=item.v;
     const opts=NAV_ICON_OPTIONS[view]||[];
     const curId=S.settings?.navIcons?.[view]||opts[0]?.id;
@@ -13183,8 +13180,8 @@ ${_airconSettingsHtml()}
       ]},
       {label:'Navigate',items:[
         {action:'dashboard',label:'Dashboard'},
-        {action:'kanban',label:'Kanban Board'},
-        {action:'campaign',label:'Campaign Board'},
+        {action:'kanban',label:'Board: Status view'},
+        {action:'campaign',label:'Board: Labels view'},
         {action:'finance',label:'Finance'},
         {action:'sponsors',label:'Sponsors'},
         {action:'templates',label:'Templates'},
@@ -13461,9 +13458,8 @@ function importData(input){
       if(!S.areas)S.areas=[];
 
       // Filters & UI state
-      if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
       if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
-      if(!S.campaignFilter)S.campaignFilter={project:'',phase:'',member:''};
+      _bf();
       if(S.hideDone===undefined)S.hideDone=false;
       if(!S.expandedTasks)S.expandedTasks=[];
       if(!S.expandedGantt)S.expandedGantt=[];
@@ -16352,7 +16348,7 @@ async function init(){
   initPWA();
   if(!S.dashFilters)S.dashFilters={project:'',member:'',label:''};
   if(S.hideDone===undefined)S.hideDone=false;
-  if(!S.kbFilter)S.kbFilter={project:'',member:'',label:'',phase:''};
+  if(!S.boardFilter)S.boardFilter={project:'',phase:'',member:'',label:''};
   if(!S.coworkDays)S.coworkDays=[];
   applyBranding();
   applyNavVis();
@@ -16731,13 +16727,13 @@ function applyNavVis(){
   // Top rail buttons (.rbtn[data-v])
   document.querySelectorAll('.rbtn[data-v]').forEach(btn=>{
     const view=btn.dataset.v;
-    const vis=nv[view]===false?false:true;
+    const vis=view==='kanban'?(nv.kanban!==false||nv.campaign!==false):nv[view]!==false;   // the Board shows unless both of its old items were hidden
     btn.style.display=vis?'':'none';
   });
   // Side nav items (.nitem[data-v] and their .nav-row parents)
   document.querySelectorAll('.nitem[data-v]').forEach(item=>{
     const view=item.dataset.v;
-    const vis=nv[view]===false?false:true;
+    const vis=view==='kanban'?(nv.kanban!==false||nv.campaign!==false):nv[view]!==false;
     const row=item.closest('.nav-row');
     if(row)row.style.display=vis?'':'none';
     else item.style.display=vis?'':'none';
