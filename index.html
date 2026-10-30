@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PcqMTFuk9dq01vQBoDPo93PG5jdkjZHRmkTg1ezPuY8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-0oL81Sw2OJ9AUKoDaRmHLnbPCt8fvmDIm1p0eGhTUYQ='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2003,6 +2003,11 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .co-tick{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border2,var(--border));background:var(--surface);color:#fff;font-size:.8rem;line-height:1;cursor:pointer;padding:0;flex:0 0 22px;position:relative;}
 .co-tick.on{background:var(--acc);border-color:var(--acc);color:#0b0b0b;}
 .co-tick::before{content:"";position:absolute;inset:-9px;}
+.cl-list{display:flex;flex-direction:column;}
+.cl-row{display:flex;gap:12px;align-items:baseline;padding:7px 0;border-bottom:1px solid var(--border);font-size:.8rem;color:var(--text2);}
+.cl-row b{flex:0 0 38px;font-family:'DM Mono',monospace;font-size:.7rem;color:var(--muted);font-weight:500;}
+.cl-row span{min-width:0;overflow-wrap:anywhere;}
+.cl-now{color:var(--text);}.cl-now b{color:var(--acc);}
 </style>
 </head>
 <body>
@@ -4417,7 +4422,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=155;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=156;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8119,6 +8124,26 @@ function _finOverviewHtml(){
   const hrs=(S.members||[]).filter(x=>!x.isDirector).reduce((a,x)=>a+memberHoursTotal(x),0);
   const team=`<div class="card"><div class="hd">Team pay<span class="sp"></span>${_foGo('pay','Rates &amp; hours →')}</div><div class="bd"><div class="fo-2"><b class="mono fo-big">${m(P.teamPay)}</b><span class="mono mut">${Math.round(hrs*10)/10} hrs logged</span></div><p class="hint">Counted as a cost before tax. Hours come from the team page. Directors are paid through dividends.</p></div></div>`;
   return `<div class="fo-top2">${_finReviewCardHtml()}${_finTasksHtml()}</div>${_finBankHtml()}${strip}${_finFlowHtml()}<div class="fo-grid">${budget}${recC}${evC}${sav}${team}</div>`;
+}
+/* ── What's new (Settings › Advanced) ──
+   A short summary of the latest releases, newest first: [release number, one plain sentence].
+   Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
+   if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
+const PF_CHANGELOG=[
+  [156,'A "What\u2019s new" list in Settings, under Advanced'],
+  [155,'Company: contacts (accountant, bank, solicitor) and a compliance checklist'],
+  [154,'Finance has a new Company pill: details, key dates, documents, directors and shareholders'],
+  [153,'Team profiles show tasks done instead of hours per week'],
+  [152,'The Now / Next / Later board uses the full add bar (assignees, labels, due date, notes)'],
+  [151,'Bigger touch targets on phones and tablets'],
+  [150,'The ? shortcut sheet opens properly; help overlays can be switched off in Settings'],
+  [149,'Calmer screen: clearer grey text, quiet save indicator, helpful empty states'],
+  [148,'Soft placeholders instead of a blank screen while loading'],
+  [147,'Deleting something shows a short Undo message'],
+  [146,'Smoother tab and screen switches']
+];
+function _changelogHtml(){
+  return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
 }
 //@act coSaveDetails coContactSave coContactDel coDocSave coDocDel coPersonSave coPersonDel coHolderSave coHolderDel   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
 /* ── Finance › Company pill: the facts, dates, documents and ownership of the company in one place ──
@@ -13201,6 +13226,7 @@ ${_airconSettingsHtml()}
 
 </div>
 <div class="st-panel" data-st="adv" style="display:${_stT==='adv'?'':'none'}">
+${_changelogHtml()}
 <div class="settings-sec">
   <div class="settings-ttl" style="color:var(--red);"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg> Danger Zone</div>
   <button class="btn btn-danger btn-sm" onclick="clearAll()">Clear all data</button>
