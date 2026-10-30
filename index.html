@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-36MvXIv53OrOAp2jcIkTRpPM5ebVx0Ksy3ipbr0sMXc='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-vzTPVUxzZbJ/HzEhlM6iaW7xkqVd5fz75hg6JxYRu5M='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1956,6 +1956,20 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
   .ti-check,.hit{position:relative;}
   .ti-check::before,.hit::before{content:'';position:absolute;inset:-13px;}
 }
+@media (pointer:coarse),(max-width:700px){
+  .qa-bar-input,.qa-date-inp,.inline-sub-inp{min-height:40px;box-sizing:border-box;}
+  .qa-prio-btn,.qa-add-btn{min-width:40px;min-height:40px;}
+  .qa-bar-main,.inline-sub-main{flex-wrap:wrap;}
+  .qa-bar-input{flex:1 1 140px;}
+}
+@media (pointer:coarse),(max-width:700px){
+  .pft-btn,.pft-out,.grow-lbl,.pill-opt,.av-toggle{min-height:40px;box-sizing:border-box;display:inline-flex;align-items:center;}
+  .grow-lbl{display:flex;}
+  .pill-opt{min-width:40px;justify-content:center;}
+  [data-onclick^="qaToggleMember"]{min-width:40px;min-height:40px;display:flex;align-items:center;justify-content:center;box-sizing:border-box;}
+  :is([data-onclick^="openModal('task'"],span[data-onclick^="openModal('coworkDay'"]):not(button):not(.ti-check){position:relative;}
+  :is([data-onclick^="openModal('task'"],span[data-onclick^="openModal('coworkDay'"]):not(button):not(.ti-check)::before{content:'';position:absolute;inset:-14px 0;}
+}
 </style>
 </head>
 <body>
@@ -2356,7 +2370,6 @@ keyBlur:()=>keyBlur,
 keyClick:()=>keyClick,
 laneOver:()=>laneOver,
 listShowMore:()=>listShowMore,
-lnAdd:()=>lnAdd,
 lnDrop:()=>lnDrop,
 lnMove:()=>lnMove,
 lnToggleDone:()=>lnToggleDone,
@@ -4355,7 +4368,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=151;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=152;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -10475,8 +10488,9 @@ function qaSubmit(barId,projectId,forcedPhase){
   const activePhase=forcedPhase||(document.querySelector(`#${barId}-meta .qa-phase-pill.active`)?.dataset.phase)||'';
   const activeLabels=Array.from(document.querySelectorAll(`#${barId}-meta .qa-label-dot.active`)).map(d=>d.dataset.lid);
   const endDate=el(`${barId}-date`)?.value||'';
+  const lane=el(barId)?.dataset.lane||'';   // set by the board columns (Now / Next / Later)
   saveWithUndo('Add task');
-  S.tasks.unshift({id:uid(),name,description:desc,projectId:proj,parentId:null,priority:prio,phase:activePhase,assignees,labels:activeLabels,blockedBy:[],startDate:'',endDate,kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}});
+  S.tasks.unshift({id:uid(),name,description:desc,projectId:proj,parentId:null,priority:prio,phase:activePhase,assignees,labels:activeLabels,blockedBy:[],startDate:'',endDate,kStatus:'todo',done:false,...(lane&&LANES.some(l=>l[0]===lane)?{lane}:{}),recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}});
   saveNow();
   // Clear name and desc but KEEP assignees and priority sticky
   if(nameEl)nameEl.value='';
@@ -10856,7 +10870,6 @@ function renderDetailBoard(p,top){
   const cols=LANES.map(([id,label,hint])=>{
     const items=open.filter(t=>taskLane(t)===id).sort((a,b)=>dk(a)<dk(b)?-1:dk(a)>dk(b)?1:0);
     const over=id==='now'&&items.length>NOW_CAP;
-    const inp='ln-in-'+p.id+'-'+id;
     return`<div class="ln-col" data-ln-lane="${escHtml(id)}" ondragover="laneOver(event,this)" ondragleave="domRemoveClass(this,'ln-over')" ondrop="lnDrop(event,'${id}')">
       <div style="display:flex;align-items:baseline;gap:8px;margin-bottom:8px;">
         <span style="font-size:.72rem;font-weight:700;letter-spacing:.08em;text-transform:uppercase;color:${id==='now'?'var(--acc)':'var(--text2)'};">${label/*sec-ok: fixed text*/}</span>
@@ -10864,7 +10877,7 @@ function renderDetailBoard(p,top){
         <span style="font-size:.62rem;color:var(--muted);margin-left:auto;">${hint}</span>
       </div>
       ${over?`<div style="font-size:.68rem;color:var(--red);margin-bottom:8px;">Over capacity: move something to Next to stay focused.</div>`:''}
-      <div style="display:flex;gap:5px;margin-bottom:9px;"><input class="inp" id="${inp}" placeholder="Add to ${label}…" style="font-size:.76rem;" onkeydown="if(event.key==='Enter'){event.preventDefault();lnAdd('${p.id}','${id}')}"><button class="btn btn-acc btn-xs" onclick="lnAdd('${p.id}','${id}')" title="Add">+</button></div>
+      ${quickAddBarLaneHtml(p.id,id,label)}
       ${items.length?items.map(lnCard).join(''):`<div style="font-size:.72rem;color:var(--muted);text-align:center;padding:14px 4px;opacity:.7;">Nothing here</div>`}
     </div>`;
   }).join('');
@@ -10882,13 +10895,6 @@ function lnMove(id,lane){
   if(lane==='now'){const n=S.tasks.filter(x=>x.projectId===t.projectId&&!x.parentId&&!x.done&&taskLane(x)==='now').length;if(n>NOW_CAP)showToast('Now has '+n+' items: consider moving one to Next');}
 }
 function lnDrop(ev,lane){ev.preventDefault();const c=ev.currentTarget;if(c&&c.classList)c.classList.remove('ln-over');const id=ev.dataTransfer&&ev.dataTransfer.getData('text/plain');if(id)lnMove(id,lane);}
-function lnAdd(pid,lane){
-  const inp=el('ln-in-'+pid+'-'+lane);const name=inp&&inp.value.trim();if(!name||!LANES.some(l=>l[0]===lane))return;
-  saveWithUndo('Add task');
-  S.tasks.unshift({id:uid(),name,description:'',projectId:pid,parentId:null,priority:'Medium',phase:'',assignees:[],labels:[],blockedBy:[],startDate:'',endDate:'',kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{},lane});
-  saveNow();render();
-  setTimeout(()=>{const n=el('ln-in-'+pid+'-'+lane);if(n)n.focus();},60);
-}
 /* ── Dated status updates: a short running log per project, newest first ── */
 const _UPD_MON=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 function _updDate(iso){const q=_isoParts(iso);return q?q[2]+' '+_UPD_MON[q[1]-1]+' '+q[0]:'';}
@@ -11031,6 +11037,40 @@ function togglePhaseSection(sectionId,bodyId){
   window._phaseCollapsed[sectionId]=isNowCollapsed;
   if(body)body.style.display=isNowCollapsed?'none':'';
   if(chev)chev.style.transform=isNowCollapsed?'rotate(-90deg)':'rotate(0deg)';
+}
+
+/* Board column add bar: the same bar as everywhere else (assignees, priority, labels, due date, notes), tagging the new task with the column (Now / Next / Later).
+   Stable id so the bar keeps its focus and its sticky assignees after the board redraws. qaSubmit reads the column from data-lane. */
+function quickAddBarLaneHtml(projectId,lane,label){
+  const barId='qal-'+String(projectId).replace(/[^A-Za-z0-9_-]/g,'')+'-'+lane;
+  if(!window._qaAssignees[barId])window._qaAssignees[barId]=[];
+  const hasMems=S.members.length>0,hasLabels=S.labels.length>0;
+  return`<div class="qa-bar" id="${barId}" data-lane="${escHtml(lane)}" style="margin-bottom:9px;">
+  <div class="qa-bar-main">
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2.5" stroke-linecap="round" style="flex-shrink:0;"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+    <input class="qa-bar-input" id="${barId}-name" placeholder="Add to ${escHtml(label)}…"
+      onkeydown="qaKeyDown(event,'${barId}','${projectId}','')"
+      onfocus="qaOpenDesc('${barId}')">
+    ${hasMems?`<div id="${barId}-members" style="display:flex;gap:3px;align-items:center;flex-shrink:0;">${qaAvatarRowHtml(barId)}</div>`:''}
+    <button class="qa-prio-btn Medium" id="${barId}-prio" data-prio="Medium" onmousedown="event.preventDefault()" onclick="qaTogglePrio(this)" title="Priority" style="flex-shrink:0;">M</button>
+    <button class="qa-add-btn" onclick="qaSubmit('${barId}','${projectId}','')" title="Add task (Enter)" style="flex-shrink:0;">+</button>
+  </div>
+  <div class="qa-meta" id="${barId}-meta">
+    ${hasLabels?`
+    <span class="qa-meta-lbl">Label</span>
+    <div class="qa-label-wrap" id="${barId}-labels">
+      ${S.labels.map(l=>`<span class="qa-label-dot" id="${barId}-lbl-${l.id}"
+        style="background:${l.color};--label-c:${l.color};"
+        data-lid="${escHtml(l.id)}" data-name="${escHtml(l.name)}" title="${escHtml(l.name)}"
+        onmousedown="event.preventDefault()" onclick="qaToggleLabel(this,'${barId}','${l.id}')">${escHtml(l.name)}</span>`).join('')}
+    </div>
+    <div class="qa-meta-sep"></div>`:''}
+    <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round" style="flex-shrink:0;"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+    <input type="date" class="qa-date-inp" id="${barId}-date" title="Due date" onchange="_qaPinMeta('${barId}')">
+  </div>
+  <textarea class="qa-bar-desc" id="${barId}-desc" placeholder="Notes… (Enter to save, Esc to hide)"
+    onkeydown="qaKey(event,this,'${barId}','${projectId}','')"></textarea>
+</div>`;
 }
 
 // Quick-add bar pre-tagged with a phase — full meta row including labels & date
