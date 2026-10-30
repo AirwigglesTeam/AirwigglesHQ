@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-npYJh2q0gRn+5Fl62oATDvMXI/uXGhKNBJ4482s5bCA='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-PcqMTFuk9dq01vQBoDPo93PG5jdkjZHRmkTg1ezPuY8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1972,6 +1972,37 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
   :is([data-onclick^="openModal('task'"],span[data-onclick^="openModal('coworkDay'"]):not(button):not(.ti-check){position:relative;}
   :is([data-onclick^="openModal('task'"],span[data-onclick^="openModal('coworkDay'"]):not(button):not(.ti-check)::before{content:'';position:absolute;inset:-14px 0;}
 }
+/* Finance › Company */
+.co-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px 28px;}
+.co-row{display:flex;align-items:baseline;gap:8px;padding:8px 0;border-bottom:1px solid var(--border);min-width:0;}
+.co-l{font-size:.66rem;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;flex:0 0 38%;}
+.co-v{font-size:.82rem;min-width:0;overflow-wrap:anywhere;flex:1;}.co-v i{color:var(--muted);font-style:normal;}
+.co-copy{background:none;border:0;color:var(--muted);cursor:pointer;padding:2px 6px;border-radius:6px;font-size:.8rem;}
+.co-copy:hover{color:var(--acc);}
+.co-dates{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;}
+.co-due{display:inline-block;margin-top:4px;font-size:.68rem;font-weight:600;}
+.co-due.ok{color:var(--green);}.co-due.warn{color:var(--yellow);}.co-due.bad{color:var(--red);}.co-due.none{color:var(--muted);font-weight:500;}
+.co-doc{display:flex;align-items:center;gap:8px;padding:6px 0;border-bottom:1px solid var(--border);}
+.co-doc-a{display:flex;align-items:baseline;gap:8px;flex:1;min-width:0;color:var(--text);text-decoration:none;font-size:.82rem;}
+.co-doc-a:hover b{color:var(--acc);}.co-doc-a small{color:var(--muted);font-size:.68rem;}.co-doc-a i{color:var(--muted);font-style:normal;margin-left:auto;}
+.co-doc-d{font-size:.68rem;color:var(--muted);}
+.co-empty{font-size:.78rem;color:var(--text2);padding:4px 0 8px;}
+.co-sugg{display:flex;gap:6px;flex-wrap:wrap;margin-top:10px;}
+.co-two{margin-top:14px;margin-bottom:0;}
+.co-p{display:flex;align-items:center;gap:8px;padding:7px 0;border-bottom:1px solid var(--border);}
+.co-pn{flex:1;min-width:0;font-size:.82rem;display:flex;flex-direction:column;}.co-pn small{color:var(--muted);font-size:.68rem;}
+.co-pct{font-variant-numeric:tabular-nums;font-size:.82rem;}
+.co-bar{display:flex;height:10px;border-radius:99px;overflow:hidden;gap:2px;margin-bottom:8px;background:var(--surface2);}.co-bar s{display:block;}
+.co-note{font-size:.68rem;color:var(--muted);margin-top:8px;line-height:1.5;}
+@media(max-width:700px){.co-grid{grid-template-columns:1fr;}.co-dates{grid-template-columns:1fr;}}
+#co-glance,#co-dates,#co-docs{margin-bottom:14px;}
+#co-glance a.btn{text-decoration:none;}
+.co-role{font-style:normal;font-size:.64rem;font-family:'DM Mono',monospace;color:var(--muted);text-transform:uppercase;letter-spacing:.08em;margin-left:8px;}
+.co-chk{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.co-cl{flex:1;font-size:.82rem;min-width:0;}.co-chk small{font-size:.68rem;color:var(--muted);}.co-chk small.co-old{color:var(--yellow);}
+.co-tick{width:22px;height:22px;border-radius:7px;border:1.5px solid var(--border2,var(--border));background:var(--surface);color:#fff;font-size:.8rem;line-height:1;cursor:pointer;padding:0;flex:0 0 22px;position:relative;}
+.co-tick.on{background:var(--acc);border-color:var(--acc);color:#0b0b0b;}
+.co-tick::before{content:"";position:absolute;inset:-9px;}
 </style>
 </head>
 <body>
@@ -2280,6 +2311,22 @@ closeDetailView:()=>closeDetailView,
 closeModal:()=>closeModal,
 closePanel:()=>closePanel,
 closeSponsorMatch:()=>closeSponsorMatch,
+coCheckToggle:()=>coCheckToggle,
+coContactDel:()=>coContactDel,
+coContactEdit:()=>coContactEdit,
+coContactSave:()=>coContactSave,
+coCopy:()=>coCopy,
+coDocDel:()=>coDocDel,
+coDocEdit:()=>coDocEdit,
+coDocSave:()=>coDocSave,
+coEditDetails:()=>coEditDetails,
+coHolderDel:()=>coHolderDel,
+coHolderEdit:()=>coHolderEdit,
+coHolderSave:()=>coHolderSave,
+coPersonDel:()=>coPersonDel,
+coPersonEdit:()=>coPersonEdit,
+coPersonSave:()=>coPersonSave,
+coSaveDetails:()=>coSaveDetails,
 commitPtSub:()=>commitPtSub,
 commitTeamNs:()=>commitTeamNs,
 commitTeamYr:()=>commitTeamYr,
@@ -4370,7 +4417,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=153;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=155;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -5160,6 +5207,7 @@ function _applyDefaults(){
   if(!S.finance.finAuth)S.finance.finAuth=false;
   if(!S.finance.assets)S.finance.assets=[];
   if(!Array.isArray(S.finance.links))S.finance.links=[];
+  _co();   // company details, documents, directors, shareholders (pre-filled once)
   if(!Array.isArray(S.finance.reviews))S.finance.reviews=[];
   if(!Array.isArray(S.finance.bank))S.finance.bank=[];
   if(S.finance.finYear===undefined){const n=new Date();S.finance.finYear=n.getMonth()>=1?n.getFullYear():n.getFullYear()-1;}
@@ -8072,6 +8120,138 @@ function _finOverviewHtml(){
   const team=`<div class="card"><div class="hd">Team pay<span class="sp"></span>${_foGo('pay','Rates &amp; hours →')}</div><div class="bd"><div class="fo-2"><b class="mono fo-big">${m(P.teamPay)}</b><span class="mono mut">${Math.round(hrs*10)/10} hrs logged</span></div><p class="hint">Counted as a cost before tax. Hours come from the team page. Directors are paid through dividends.</p></div></div>`;
   return `<div class="fo-top2">${_finReviewCardHtml()}${_finTasksHtml()}</div>${_finBankHtml()}${strip}${_finFlowHtml()}<div class="fo-grid">${budget}${recC}${evC}${sav}${team}</div>`;
 }
+//@act coSaveDetails coContactSave coContactDel coDocSave coDocDel coPersonSave coPersonDel coHolderSave coHolderDel   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+/* ── Finance › Company pill: the facts, dates, documents and ownership of the company in one place ──
+   Stored in S.finance.company (synced with the rest of the workspace). Documents are links only (no files are stored).
+   Dates here are entered once; the yearly Companies House / tax reminders stay in the recurring Finance tasks. */
+const CO_FIELDS=[ // [key, label, type]
+  ['name','Company name','text'],['number','Company number','text'],['type','Company type','text'],['incorporated','Incorporated','date'],
+  ['status','Status','text'],['office','Registered office','text'],['sic','SIC codes','text'],['ard','Accounting reference date','text'],['vat','VAT','text']];
+const CO_DATES=[['accountsDue','Annual accounts due'],['confDue','Confirmation statement due'],['ctDue','Corporation tax due']];
+const CO_CHECKS=[['psc','PSC register up to date'],['dirs','Directors\u2019 details correct at Companies House'],['conf','Confirmation statement filed'],['accts','Annual accounts filed'],['reg','Shareholder register current'],['ins','Insurance in force']];
+const CO_ROLE_SUGGEST=['Accountant','Bank','Payment provider','Solicitor','Insurer','Registered office / mail'];
+const CO_DOC_SUGGEST=['Articles of Association',"Shareholders' agreement",'Certificate of incorporation','Ownership structure chart','Statutory registers','Insurance policy'];
+function _coDefaults(){return{
+  f:{name:'Airwiggles Ltd',number:'16206428',type:'Private limited company',incorporated:'2025-01-24',status:'',office:'Godalming, Surrey',sic:'',ard:'31 January',vat:'Not VAT registered',accountsDue:'',confDue:'',ctDue:''},
+  docs:[],
+  contacts:[{id:'cc1',role:'Domain / DNS',name:'GoDaddy',contact:'airwiggles.com',url:'',note:''},{id:'cc2',role:'Email',name:'Google Workspace',contact:'info@airwiggles.com',url:'',note:''}],
+  checks:{},
+  people:[{id:'cd1',name:'Gregory Scott Lester',role:'Director',since:''},{id:'cd2',name:'Jonathan Jack Sands',role:'Director',since:''},{id:'cd3',name:'Lewis Stephen Thompson',role:'Director',since:''}],
+  shares:[{id:'cs1',name:'Gregory Lester',cls:'A',pct:32,note:''},{id:'cs2',name:'Lewis Thompson',cls:'A',pct:28,note:''},{id:'cs3',name:'A Sound Holding ApS',cls:'B',pct:25,note:'Owned by Asbjoern Andersen'},{id:'cs4',name:'Jonathan Sands',cls:'A',pct:15,note:''}]};}
+function _co(){
+  const F=S.finance;if(!F.company||typeof F.company!=='object')F.company=_coDefaults();const c=F.company,d=_coDefaults();
+  if(!c.f||typeof c.f!=='object')c.f=d.f;
+  for(const k of ['docs','people','shares','contacts'])if(!Array.isArray(c[k]))c[k]=d[k];
+  if(!c.checks||typeof c.checks!=='object'||Array.isArray(c.checks))c.checks={};
+  return c;
+}
+const _coDay=s=>/^\d{4}-\d{2}-\d{2}$/.test(s||'')?s:'';
+function _coDue(s){
+  if(!_coDay(s))return'<span class="co-due none">not set</span>';
+  const n=Math.round((new Date(s+'T00:00:00')-new Date(_localToday()+'T00:00:00'))/864e5);
+  const t=n<0?Math.abs(n)+' day'+(n<-1?'s':'')+' overdue':n===0?'today':n===1?'tomorrow':'in '+n+' days';
+  return `<span class="co-due ${n<0?'bad':n<=30?'warn':'ok'}">${t}</span>`;
+}
+function _coCopy(v){return v?`<button class="co-copy" title="Copy" aria-label="Copy" onclick="coCopy(this)" data-v="${escHtml(v)}">⧉</button>`:'';}
+function coCopy(b){const v=b&&b.dataset?b.dataset.v:'';if(!v)return;try{navigator.clipboard.writeText(v).then(()=>{b.textContent='✓';setTimeout(()=>{b.textContent='⧉';},1200);}).catch(()=>{});}catch(e){}}
+function _coRow(l,v,copy,raw){return `<div class="co-row"><span class="co-l">${l}</span><span class="co-v">${raw||(v?escHtml(v):'<i>not set</i>')}</span>${copy?_coCopy(v):''}</div>`;}
+function _finCompanyHtml(){
+  const c=_co(),f=c.f,ch='https://find-and-update.company-information.service.gov.uk/company/'+encodeURIComponent(f.number||'');
+  const inc=_coDay(f.incorporated)?fmtD(f.incorporated):'';
+  const glance=`<div class="card" id="co-glance"><div class="card-hd"><span class="card-title">${escHtml(f.name||'Company')}</span><span style="display:flex;gap:6px;">${f.number?`<a class="btn btn-ghost btn-xs" href="${escHtml(ch)}" target="_blank" rel="noopener">Companies House ↗</a>`:''}<button class="btn btn-acc btn-xs" onclick="coEditDetails()">Edit</button></span></div><div class="card-bd co-grid">
+    ${_coRow('Company number',f.number,1)}${_coRow('Type',f.type)}${_coRow('Incorporated',inc)}${_coRow('Status',f.status)}
+    ${_coRow('Registered office',f.office,1)}${_coRow('SIC codes',f.sic,1)}${_coRow('Accounting reference date',f.ard)}${_coRow('VAT',f.vat)}</div></div>`;
+  const dates=`<div class="card" id="co-dates"><div class="card-hd"><span class="card-title">Key dates</span><button class="btn btn-ghost btn-xs" onclick="coEditDetails()">Set dates</button></div><div class="card-bd co-dates">
+    ${CO_DATES.map(([k,l])=>`<div class="fin-metric"><div class="flbl2">${l}</div><div class="fval" style="font-size:.95rem;">${_coDay(f[k])?escHtml(fmtD(f[k])):'—'}</div>${_coDue(f[k])}</div>`).join('')}</div></div>`;
+  const docs=`<div class="card" id="co-docs"><div class="card-hd"><span class="card-title">Documents</span><button class="btn btn-acc btn-xs" onclick="coDocEdit('','')">+ Add document</button></div><div class="card-bd">
+    ${c.docs.length?c.docs.map(d=>`<div class="co-doc"><a class="co-doc-a" href="${escHtml(safeUrl(d.url))}" target="_blank" rel="noopener"><b>${escHtml(d.name)}</b>${d.category?`<small>${escHtml(d.category)}</small>`:''}<i aria-hidden="true">↗</i></a>${d.date?`<span class="co-doc-d">${escHtml(fmtD(d.date))}</span>`:''}<button class="fl-x" title="Edit" aria-label="Edit ${escHtml(d.name)}" onclick="coDocEdit('${jsq(d.id)}','')">✎</button></div>`).join('')
+    :`<div class="co-empty">Add links to the company's important documents (Google Drive links work well).</div>`}
+    <div class="co-sugg">${CO_DOC_SUGGEST.map((n,i)=>c.docs.some(d=>d.name===n)?'':`<button class="btn btn-ghost btn-xs" onclick="coDocEdit('','${i}')">+ ${escHtml(n)}</button>`).join('')}</div></div></div>`;
+  const tot=c.shares.reduce((a,s)=>a+(Number(s.pct)||0),0);
+  const cols={A:'var(--acc)',B:'var(--blue)'};
+  const people=`<div class="fin-grid2 co-two"><div class="card" id="co-people"><div class="card-hd"><span class="card-title">Directors</span><button class="btn btn-acc btn-xs" onclick="coPersonEdit('')">+ Add</button></div><div class="card-bd">
+    ${c.people.map(p=>`<div class="co-p"><span class="co-pn">${escHtml(p.name)}<small>${escHtml(p.role||'')}${p.since?' · since '+escHtml(fmtD(p.since)):''}</small></span><button class="fl-x" title="Edit" aria-label="Edit ${escHtml(p.name)}" onclick="coPersonEdit('${jsq(p.id)}')">✎</button></div>`).join('')||'<div class="co-empty">No directors added.</div>'}</div></div>
+    <div class="card" id="co-shares"><div class="card-hd"><span class="card-title">Shareholders</span><button class="btn btn-acc btn-xs" onclick="coHolderEdit('')">+ Add</button></div><div class="card-bd">
+    <div class="co-bar">${c.shares.filter(s=>Number(s.pct)>0).map(s=>`<s style="flex:${Number(s.pct)};background:${cols[String(s.cls).toUpperCase()]||'var(--muted)'};" title="${escHtml(s.name)} ${escHtml(s.pct)}%"></s>`).join('')}</div>
+    ${c.shares.map(s=>`<div class="co-p"><span class="co-pn">${escHtml(s.name)}<small>${s.cls?escHtml(s.cls)+' shares':''}${s.note?' · '+escHtml(s.note):''}</small></span><b class="co-pct">${escHtml(Number(s.pct)||0)}%</b><button class="fl-x" title="Edit" aria-label="Edit ${escHtml(s.name)}" onclick="coHolderEdit('${jsq(s.id)}')">✎</button></div>`).join('')||'<div class="co-empty">No shareholders added.</div>'}
+    <div class="co-note">${Math.abs(tot-100)<.01?'Adds up to 100%':'Total '+escHtml(Math.round(tot*100)/100)+'% — check these add up to 100%'}. The split between A and B share classes is not confirmed.</div></div></div></div>`;
+  const contacts=`<div class="card" id="co-contacts" style="margin-top:14px;"><div class="card-hd"><span class="card-title">Accountant, bank &amp; other contacts</span><button class="btn btn-acc btn-xs" onclick="coContactEdit('','')">+ Add contact</button></div><div class="card-bd">
+    ${c.contacts.map(k=>`<div class="co-p"><span class="co-pn"><span>${escHtml(k.name)}<em class="co-role">${escHtml(k.role||'')}</em></span><small>${escHtml(k.contact||'')}${k.note?' · '+escHtml(k.note):''}</small></span>${safeUrl(k.url)?`<a class="btn btn-ghost btn-xs" href="${escHtml(safeUrl(k.url))}" target="_blank" rel="noopener">Open ↗</a>`:''}${_coCopy(k.contact)}<button class="fl-x" title="Edit" aria-label="Edit ${escHtml(k.name)}" onclick="coContactEdit('${jsq(k.id)}','')">✎</button></div>`).join('')||'<div class="co-empty">Add who looks after the accounts, the bank, insurance and legal work. Names and contact details only, never passwords.</div>'}
+    <div class="co-sugg">${CO_ROLE_SUGGEST.map((n,i)=>c.contacts.some(k=>k.role===n)?'':`<button class="btn btn-ghost btn-xs" onclick="coContactEdit('','${i}')">+ ${escHtml(n)}</button>`).join('')}</div></div></div>`;
+  const today=_localToday(),ago=d=>Math.round((new Date(today+'T00:00:00')-new Date(d+'T00:00:00'))/864e5);
+  const done=CO_CHECKS.filter(([k])=>c.checks[k]&&c.checks[k].on).length;
+  const checks=`<div class="card" id="co-checks" style="margin-top:14px;"><div class="card-hd"><span class="card-title">Compliance checklist</span><span class="co-note" style="margin:0;">${done} of ${CO_CHECKS.length} ticked</span></div><div class="card-bd">
+    ${CO_CHECKS.map(([k,l])=>{const v=c.checks[k]||{},on=!!v.on,dt=_coDay(v.date),old=on&&dt&&ago(dt)>365;return `<div class="co-chk"><button class="co-tick${on?' on':''}" role="checkbox" aria-checked="${on}" aria-label="${escHtml(l)}" onclick="coCheckToggle('${k}')">${on?'✓':''}</button><span class="co-cl">${escHtml(l)}</span><small class="${old?'co-old':''}">${on&&dt?'checked '+escHtml(fmtD(dt))+(old?' · over a year ago':''):'not checked'}</small></div>`;}).join('')}
+    <div class="co-note">Ticking records today\u2019s date. Untick and tick again after each yearly review.</div></div></div>`;
+  return glance+dates+docs+people+contacts+checks;
+}
+/* ── editing ── */
+function _coModal(title,body,save,del){
+  const mc=el('mc');mc.style.display='flex';
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:400px;"><div class="mo-hd"><span class="mo-title">${escHtml(title)}</span><button class="mo-close" onclick="closeModal()">×</button></div><div class="mo-body">${body}<div id="co-err" style="color:var(--red);font-size:.72rem;display:none;"></div></div><div class="mo-ft">${del?`<button class="btn btn-ghost" style="margin-right:auto;color:var(--red);" onclick="${del}">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="${save}">Save</button></div></div></div>`;
+  const i=mc.querySelector('input');if(i)i.focus();
+}
+function _coErr(m){const e=el('co-err');if(e){e.textContent=m;e.style.display='block';}}
+const _cof=(id,l,v,ph,type)=>`<div class="field"><label class="flbl">${l}</label><input class="inp" id="${id}" type="${type||'text'}" value="${escHtml(v||'')}"${ph?` placeholder="${escHtml(ph)}"`:''}></div>`;
+const _coVal=id=>(el(id)?.value||'').trim();
+function coEditDetails(){
+  const f=_co().f;
+  _coModal('Company details',CO_FIELDS.map(([k,l,t])=>_cof('co-f-'+k,l,f[k],'',t)).join('')+CO_DATES.map(([k,l])=>_cof('co-f-'+k,l,f[k],'','date')).join(''),'coSaveDetails()','');
+}
+function coSaveDetails(){
+  const c=_co(),nf={};
+  for(const [k,,t] of [...CO_FIELDS,...CO_DATES.map(([k,l])=>[k,l,'date'])]){const v=_coVal('co-f-'+k);if(t==='date'&&v&&!_coDay(v))return _coErr('Enter dates as day / month / year');nf[k]=v.slice(0,200);}
+  saveWithUndo('Edit company details');c.f=nf;saveNow();closeModal();render();
+}
+function _coFind(list,id){return id?_co()[list].find(x=>x.id===id):null;}
+function _coPut(list,id,obj,label){
+  const c=_co();saveWithUndo((id?'Edit ':'Add ')+label);
+  if(id){const i=c[list].findIndex(x=>x.id===id);if(i>=0)c[list][i]={...c[list][i],...obj};}else c[list].push({id:uid(),...obj});
+  saveNow();closeModal();render();
+}
+function _coDel(list,id,label){saveWithUndo('Delete '+label);const c=_co();c[list]=c[list].filter(x=>x.id!==id);saveNow();closeModal();render();}
+function coDocEdit(id,sugg){
+  const d=_coFind('docs',id),nm=d?d.name:(sugg!==''&&CO_DOC_SUGGEST[Number(sugg)])||'';
+  _coModal(d?'Edit document':'Add document',_cof('co-d-n','Name *',nm,"Articles of Association")+_cof('co-d-u','Link *',d?.url,'https://drive.google.com/…')+_cof('co-d-c','Label',d?.category,'e.g. Legal, Insurance (optional)')+_cof('co-d-d','Document date',d?.date,'','date'),`coDocSave('${jsq(id)}')`,d?`coDocDel('${jsq(id)}')`:'');
+}
+function coDocSave(id){
+  const name=_coVal('co-d-n').slice(0,160),url=_finSafeUrl(_coVal('co-d-u')),date=_coVal('co-d-d');
+  if(!name||!url)return _coErr('Enter a name and a web address (https://…)');if(date&&!_coDay(date))return _coErr('Enter the date as day / month / year');
+  _coPut('docs',id,{name,url,category:_coVal('co-d-c').slice(0,60),date},'document');
+}
+function coDocDel(id){_coDel('docs',id,'document');}
+function coPersonEdit(id){
+  const p=_coFind('people',id);
+  _coModal(p?'Edit director':'Add director',_cof('co-p-n','Name *',p?.name)+_cof('co-p-r','Role',p?p.role:'Director')+_cof('co-p-s','Appointed',p?.since,'','date'),`coPersonSave('${jsq(id)}')`,p?`coPersonDel('${jsq(id)}')`:'');
+}
+function coPersonSave(id){const name=_coVal('co-p-n').slice(0,120),since=_coVal('co-p-s');if(!name)return _coErr('Enter a name');if(since&&!_coDay(since))return _coErr('Enter the date as day / month / year');_coPut('people',id,{name,role:_coVal('co-p-r').slice(0,60),since},'director');}
+function coPersonDel(id){_coDel('people',id,'director');}
+function coHolderEdit(id){
+  const s=_coFind('shares',id);
+  _coModal(s?'Edit shareholder':'Add shareholder',_cof('co-h-n','Name *',s?.name)+_cof('co-h-c','Share class',s?s.cls:'A','A, B…')+_cof('co-h-p','Percentage *',s?s.pct:'','','number')+_cof('co-h-o','Note',s?.note,'e.g. owned by … (optional)'),`coHolderSave('${jsq(id)}')`,s?`coHolderDel('${jsq(id)}')`:'');
+}
+function coHolderSave(id){
+  const name=_coVal('co-h-n').slice(0,120),pr=_coVal('co-h-p'),pct=Number(pr);
+  if(!name||pr===''||!isFinite(pct)||pct<0||pct>100)return _coErr('Enter a name and a percentage from 0 to 100');
+  _coPut('shares',id,{name,cls:_coVal('co-h-c').slice(0,20),pct:Math.round(pct*100)/100,note:_coVal('co-h-o').slice(0,120)},'shareholder');
+}
+function coHolderDel(id){_coDel('shares',id,'shareholder');}
+
+function coCheckToggle(k){
+  if(!CO_CHECKS.some(x=>x[0]===k))return;
+  const c=_co(),on=!(c.checks[k]&&c.checks[k].on);
+  saveWithUndo('Update compliance checklist');c.checks[k]={on,date:on?_localToday():''};saveNow();render();
+}
+function coContactEdit(id,sugg){
+  const k=_coFind('contacts',id),role=k?k.role:(sugg!==''&&CO_ROLE_SUGGEST[Number(sugg)])||'';
+  _coModal(k?'Edit contact':'Add contact',_cof('co-k-r','Role',role,'Accountant, Bank, Solicitor…')+_cof('co-k-n','Name *',k?.name,'Company or person')+_cof('co-k-c','Email / phone',k?.contact)+_cof('co-k-u','Website or portal link',k?.url,'https://…')+_cof('co-k-o','Note',k?.note,'e.g. account manager (optional)'),`coContactSave('${jsq(id)}')`,k?`coContactDel('${jsq(id)}')`:'');
+}
+function coContactSave(id){
+  const name=_coVal('co-k-n').slice(0,120),ur=_coVal('co-k-u'),url=ur?_finSafeUrl(ur):'';
+  if(!name)return _coErr('Enter a name');if(ur&&!url)return _coErr('The link must be a web address (https://…)');
+  _coPut('contacts',id,{role:_coVal('co-k-r').slice(0,60),name,contact:_coVal('co-k-c').slice(0,120),url,note:_coVal('co-k-o').slice(0,120)},'contact');
+}
+function coContactDel(id){_coDel('contacts',id,'contact');}
 /* ── Finance: Savings & pay page, laid out as in the approved mockup ──
    Money in the bank, the profit-to-payout list, Savings and Team pay cards, then folds for dividends (per the Articles),
    revenue sources, corporation tax and assets. All figures come from finPayCalc(), the same calculation the Overview and report use. */
@@ -12003,11 +12183,12 @@ function _createSponsorTemplate(type){
 }
 
 /* ════ FINANCE ════ */
-/* ── Finance navigation: four pills, each holding the existing tabs (tab ids and data are unchanged) ── */
+/* ── Finance navigation: five pills, each holding the existing tabs (tab ids and data are unchanged) ── */
 const FIN_GROUPS=[
   {k:'overview',l:'Overview',t:['overview']},
   {k:'spend',l:'Budget & spending',t:['budget','recurring','oneoff','categories']},
   {k:'events',l:'Events',t:['projects']},
+  {k:'company',l:'Company',t:['company']},
   {k:'pay',l:'Savings & pay',t:['savings','payout','tax','assets']}];
 const FIN_TAB_LABEL={oneoff:'One-off',payout:'Team Payout',savings:'Savings & pay',budget:'Budgets',projects:'Events'};
 function _finGroupOf(tab){return FIN_GROUPS.find(g=>g.t.includes(tab))||FIN_GROUPS[0];}
@@ -12129,6 +12310,10 @@ ${_finSubHtml(tab)}
 
 <div class="fin-view${tab==='projects'?' active':''}" id="fin-projects">
   ${_finEventsHtml()}
+</div>
+
+<div class="fin-view${tab==='company'?' active':''}" id="fin-company">
+  ${tab==='company'?_finCompanyHtml():''}
 </div>
 
 <div class="fin-view${_finGroupOf(tab).k==='pay'&&tab!=='assets'?' active':''}" id="fin-pay">
