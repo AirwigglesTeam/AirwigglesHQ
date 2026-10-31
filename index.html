@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sHI7m87MbMmuPpndTyV8INzh/4PrAKmhTAD/fkLCDhU='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CX9hDMi9H9Vu97kD/AXrj16rssBpX4pKb6/1s/Wa3C0='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -755,7 +755,7 @@ hr.div{border:none;border-top:1px solid var(--border);margin:16px 0;}
 /* ── CHIP FILTERS ── */
 .chip{background:var(--surface2);border:1.5px solid var(--border);border-radius:20px;padding:5px 12px;font-size:.72rem;font-weight:500;cursor:pointer;color:var(--text2);transition:var(--tr-ui);white-space:nowrap;}
 .chip:hover{border-color:var(--acc);color:var(--acc);}
-.chip.on{background:var(--acc);border-color:var(--acc);color:var(--black);font-weight:700;}
+.chip.on{border-color:var(--acc);color:var(--acc);font-weight:600;}   /* a selected filter looks like the hover state; filled green is kept for actions */
 .fsel{background:var(--surface2);border:1px solid var(--border);border-radius:6px;color:var(--text);font-size:.72rem;padding:6px 22px 6px 9px;outline:none;cursor:pointer;-webkit-appearance:none;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6'%3E%3Cpath fill='%235a5a5a' d='M5 6L0 0h10z'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 7px center;background-color:var(--surface2);}
 .fsel:focus{border-color:var(--acc);}
 
@@ -2095,7 +2095,7 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-rn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 .pb-vw{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;}
 .pb-vw button{font:inherit;font-size:.72rem;font-weight:600;padding:6px 12px;min-height:32px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pb-vw button.on{background:var(--acc);border-color:var(--acc);color:var(--black);}
+.pb-vw button.on{border-color:var(--acc);color:var(--acc);}
 .pb-sum{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
 .pb-sum span{flex:1 1 130px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:9px 12px;font-size:.68rem;color:var(--muted);display:flex;flex-direction:column;gap:2px;}
 .pb-sum b{font-size:.9rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -4563,7 +4563,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=171;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=172;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8989,6 +8989,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [172,'Selected filters look like the hover state; green fill is kept for actions'],
   [171,'Workflow tag on tasks; Tidy puts a step after the one you chose, not at the end'],
   [170,'Workflows: runs are now called projects; start a project from a Workflow in New Project'],
   [169,'Workflows: Print / PDF sheet with the map, steps, notes, links and run dates'],
@@ -8998,8 +8999,7 @@ const PF_CHANGELOG=[
   [165,'Playbooks are now called Workflows; steps show as a simple list on phones'],
   [164,'Playbook Templates tab, Event and Product starters, run date can be the event day'],
   [163,'Playbook steps can be ticked in any order (the lock is now optional); audit and tune-up'],
-  [162,'Playbooks: a quarterly finance review that reuses your recurring finance tasks'],
-  [161,'Playbooks: run versions, retro with late steps, duplicate and archive']
+  [162,'Playbooks: a quarterly finance review that reuses your recurring finance tasks']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
