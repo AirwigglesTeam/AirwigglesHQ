@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3w4GWRqSAlQAYuDWTcSkIiCDDkMLnYONTP2NGYLwF50='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-sHI7m87MbMmuPpndTyV8INzh/4PrAKmhTAD/fkLCDhU='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2117,6 +2117,8 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-rq b{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
 .pb-chk{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text2);margin:2px 0 8px;min-height:40px;cursor:pointer;}
 .pb-chk input{width:18px;height:18px;flex:none;}
+.pb-wt{all:unset;box-sizing:border-box;cursor:pointer;display:inline-block;max-width:120px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;vertical-align:middle;margin-left:6px;font-size:.58rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--teal-dim);color:var(--acc);border:1px solid var(--teal-mid);}
+.pb-wt:hover,.pb-wt:focus-visible{border-color:var(--acc);}
 .pb-tag{font-size:.6rem;font-weight:700;padding:2px 7px;border-radius:4px;background:var(--teal-dim);color:var(--acc);white-space:nowrap;flex-shrink:0;}
 </style>
 </head>
@@ -2570,6 +2572,7 @@ openSpMatch:()=>openSpMatch,
 openSponsorProfile:()=>openSponsorProfile,
 openSponsorProfileClose:()=>openSponsorProfileClose,
 pbAddItem:()=>pbAddItem,
+pbAddLink:()=>pbAddLink,
 pbAddStarter:()=>pbAddStarter,
 pbAddStep:()=>pbAddStep,
 pbArchive:()=>pbArchive,
@@ -2578,6 +2581,7 @@ pbBumpDays:()=>pbBumpDays,
 pbCloseStep:()=>pbCloseStep,
 pbCreate:()=>pbCreate,
 pbDelItem:()=>pbDelItem,
+pbDelLink:()=>pbDelLink,
 pbDelStep:()=>pbDelStep,
 pbDeletePb:()=>pbDeletePb,
 pbDuplicate:()=>pbDuplicate,
@@ -2586,6 +2590,8 @@ pbFinanceStarter:()=>pbFinanceStarter,
 pbNewModal:()=>pbNewModal,
 pbNewPreview:()=>pbNewPreview,
 pbOpen:()=>pbOpen,
+pbOpenRun:()=>pbOpenRun,
+pbPrint:()=>pbPrint,
 pbRestoreVer:()=>pbRestoreVer,
 pbRetroModal:()=>pbRetroModal,
 pbRunModal:()=>pbRunModal,
@@ -4557,7 +4563,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=167;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=171;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8411,12 +8417,12 @@ function _pbDesignHtml(p){
   const rv=_pbRunsOf(p).find(r=>r.id===_pbUI.run);if(rv)return _pbRunViewHtml(p,rv);
   const calc=_pbCalc(p),s=_pbStepOf(p,_pbUI.step);
   return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>Workflows</em> / <input class="pb-name" value="${escHtml(p.name||'')}" onchange="pbSetName(this.value)" aria-label="Workflow name"></div>
-    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button><button class="btn btn-ghost btn-sm" onclick="pbAddStep()">+ Add step</button>${p.steps.length?`<button class="btn btn-acc btn-sm" onclick="pbRunModal()">Start a run</button>`:''}</div></div>
+    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button>${p.steps.length?`<button class="btn btn-ghost btn-sm" onclick="pbPrint()">Print / PDF</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbAddStep()">+ Add step</button>${p.steps.length?`<button class="btn btn-acc btn-sm" onclick="pbRunModal()">Start a project</button>`:''}</div></div>
   ${_pbViewBar(p)}
   ${p.outcome?`<p class="pb-lede">${escHtml(p.outcome)}</p>`:''}
   <div class="pb-layout${s?' open':''}"><div><div class="card">${p.steps.length?_pbMapHtml(p):`<div class="empty" style="padding:30px;"><div class="empty-txt">No steps yet. Add the first one.</div><button class="btn btn-acc btn-sm" onclick="pbAddStep()" style="margin-top:10px;">+ Add step</button></div>`}
     <div class="pb-legend"><span><i></i>Step</span><span><i class="g"></i>Approval gate</span><span>Click a step to edit it. Drag to move it. Use “Comes after” in the editor to connect steps.</span></div></div>
-    ${p.steps.length?`<p class="pb-note">${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(calc.total)} day${calc.total===1?'':'s'}. A run counts back from the publish date so each step gets its due date.</p>`:''}</div>
+    ${p.steps.length?`<p class="pb-note">${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(calc.total)} day${calc.total===1?'':'s'}. A project counts back from the publish date so each step gets its due date.</p>`:''}</div>
   ${s?_pbDrawerHtml(p,s):''}</div>${_pbRunsHtml(p)}${_pbVersHtml(p)}</div>`;
 }
 function _pbDrawerHtml(p,s){
@@ -8432,6 +8438,8 @@ function _pbDrawerHtml(p,s){
     ${inp('Goes out',`<input class="inp" value="${escHtml(s.out||'')}" onchange="pbSetField('${jsq(s.id)}','out',this.value)" placeholder="e.g. Final script" aria-label="What goes out">`)}</div>
   ${inp('Where the work lives',`<div class="pb-two"><input class="inp" value="${escHtml(s.toolName||'')}" onchange="pbSetField('${jsq(s.id)}','toolName',this.value)" placeholder="Miro, Google Doc…" aria-label="Tool name"><input class="inp" value="${escHtml(s.toolUrl||'')}" onchange="pbSetField('${jsq(s.id)}','toolUrl',this.value)" placeholder="https://…" aria-label="Tool link"></div>${safeUrl(s.toolUrl)?`<a class="pb-open" href="${escHtml(safeUrl(s.toolUrl))}" target="_blank" rel="noopener">Open ${escHtml(s.toolName||'link')} ↗</a>`:''}`)}
   <label class="pb-gate"><input type="checkbox" ${s.gate?'checked':''} onchange="pbSetGate('${jsq(s.id)}',this.checked)"> Approval gate: someone signs off before the next step</label>
+  ${inp('Notes',`<textarea class="inp" rows="3" maxlength="600" onchange="pbSetField('${jsq(s.id)}','notes',this.value)" placeholder="Tips, links to examples, what good looks like…" aria-label="Step notes">${escHtml(s.notes||'')}</textarea>`)}
+  ${inp('Links and files',`${(Array.isArray(s.links)?s.links:[]).map(c=>{const u=c&&_finSafeUrl(c.url);return u?`<div class="pb-li"><span><a class="pb-open" style="margin:0;" href="${escHtml(u)}" target="_blank" rel="noopener noreferrer">${escHtml(c.text||'Link')}</a></span><button class="fl-x" aria-label="Remove" onclick="pbDelLink('${jsq(s.id)}','${jsq(c.id)}')">✕</button></div>`:'';}).join('')}<div class="pb-two" style="margin-top:6px;"><input class="inp" id="pb-new-lk-t" maxlength="40" placeholder="Name (Brief, Folder…)" aria-label="Link name"><input class="inp" id="pb-new-lk-u" placeholder="https://… (Drive, Dropbox)" onkeydown="if(event.key==='Enter')pbAddLink('${jsq(s.id)}')" aria-label="Link address"></div><div class="pb-add"><span class="pb-hint" style="flex:1;">Paste a link to the file. Files stay where they live.</span><button class="btn btn-ghost btn-xs" onclick="pbAddLink('${jsq(s.id)}')">Add</button></div>`)}
   ${inp('Comes after',others.length?`<div class="pb-after">${others.map(o=>`<label><input type="checkbox" ${_pbAfter(s).includes(o.id)?'checked':''} onchange="pbToggleAfter('${jsq(s.id)}','${jsq(o.id)}',this.checked)"> ${escHtml(o.name||'Step')}</label>`).join('')}</div>`:'<span class="pb-hint">Add more steps to connect them.</span>')}
   ${inp('Done means',`${(s.checks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','checks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-checks" placeholder="Add a check" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','checks')" aria-label="New check"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','checks')">Add</button></div>`)}
   ${inp('Tasks this step creates',`${(s.tasks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','tasks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-tasks" placeholder="Add a task" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','tasks')" aria-label="New task"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','tasks')">Add</button></div><span class="pb-hint">Each task is due when the step ends, once you start a run.</span>`)}
@@ -8451,6 +8459,7 @@ function pbSetField(sid,k,v){
   else if(k==='toolUrl'){v=_pbT(v,300);if(v){const u=_finSafeUrl(v);if(!u){render();return;}v=u;}}
   else if(k==='owner'){v=S.members.some(m=>m.id===v)?v:'';}
   else if(k==='ph'){v=PHASES.includes(v)?v:'';}
+  else if(k==='notes'){v=String(v==null?'':v).replace(/\r/g,'').split('\n').map(l=>l.replace(/[ \t]+/g,' ').trim()).join('\n').replace(/\n{3,}/g,'\n\n').trim().slice(0,600);}
   else if(_PB_FIELDS[k])v=_pbT(v,_PB_FIELDS[k]);
   else return;
   if(k==='name'&&!v)v='New step';
@@ -8460,6 +8469,7 @@ function pbSetGate(sid,on){const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;save
 function pbToggleAfter(sid,aid,on){
   const p=_pbCur(),s=_pbStepOf(p,sid),a=_pbStepOf(p,aid);if(!s||!a||sid===aid)return;
   let L=_pbAfter(s).filter(x=>x!==aid);
+  if(s.auto){delete s.auto;if(on)L=[];}
   if(on){if(_pbDependsOn(p,aid,sid)){render();return;}L.push(aid);}   // a loop is refused: the box un-ticks when the editor redraws
   saveWithUndo('Edit step');s.after=L;_pbPlace(p,s);save();render();
 }
@@ -8471,6 +8481,17 @@ function pbAddItem(sid,kind){
   saveWithUndo('Edit step');s[kind].push({id:uid(),text:t});save();render();
   const n=el('pb-new-'+kind);if(n)n.focus();
 }
+function pbAddLink(sid){
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
+  const tx=el('pb-new-lk-t'),ux=el('pb-new-lk-u'),u=_finSafeUrl(_pbT(ux&&ux.value,300));
+  if(!u){showToast('Paste a full link starting with https://');return;}
+  if(!Array.isArray(s.links))s.links=[];if(s.links.length>=8){showToast('A step can have 8 links');return;}
+  saveWithUndo('Edit step');s.links.push({id:uid(),text:_pbT(tx&&tx.value,40)||'Link',url:u});p.updated=_localToday();save();render();
+}
+function pbDelLink(sid,iid){
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
+  saveWithUndo('Edit step');s.links=(Array.isArray(s.links)?s.links:[]).filter(x=>x&&x.id!==iid);save();render();
+}
 function pbDelItem(sid,kind,iid){
   if(kind!=='checks'&&kind!=='tasks')return;
   const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
@@ -8481,6 +8502,7 @@ function pbAddStep(){
   saveWithUndo('Add step');
   const prev=_pbStepOf(p,_pbUI.step)||p.steps[p.steps.length-1]||null;
   const s={id:uid(),name:'New step',owner:'',days:1,inp:'',out:'',toolName:'',toolUrl:'',gate:false,c:0,r:0,after:prev?[prev.id]:[],checks:[],tasks:[]};
+  if(prev)s.auto=true;   // the first link is only a starting guess: the first time you choose "Comes after" it is replaced, not added to
   p.steps.push(s);_pbPlace(p,s);_pbUI.step=s.id;p.updated=_localToday();save();render();
 }
 function pbDelStep(sid){
@@ -8529,10 +8551,10 @@ function pbSettingsModal(){
   <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-s-trig"><option value="once"${p.trigger!=='repeat'?' selected':''}>One-off</option><option value="repeat"${p.trigger==='repeat'?' selected':''}>Repeats</option></select></div>
   <div class="field"><label class="flbl">Repeats every</label><select class="sel" id="pb-s-ev">${[['week','Week'],['2weeks','2 weeks'],['month','Month']].map(o=>`<option value="${escHtml(o[0])}"${(p.repeat&&p.repeat.every||'week')===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select></div>
   <div class="field"><label class="flbl">Next publish date</label><input class="inp" type="date" id="pb-s-next" value="${escHtml((p.repeat&&p.repeat.next)||'')}"></div>
-  <div class="field"><label class="flbl">A run creates</label><select class="sel" id="pb-s-type"><option value="improvement"${p.projType!=='event'?' selected':''}>A project</option><option value="event"${p.projType==='event'?' selected':''}>An event (with phases, sponsors and prizes)</option></select></div>
-  <div class="field"><label class="flbl">The run date is when this step ends</label><select class="sel" id="pb-s-anchor"><option value="">The last steps (steps count back from the date)</option>${p.steps.map(x=>`<option value="${escHtml(x.id)}"${p.anchor===x.id?' selected':''}>${escHtml(x.name||'Step')}</option>`).join('')}</select></div>
+  <div class="field"><label class="flbl">Creates</label><select class="sel" id="pb-s-type"><option value="improvement"${p.projType!=='event'?' selected':''}>A project</option><option value="event"${p.projType==='event'?' selected':''}>An event (with phases, sponsors and prizes)</option></select></div>
+  <div class="field"><label class="flbl">The project date is when this step ends</label><select class="sel" id="pb-s-anchor"><option value="">The last steps (steps count back from the date)</option>${p.steps.map(x=>`<option value="${escHtml(x.id)}"${p.anchor===x.id?' selected':''}>${escHtml(x.name||'Step')}</option>`).join('')}</select></div>
   <div class="field" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="pbDuplicate()">Duplicate</button><button class="btn btn-ghost btn-sm" onclick="pbArchive()">${p.archived?'Restore from archive':'Archive'}</button></div>
-  <div class="pb-hint">Only used when it repeats. Each time, the run is created about 3 days before its first step is due, when someone opens the app.</div>`;
+  <div class="pb-hint">Only used when it repeats. Each time, the project is created about 3 days before its first step is due, when someone opens the app.</div>`;
   _coModal('Workflow settings',body,'pbSaveSettings()','pbDeletePb()');
 }
 function pbSaveSettings(){const p=_pbCur();if(!p)return;saveWithUndo('Edit workflow');p.outcome=_coVal('pb-s-out').slice(0,160);p.trigger=_coVal('pb-s-trig')==='repeat'?'repeat':'once';{const an=_coVal('pb-s-anchor');p.anchor=p.steps.some(x=>x.id===an)?an:'';p.projType=_coVal('pb-s-type')==='event'?'event':'improvement';}{const ev=_coVal('pb-s-ev'),nx=_coVal('pb-s-next');p.repeat={every:ev==='2weeks'||ev==='month'?ev:'week',next:nx&&addDays(nx,0)===nx?nx:''};}p.updated=_localToday();save();closeModal();render();}
@@ -8639,7 +8661,7 @@ function pbInitMap(){
 }
 
 /* ── Runs: one go through the Workflow, counted back from a publish date ──
-   A run creates an ordinary project and one task per step (the step's own tasks become subtasks). Steps that come after others
+   Creates an ordinary project and one task per step (the step's own tasks become subtasks). Steps that come after others
    are blocked until those finish. p.runs=[{id,name,date,projectId,created}]; each task carries t.pbRun={pb,run,step}. */
 const PB_MAX_RUNS=60,PB_MAX_PB=40,PB_MAX_TASKS=300;   // keeps the workspace record small: a run never makes more than 300 tasks
 function _pbRunSize(p){return p.steps.reduce((n,s)=>n+1+(Array.isArray(s.tasks)?s.tasks.length:0),0);}
@@ -8675,21 +8697,21 @@ function _pbRunsOf(p){return Array.isArray(p.runs)?p.runs.filter(r=>r&&typeof r=
 function _pbRunsHtml(p){
   const runs=_pbRunsOf(p);if(!runs.length)return '';
   const row=r=>{const ts=(S.tasks||[]).filter(t=>t.pbRun&&t.pbRun.run===r.id&&!t.parentId),n=ts.length,d=ts.filter(t=>t.done).length,gone=!getProject(r.projectId);
-    return `<div class="pb-run"><div class="pb-rn"><b>${escHtml(r.name||'Run')}</b><span class="mut">publish ${escHtml(fmtD(r.date))}${(()=>{const v=_pbVers(p).find(x=>x.id===r.v);return v?' · version '+escHtml(v.n):'';})()}${r.retro?' · retro written':''}${gone?' · project deleted':` · ${d} of ${n} steps done`}</span></div>${gone?'':`<button class="btn btn-ghost btn-xs" onclick="pbSetView('${jsq(r.id)}')">Live map</button><button class="btn btn-ghost btn-xs" onclick="openDetail('${jsq(r.projectId)}')">Open project</button>`}</div>`;};
-  return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Runs</span><span class="pill">${runs.length}</span></div><div class="card-bd">${runs.slice().reverse().map(row).join('')}</div></div>`;
+    return `<div class="pb-run"><div class="pb-rn"><b>${escHtml(r.name||'Project')}</b><span class="mut">publish ${escHtml(fmtD(r.date))}${(()=>{const v=_pbVers(p).find(x=>x.id===r.v);return v?' · version '+escHtml(v.n):'';})()}${r.retro?' · retro written':''}${gone?' · project deleted':` · ${d} of ${n} steps done`}</span></div>${gone?'':`<button class="btn btn-ghost btn-xs" onclick="pbSetView('${jsq(r.id)}')">Live map</button><button class="btn btn-ghost btn-xs" onclick="openDetail('${jsq(r.projectId)}')">Open project</button>`}</div>`;};
+  return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Projects</span><span class="pill">${runs.length}</span></div><div class="card-bd">${runs.slice().reverse().map(row).join('')}</div></div>`;
 }
 function pbRunModal(){
   const p=_pbCur();if(!p||!p.steps.length)return;
-  if(_pbRunsOf(p).length>=PB_MAX_RUNS)return showToast('This Workflow has '+PB_MAX_RUNS+' runs. Delete an old project first.');
+  if(_pbRunsOf(p).length>=PB_MAX_RUNS)return showToast('This Workflow has '+PB_MAX_RUNS+' projects. Delete an old one first.');
   let def=addDays(_localToday(),Math.ceil(_pbCalc(p).total)+2);
   if(p.link==='finreview'&&typeof finReviewState==='function'){try{const st=finReviewState(),d=(st.review&&st.review.date)||st.dueBy;if(d&&d>=_localToday())def=d;}catch(_){}}
   const body=`<div class="field"><label class="flbl">${escHtml(((p.anchor&&_pbStepOf(p,p.anchor))?(_pbStepOf(p,p.anchor).name||'Step')+' date':'Publish date'))} *</label><input class="inp" type="date" id="pb-r-date" value="${escHtml(def)}" oninput="pbRunPreview()"></div>
   <div id="pb-r-pv" class="pb-hint" style="margin:-4px 0 10px;"></div>
-  <div class="field"><label class="flbl">Project name</label><input class="inp" id="pb-r-name" maxlength="80" placeholder="${escHtml((p.name||'Run')+' · publish date')}"></div>
+  <div class="field"><label class="flbl">Project name</label><input class="inp" id="pb-r-name" maxlength="80" placeholder="${escHtml((p.name||'Project')+' · publish date')}"></div>
   ${(()=>{const l=_pbRunsOf(p).slice().reverse().find(r=>r.retro&&r.retro.change);return l?`<div class="pb-lesson"><b>Change from last time</b>${escHtml(l.retro.change)}</div>`:'';})()}
   <label class="pb-chk"><input type="checkbox" id="pb-r-lock"${p.lock?' checked':''}> Lock each step until the steps before it are done</label>
   <div class="pb-hint">Creates a project with one task per step, due dates counted back from the publish date. With the lock off, tasks can be ticked in any order.</div>`;
-  _coModal('Start a run',body,'pbStartRun()','');pbRunPreview();
+  _coModal('Start a project',body,'pbStartRun()','');pbRunPreview();
 }
 function pbRunPreview(){
   const p=_pbCur(),pv=el('pb-r-pv');if(!p||!pv)return;
@@ -8703,18 +8725,19 @@ function pbRunPreview(){
 function pbStartRun(){
   const p=_pbCur();if(!p||!p.steps.length)return;
   const date=_coVal('pb-r-date');if(!date||addDays(date,0)!==date)return _coErr('Pick a publish date');
-  if(_pbRunsOf(p).length>=PB_MAX_RUNS)return _coErr('Too many runs on this Workflow');
-  if(_pbRunSize(p)>PB_MAX_TASKS)return _coErr('A run would create '+_pbRunSize(p)+' tasks (the limit is '+PB_MAX_TASKS+'). Remove some step tasks first.');
+  if(_pbRunsOf(p).length>=PB_MAX_RUNS)return _coErr('Too many projects on this Workflow');
+  if(_pbRunSize(p)>PB_MAX_TASKS)return _coErr('A project would create '+_pbRunSize(p)+' tasks (the limit is '+PB_MAX_TASKS+'). Remove some step tasks first.');
   saveWithUndo('Start run');
   const lock=!!(el('pb-r-lock')&&el('pb-r-lock').checked);p.lock=lock;
   const n=_pbMakeRun(p,date,_coVal('pb-r-name'),false,lock);
   save();closeModal();
   if(V!=='playbooks'){_pbUI.run=p.runs[p.runs.length-1].id;_pbUI.step='';nav('playbooks');}else render();
-  showToast('Run started: '+n+' tasks created');
+  showToast('Project started: '+n+' tasks created');
 }
 /* builds the project and tasks for one run. auto runs use fixed ids, so two devices making the same run merge into one */
+function _pbLinkLines(s){const L=(Array.isArray(s.links)?s.links:[]).map(c=>{const u=c&&_finSafeUrl(c.url);return u?'• '+_pbT(c.text,40)+' '+u:'';}).filter(Boolean);return L.length?'Links:\n'+L.join('\n'):'';}
 function _pbMakeRun(p,date,nm,auto,lock){
-  const name=(nm||((p.name||'Run')+' · '+fmtD(date))).slice(0,80);
+  const name=(nm||((p.name||'Project')+' · '+fmtD(date))).slice(0,80);
   const sc=_pbSchedule(p,date),first=Object.values(sc).reduce((m,x)=>x.start<m?x.start:m,date),last=Object.values(sc).reduce((m,x)=>x.end>m?x.end:m,date);
   const k=auto?'a'+date.replace(/-/g,''):'',run=auto?'ar'+k+p.id:uid(),pid=auto?'ap'+k+p.id:uid(),tid=Object.create(null);
   const reuse=Object.create(null);
@@ -8726,7 +8749,7 @@ function _pbMakeRun(p,date,nm,auto,lock){
   p.steps.forEach(s=>{
     if(reuse[s.id]){reuse[s.id].pbRun={pb:p.id,run,step:s.id};linked++;return;}
     const x=sc[s.id],own=S.members.some(m=>m.id===s.owner)?[s.owner]:[],link=s.toolUrl?_finSafeUrl(s.toolUrl):'';
-    const desc=[s.out?'Produces: '+s.out:'',s.inp?'Needs: '+s.inp:'',s.toolName||link?'Where: '+(s.toolName||'')+(link?' '+link:''):'',s.gate?'Approval gate: someone signs off before the next step.':'',(s.checks||[]).length?'Done means:\n'+s.checks.map(c=>'• '+c.text).join('\n'):''].filter(Boolean).join('\n');
+    const desc=[s.out?'Produces: '+s.out:'',s.inp?'Needs: '+s.inp:'',s.toolName||link?'Where: '+(s.toolName||'')+(link?' '+link:''):'',s.gate?'Approval gate: someone signs off before the next step.':'',(s.checks||[]).length?'Done means:\n'+s.checks.map(c=>'• '+c.text).join('\n'):'',s.notes?'Notes:\n'+s.notes:'',_pbLinkLines(s)].filter(Boolean).join('\n');
     const id=tid[s.id];
     S.tasks.push(Object.assign({id,name:String(s.name||'Step').slice(0,120),description:desc,parentId:null,priority:s.gate?'High':'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:lock?_pbAfter(s).filter(a=>tid[a]&&a!==s.id).map(a=>tid[a]):[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base));made.push(id);
     (s.tasks||[]).forEach(t=>{const sid=auto?'au'+k+t.id:uid();S.tasks.push(Object.assign({id:sid,name:String(t.text||'Task').slice(0,120),description:'',parentId:id,priority:'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base));made.push(sid);});
@@ -8754,7 +8777,7 @@ function _pbStat(p,run){
 }
 function _pbViewBar(p){
   const runs=_pbRunsOf(p);if(!runs.length)return '';
-  return `<div class="pb-vw" role="tablist"><button class="${_pbUI.run?'':'on'}" onclick="pbSetView('')">Design</button>${runs.slice(-6).map(r=>`<button class="${_pbUI.run===r.id?'on':''}" onclick="pbSetView('${jsq(r.id)}')">${escHtml(r.name||'Run')}</button>`).join('')}</div>`;
+  return `<div class="pb-vw" role="tablist"><button class="${_pbUI.run?'':'on'}" onclick="pbSetView('')">Design</button>${runs.slice(-6).map(r=>`<button class="${_pbUI.run===r.id?'on':''}" onclick="pbSetView('${jsq(r.id)}')">${escHtml(r.name||'Project')}</button>`).join('')}</div>`;
 }
 function _pbRunViewHtml(p0,run){
   const ver=_pbVers(p0).find(v=>v.id===run.v),p=ver?Object.assign({},p0,{steps:ver.steps}):p0;
@@ -8767,8 +8790,8 @@ function _pbRunViewHtml(p0,run){
     ${sv.task?`<div class="pb-hint">Due ${escHtml(fmtD(sv.task.endDate)||'no date')}${sv.kids?` · ${sv.done} of ${sv.kids} tasks done`:''}${(sv.task.assignees||[]).length?'':' · no owner yet'}</div>
     ${isBlocked(sv.task)?`<div class="pb-hint">Waiting on: ${escHtml(blockerNames(sv.task).join(', '))}</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="openModal('task','${jsq(sv.task.id)}')">Open task</button><button class="btn btn-ghost btn-sm" onclick="openDetail('${jsq(run.projectId)}')">Open project</button></div>`:'<div class="pb-hint">This step\'s task was deleted from the project.</div>'}</div>`:'';
-  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>${escHtml(p.name||'Workflow')}</em> / ${escHtml(run.name||'Run')}</div>
-    <div class="bd-tools">${_pbRunLocked(run)?`<button class="btn btn-ghost btn-sm" onclick="pbUnlockRun()">Unlock steps</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbRetroModal()">${run.retro?'Edit retro':'Retro'}</button><button class="btn btn-ghost btn-sm" onclick="pbRunModal()">Start another run</button></div></div>
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>${escHtml(p.name||'Workflow')}</em> / ${escHtml(run.name||'Project')}</div>
+    <div class="bd-tools">${_pbRunLocked(run)?`<button class="btn btn-ghost btn-sm" onclick="pbUnlockRun()">Unlock steps</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbPrint()">Print / PDF</button><button class="btn btn-ghost btn-sm" onclick="pbRetroModal()">${run.retro?'Edit retro':'Retro'}</button><button class="btn btn-ghost btn-sm" onclick="pbRunModal()">Start another project</button></div></div>
   ${_pbViewBar(p0)}
   <div class="pb-sum"><span><b>${escHtml(fmtD(run.date))}</b>publish${days>=0?' · in '+days+'d':' · '+(-days)+'d ago'}</span><span><b>${cnt('done')} / ${n}</b>steps done</span><span class="${cnt('late')?'bad':''}"><b>${cnt('late')}</b>late</span><span><b>${escHtml(next?next.name:'All done')}</b>${next?'next up':''}</span></div>
   <div class="pb-layout${sel?' open':''}"><div><div class="card">${_pbMapHtml(p,stat)}<div class="pb-legend"><span><i class="s-done"></i>Done</span><span><i class="s-doing"></i>In progress</span><span><i class="s-late"></i>Late</span><span><i class="s-wait"></i>Waiting</span><span>Click a step for its task. Change the map in Design.</span></div></div>${_pbRetroCard(run)}</div>${info}</div></div>`;
@@ -8791,14 +8814,14 @@ function pbAutoRuns(){
       r.next=_pbNext(r.next,r.every);
     }
   });
-  if(made){save();render();showToast(made+' Workflow run'+(made===1?'':'s')+' started');}
+  if(made){save();render();showToast(made+' project'+(made===1?'':'s')+' started from a Workflow');}
   return made;
 }
 
 /* ── Versions: each run keeps the map exactly as it ran, so editing the Workflow later never rewrites an old run ──
    p.versions=[{id:'v<n>',n,date,sig,steps}] (newest 8). A run stores run.v; restoring copies a version back into the editable map. */
 const PB_MAX_VER=8;
-function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),(s.tasks||[]).map(c=>c&&c.text)]));}
+function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),s.notes||'',(Array.isArray(s.links)?s.links:[]).map(c=>c&&c.url),(s.tasks||[]).map(c=>c&&c.text)]));}
 function _pbVers(p){return Array.isArray(p.versions)?p.versions.filter(v=>v&&typeof v==='object'&&typeof v.id==='string'&&Array.isArray(v.steps)):[];}
 function _pbSnap(p){
   const sig=_pbSig(p);let vs=_pbVers(p);const hit=vs.find(x=>x.sig===sig);if(hit)return hit.id;
@@ -8810,7 +8833,7 @@ function _pbSnap(p){
 function _pbVersHtml(p){
   const vs=_pbVers(p);if(!vs.length)return '';const cur=_pbSig(p);
   const row=v=>{const k=_pbRunsOf(p).filter(r=>r.v===v.id).length;return `<div class="pb-run pb-ver"><div class="pb-rn"><b>Version ${escHtml(v.n)}</b><span class="mut">${escHtml(fmtD(v.date))} · ${escHtml(v.steps.length)} steps · ${escHtml(k)} run${k===1?'':'s'}</span></div>${v.sig===cur?'<span class="pill ok">Current</span>':`<button class="btn btn-ghost btn-xs" onclick="pbRestoreVer('${jsq(v.id)}')">Restore</button>`}</div>`;};
-  return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Versions</span><span class="mut" style="margin-left:auto;font-size:.68rem;">saved each time a run starts</span></div><div class="card-bd">${vs.slice().reverse().map(row).join('')}</div></div>`;
+  return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Versions</span><span class="mut" style="margin-left:auto;font-size:.68rem;">saved each time a project starts</span></div><div class="card-bd">${vs.slice().reverse().map(row).join('')}</div></div>`;
 }
 function pbRestoreVer(id){
   const p=_pbCur();if(!p)return;const v=_pbVers(p).find(x=>x.id===id);if(!v)return;
@@ -8825,7 +8848,7 @@ function pbDuplicate(){
   saveWithUndo('Duplicate workflow');
   const m=Object.create(null);p.steps.forEach(s=>{m[s.id]=uid();});
   const q={id:uid(),name:String(p.name||'Workflow').slice(0,70)+' (copy)',outcome:p.outcome||'',trigger:'once',updated:_localToday(),projType:p.projType==='event'?'event':'improvement',
-    steps:p.steps.map(s=>Object.assign({},s,{id:m[s.id],after:_pbAfter(s).filter(a=>m[a]).map(a=>m[a]),checks:(s.checks||[]).map(c=>({id:uid(),text:c.text})),tasks:(s.tasks||[]).map(c=>({id:uid(),text:c.text}))}))};
+    steps:p.steps.map(s=>Object.assign({},s,{auto:undefined,id:m[s.id],after:_pbAfter(s).filter(a=>m[a]).map(a=>m[a]),checks:(s.checks||[]).map(c=>({id:uid(),text:c.text})),links:(Array.isArray(s.links)?s.links:[]).filter(c=>c&&typeof c==='object'&&_finSafeUrl(c.url)).map(c=>({id:uid(),text:_pbT(c.text,40)||'Link',url:_finSafeUrl(c.url)})),tasks:(s.tasks||[]).map(c=>({id:uid(),text:c.text}))}))};
   if(p.anchor&&m[p.anchor])q.anchor=m[p.anchor];
   _pbList().push(q);_pbUI.pb=q.id;_pbUI.step='';_pbUI.run='';save();closeModal();render();showToast('Duplicated');
 }
@@ -8856,7 +8879,7 @@ function pbRetroModal(){
   /* one-tap fixes: give a late step the days it overran by, in the Workflow itself (later runs use it) */
   const sug=L.late.map(x=>({x,cur:_pbStepOf(p,x.id)})).filter(o=>o.cur&&_pbN(o.cur.days,0,365,1)<365).slice(0,8).map(o=>{const add=Math.min(Math.max(1,o.x.days),365-_pbN(o.cur.days,0,365,1)),d0=_pbN(o.cur.days,0,365,1);
     return `<div class="pb-sug"><span>${escHtml(o.x.name)}: ${d0} → ${d0+add} day${d0+add===1?'':'s'}</span><button class="btn btn-ghost btn-xs" onclick="pbBumpDays(this,'${jsq(o.cur.id)}',${d0},${add})">Give +${add}d</button></div>`;}).join('');
-  _coModal('Retro: '+(run.name||'Run'),sum+(sug?`<div class="pb-sugs"><div class="pb-hint">Suggested changes to the Workflow. Each applies when you tap it.</div>${sug}</div>`:'')+ta('pb-rt-well','What went well',r.well)+ta('pb-rt-slow','What slowed us down',r.slow)+ta('pb-rt-change','One change for next time',r.change),'pbSaveRetro()','');
+  _coModal('Retro: '+(run.name||'Project'),sum+(sug?`<div class="pb-sugs"><div class="pb-hint">Suggested changes to the Workflow. Each applies when you tap it.</div>${sug}</div>`:'')+ta('pb-rt-well','What went well',r.well)+ta('pb-rt-slow','What slowed us down',r.slow)+ta('pb-rt-change','One change for next time',r.change),'pbSaveRetro()','');
 }
 function pbBumpDays(btn,sid,from,add){
   const p=_pbCur(),st=p&&_pbStepOf(p,sid);if(!st)return;
@@ -8871,6 +8894,65 @@ function pbSaveRetro(){
   saveWithUndo('Edit retro');
   run.retro={well:_coVal('pb-rt-well').slice(0,400),slow:_coVal('pb-rt-slow').slice(0,400),change:_coVal('pb-rt-change').slice(0,400),date:_localToday()};
   p.updated=_localToday();save();closeModal();render();
+}
+
+/* ── Workflow tag on tasks: a small chip on any task a project made from a Workflow; it opens that project's live map ── */
+function pbTagHtml(t){
+  if(!t||!t.pbRun||typeof t.pbRun!=='object')return '';
+  const p=_pbList().find(q=>q.id===t.pbRun.pb);if(!p||!_pbRunsOf(p).some(r=>r.id===t.pbRun.run))return '';
+  return `<button class="pb-wt" title="Workflow: ${escHtml(p.name||'Workflow')}" onclick="event.stopPropagation();pbOpenRun('${jsq(p.id)}','${jsq(t.pbRun.run)}')">${escHtml(p.name||'Workflow')}</button>`;
+}
+function pbOpenRun(pid,rid){
+  const p=_pbList().find(q=>q.id===pid);if(!p||!_pbRunsOf(p).some(r=>r.id===rid))return;
+  _pbUI.pb=pid;_pbUI.run=rid;_pbUI.step='';nav('playbooks');
+}
+/* ── Print / PDF: one clean sheet in a new tab (map, steps, notes, links; run dates when printed from a run). Same pattern as the finance report. ── */
+function _pbSheetHtml(p0,run){
+  const vs=run?_pbVers(p0).find(v=>v.id===run.v):null,p=Object.assign({},p0,{steps:(vs||p0).steps.filter(x=>x&&typeof x==='object'&&typeof x.id==='string')});
+  const by=Object.create(null);p.steps.forEach(x=>{by[x.id]=x;});
+  const sc=run&&run.date?_pbSchedule(p,run.date):null,stat=run?_pbStat(p,run):null;
+  const dep=_pbCalc(p),ord=p.steps.map((x,i)=>({x,i})).sort((a,b)=>(dep.depth[a.x.id]||0)-(dep.depth[b.x.id]||0)||(Number(a.x.r)||0)-(Number(b.x.r)||0)||a.i-b.i).map(o=>o.x);
+  const num=Object.create(null);ord.forEach((x,i)=>{num[x.id]=i+1;});
+  // simple map: one column per depth, boxes numbered like the list below
+  const cols=Object.create(null);ord.forEach(x=>{const d=dep.depth[x.id]||0;(cols[d]=cols[d]||[]).push(x);});
+  const W=150,H=44,GX=34,GY=14,pos=Object.create(null);let mw=0,mh=0;
+  Object.keys(cols).forEach(c=>{cols[c].forEach((x,r)=>{pos[x.id]={x:10+c*(W+GX),y:10+r*(H+GY)};mw=Math.max(mw,10+c*(W+GX)+W+10);mh=Math.max(mh,10+r*(H+GY)+H+10);});});
+  let svg=`<svg viewBox="0 0 ${mw||10} ${mh||10}" width="100%" style="max-width:${mw||10}px">`;
+  ord.forEach(x=>_pbAfter(x).forEach(a=>{const b=pos[a],t=pos[x.id];if(!b||!t||a===x.id)return;const x1=b.x+W,y1=b.y+H/2,x2=t.x,y2=t.y+H/2,m=(x1+x2)/2;svg+=`<path d="M${x1} ${y1} C${m} ${y1} ${m} ${y2} ${x2} ${y2}" fill="none" stroke="#999" stroke-width="1.5"/>`;}));
+  ord.forEach(x=>{const q=pos[x.id],nm=String(x.name||'Step'),sh=nm.length>22?nm.slice(0,21)+'…':nm;svg+=`<rect x="${q.x}" y="${q.y}" width="${W}" height="${H}" rx="7" fill="#fff" stroke="#333" stroke-width="1.2"${x.gate?' stroke-dasharray="5 3"':''}/><text x="${q.x+9}" y="${q.y+19}" font-size="11" font-weight="700" fill="#111">${num[x.id]}. ${escHtml(sh)}</text><text x="${q.x+9}" y="${q.y+35}" font-size="10" fill="#555">${escHtml(String(_pbN(x.days,0,365,1)))}d${x.gate?' · gate':''}</text>`;});
+  svg+='</svg>';
+  const own=id=>{const m=(S.members||[]).find(m=>m.id===id);return m?m.name:'';};
+  const rows=ord.map(x=>{
+    const af=_pbAfter(x).map(a=>by[a]).filter(Boolean).map(b=>num[b.id]+'. '+(b.name||'Step')).join(', ');
+    const lk=(Array.isArray(x.links)?x.links:[]).map(c=>{const u=c&&_finSafeUrl(c.url);return u?`<a href="${escHtml(u)}">${escHtml(c.text||'Link')}</a>`:'';}).filter(Boolean).join(' · ');
+    const tu=x.toolUrl?_finSafeUrl(x.toolUrl):'',tool=x.toolName?(tu?`<a href="${escHtml(tu)}">${escHtml(x.toolName)}</a>`:escHtml(x.toolName)):'';
+    const ds=sc&&sc[x.id]?`<div class="m">${escHtml(fmtD(sc[x.id].start))}${sc[x.id].end!==sc[x.id].start?' → '+escHtml(fmtD(sc[x.id].end)):''}</div>`:'';
+    const st=stat&&stat[x.id]?`<div class="m"><b>${escHtml(stat[x.id].t)}</b></div>`:'';
+    const li=(h,a)=>Array.isArray(a)&&a.length?`<div class="m"><b>${h}</b></div><ul>${a.map(c=>`<li>${escHtml(c&&c.text||'')}</li>`).join('')}</ul>`:'';
+    return `<tr><td class="n">${num[x.id]}</td><td><b>${escHtml(x.name||'Step')}</b>${x.gate?' <i>approval gate</i>':''}${ds}${st}${x.inp||x.out?`<div class="m">${x.inp?'In: '+escHtml(x.inp):''}${x.inp&&x.out?' · ':''}${x.out?'Out: '+escHtml(x.out):''}</div>`:''}${x.notes?`<div class="nt">${escHtml(x.notes)}</div>`:''}${li('Done means',x.checks)}${li('Tasks',x.tasks)}${lk?`<div class="m">${lk}</div>`:''}</td><td>${escHtml(own(x.owner)||'—')}</td><td>${escHtml(String(_pbN(x.days,0,365,1)))}d</td><td>${af?escHtml(af):'—'}${tool?`<div class="m">${tool}</div>`:''}</td></tr>`;
+  }).join('');
+  const total=dep.total;
+  return `<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escHtml(p0.name||'Workflow')}</title><style>
+*{box-sizing:border-box}body{font:13px/1.45 system-ui,'Segoe UI',sans-serif;color:#111;background:#fff;margin:0;padding:24px max(16px,4vw);max-width:980px;margin:0 auto}
+h1{font-size:1.5rem;margin:0 0 4px}.sub{color:#555;margin:0 0 4px}.tip{background:#f1f7f4;border:1px solid #cfe3da;border-radius:8px;padding:8px 12px;margin:12px 0;font-size:.8rem}
+h2{font-size:1rem;margin:22px 0 8px;border-bottom:1px solid #ddd;padding-bottom:4px}.map{overflow-x:auto;border:1px solid #ddd;border-radius:8px;padding:8px}
+.tw{overflow-x:auto}table{width:100%;border-collapse:collapse}th{text-align:left;font-size:.68rem;text-transform:uppercase;letter-spacing:.06em;color:#555;border-bottom:2px solid #ccc;padding:6px 8px}td{vertical-align:top;border-bottom:1px solid #e3e3e3;padding:8px}td.n{width:28px;color:#555;font-weight:700}
+.m{color:#555;font-size:.78rem;margin-top:2px}.nt{white-space:pre-wrap;margin-top:4px}ul{margin:2px 0 0;padding-left:18px}i{color:#a06b00;font-size:.75rem}a{color:#0a6b52}
+tr{page-break-inside:avoid}@media print{.tip{display:none}body{padding:0}}
+</style></head><body><h1>${escHtml(p0.name||'Workflow')}${run?' · '+escHtml(run.name||'Project'):''}</h1>
+<p class="sub">${p0.outcome?escHtml(p0.outcome)+' · ':''}${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(String(total))} day${total===1?'':'s'}${run&&run.date?' · date '+escHtml(fmtD(run.date)):''}</p>
+<div class="tip">To save as a PDF, press Ctrl+P (Cmd+P on Mac) and choose “Save as PDF”.</div>
+<h2>Map</h2><div class="map">${svg}</div>
+<h2>Steps</h2><div class="tw"><table><thead><tr><th></th><th>Step</th><th>Owner</th><th>Time</th><th>Comes after</th></tr></thead><tbody>${rows}</tbody></table></div>
+<p class="m" style="margin-top:14px">Printed ${escHtml(fmtD(_localToday()))} from ProjectFlow</p></body></html>`;
+}
+function pbPrint(){
+  const p=_pbCur();if(!p||!p.steps.length)return;
+  const run=_pbUI.run?_pbRunsOf(p).find(r=>r.id===_pbUI.run):null;
+  const html=_pbSheetHtml(p,run||null),url=URL.createObjectURL(new Blob([html],{type:'text/html'}));
+  const w=window.open(url,'_blank');
+  if(!w){const a=document.createElement('a');a.href=url;a.download=(String(p.name||'workflow').replace(/[^\w-]+/g,'-').slice(0,40)||'workflow')+'.html';a.click();}
+  setTimeout(()=>URL.revokeObjectURL(url),60000);
 }
 
 /* ── Optional lock: a locked step cannot be ticked until the steps before it are done. Off by default; Unlock removes it from a run. ── */
@@ -8894,11 +8976,11 @@ function _pbTemplatesHtml(){
     const n=(q.steps||[]).length,t=_pbCalc(Object.assign({},q,{steps:q.steps||[]})).total,runs=_pbRunsOf(q).length,st=PB_STARTERS.find(x=>x.key===q.starter);
     return `<div class="tmpl-card"><div style="display:flex;align-items:flex-start;gap:8px;margin-bottom:4px;"><div class="tmpl-name" style="flex:1;">${escHtml(q.name||'Untitled')}</div><span class="pb-tag">${st?'Starter · editable':'Template'}</span></div>
       <div class="tmpl-desc">${escHtml(q.outcome||'No outcome written yet')}</div>
-      <div class="pb-meta" style="margin-bottom:11px;"><span class="chip">${n} step${n===1?'':'s'}</span>${n?`<span class="chip">${escHtml(t)} day${t===1?'':'s'}</span>`:''}<span class="chip">${q.projType==='event'?'Creates an event':'Creates a project'}</span><span class="chip">${runs} run${runs===1?'':'s'}</span></div>
-      <div style="display:flex;gap:7px;flex-wrap:wrap;">${n?`<button class="btn btn-acc btn-sm" onclick="pbTplUse('${jsq(q.id)}')">Start a run</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbTplEdit('${jsq(q.id)}')">Edit</button></div></div>`;
+      <div class="pb-meta" style="margin-bottom:11px;"><span class="chip">${n} step${n===1?'':'s'}</span>${n?`<span class="chip">${escHtml(t)} day${t===1?'':'s'}</span>`:''}<span class="chip">${q.projType==='event'?'Creates an event':'Creates a project'}</span><span class="chip">${runs} project${runs===1?'':'s'}</span></div>
+      <div style="display:flex;gap:7px;flex-wrap:wrap;">${n?`<button class="btn btn-acc btn-sm" onclick="pbTplUse('${jsq(q.id)}')">Start a project</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbTplEdit('${jsq(q.id)}')">Edit</button></div></div>`;
   };
   const sCard=x=>`<div class="tmpl-card"><div class="tmpl-name" style="margin-bottom:4px;">${escHtml(x.name)}</div><div class="tmpl-desc">${escHtml(x.blurb)}</div><div><button class="btn btn-ghost btn-sm" onclick="pbAddStarter('${jsq(x.key)}')">Add as a template</button></div></div>`;
-  return `<div style="background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:10px;padding:13px 16px;margin-bottom:18px;font-size:.78rem;color:var(--text2);line-height:1.6;">A Workflow is a process drawn once as a map of steps. <strong style="color:var(--text);">Every Workflow is an editable template:</strong> change its steps, owners and days any time. Start a run to create a real project with tasks counted back from a date. Past runs keep the version they used.</div>
+  return `<div style="background:var(--teal-dim);border:1px solid var(--teal-mid);border-radius:10px;padding:13px 16px;margin-bottom:18px;font-size:.78rem;color:var(--text2);line-height:1.6;">A Workflow is a process drawn once as a map of steps. <strong style="color:var(--text);">Every Workflow is an editable template:</strong> change its steps, owners and days any time. Start a project to create real tasks counted back from a date. Past projects keep the version they used.</div>
   ${list.length?`<div class="tmpl-grid">${list.map(card).join('')}</div>`:`<div class="empty"><div class="empty-ico">${ICO.copy}</div><div class="empty-txt">No Workflow templates yet.<br><span style="font-size:.78rem;color:var(--muted);">Add one from the starters below, or write your own.</span></div></div>`}
   ${free.length?`<div style="font-size:.72rem;font-weight:700;color:var(--text2);text-transform:uppercase;letter-spacing:.06em;margin:18px 0 9px;">Starters</div><div class="tmpl-grid">${free.map(sCard).join('')}</div>`:''}`;
 }
@@ -8907,17 +8989,17 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [171,'Workflow tag on tasks; Tidy puts a step after the one you chose, not at the end'],
+  [170,'Workflows: runs are now called projects; start a project from a Workflow in New Project'],
+  [169,'Workflows: Print / PDF sheet with the map, steps, notes, links and run dates'],
+  [168,'Workflow steps can have notes and links that flow into the run tasks'],
   [167,'Workflow retro suggests giving late steps more days, one tap each'],
   [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first'],
   [165,'Playbooks are now called Workflows; steps show as a simple list on phones'],
   [164,'Playbook Templates tab, Event and Product starters, run date can be the event day'],
   [163,'Playbook steps can be ticked in any order (the lock is now optional); audit and tune-up'],
   [162,'Playbooks: a quarterly finance review that reuses your recurring finance tasks'],
-  [161,'Playbooks: run versions, retro with late steps, duplicate and archive'],
-  [160,'Playbooks: live map coloured by task progress, and Playbooks that repeat on a schedule'],
-  [159,'Playbooks: Start a run builds a project with tasks counted back from a publish date'],
-  [158,'Playbooks: draw a process as a map of steps, with owners, tools, checks and tasks'],
-  [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters']
+  [161,'Playbooks: run versions, retro with late steps, duplicate and archive']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -10929,6 +11011,7 @@ function renderTaskRow(t,depth=0,showProj=false){
   <!-- Task name — flex:1 -->
   <div class="ti-name-col">
     <span class="ti-name${comp===100?' done':''}" onclick="openModal('task','${t.id}')" title="Open task"${t.description?` data-desc="${escHtml(t.description.slice(0,120))}"`:''}>${escHtml(t.name)}</span>
+    ${typeof pbTagHtml==='function'?pbTagHtml(t):''}
     ${blocked?`<span class="ti-badge" style="color:var(--yellow);display:inline-flex;align-items:center;" title="${escHtml(bn.join(', '))}"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg></span>`:''}
     ${t.recur?.enabled?`<span class="ti-badge ti-badge-purple" title="Recurring"><svg width="9" height="9" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><polyline points="1 4 1 10 7 10"/><path d="M3.51 15a9 9 0 102.13-9.36L1 10"/></svg></span>`:''}
   </div>
@@ -12151,6 +12234,7 @@ ${_kbCols().map(col=>`
       return`<div class="kcard${kBlocked?' kcard-blocked':''}" draggable="true" data-task-id="${escHtml(t.id)}" style="position:relative;${t.done?'opacity:.65;':''}"
         ${kBlocked?`onmouseenter="domShowId('kbt-${t.id}')" onmouseleave="domHideId('kbt-${t.id}')"`:''}>
 ${parentTask?`<div style="font-size:.58rem;color:var(--muted);margin-bottom:4px;display:flex;align-items:center;gap:4px;"><span style="color:var(--border2);">↳</span>${escHtml(parentTask.name)}</div>`:''}
+${typeof pbTagHtml==='function'&&t.pbRun?`<div style="margin-bottom:4px;">${pbTagHtml(t)}</div>`:''}
 ${kBlocked?`<div class="kcard-blocked-badge"><svg width="8" height="8" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0110 0v4"/></svg> Blocked</div>`:''}<div class="kcard-name${t.done?' done':''}" style="${t.done?'text-decoration:line-through;color:var(--muted);':''}">${escHtml(t.name)}</div>
 <div style="display:flex;gap:3px;flex-wrap:wrap;margin-bottom:7px;">
   ${effectiveLabels(t).slice(0,2).map(id=>lcHtml(id)).join('')}
@@ -14349,6 +14433,7 @@ function projectModalHtml(id){
     </div>
     ${tmpl?`<div style="font-size:.7rem;color:var(--acc);margin-top:7px;">\u2713 Will create ${tmpl.tasks?.length||0} tasks from template</div>`:''}
   </div><hr class="div" style="margin:0 0 14px 0;">`:''}
+  ${!p&&typeof _pbList==='function'&&_pbList().some(q=>!q.archived&&Array.isArray(q.steps)&&q.steps.length)?`<div style="margin:-4px 0 14px;"><label class="flbl">Or start from a Workflow</label><div style="display:flex;gap:6px;flex-wrap:wrap;">${_pbList().filter(q=>!q.archived&&Array.isArray(q.steps)&&q.steps.length).slice(0,10).map(q=>`<button class="btn btn-ghost btn-xs" onclick="pbTplUse('${jsq(q.id)}')">${escHtml(q.name||'Workflow')}</button>`).join('')}</div><div style="font-size:.7rem;color:var(--muted);margin-top:6px;">Picks a date and builds the project with a task for each step.</div></div>`:''}
   <div class="field"><label class="flbl">Type</label>
     <div style="display:flex;gap:6px;flex-wrap:wrap;" id="pm-types">${Object.entries(PROJ_TYPES).map(([k,v])=>`<button type="button" class="btn btn-ghost btn-xs" data-ptype="${escHtml(k)}" onclick="pmSetType('${k}')" style="${defType===k?'border-color:var(--acc);color:var(--acc);background:var(--teal-dim);':''}">${v.label/*sec-ok: fixed text*/}</button>`).join('')}</div>
     <input type="hidden" id="pm-type" value="${escHtml(defType)}">
