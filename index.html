@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-np6e2104HT32HGNmWzuYxOFhoqkBrbZveeDZMZ+ruxs='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-clL6fzcdAAACS9vc/WtJ5/Nyqfr5H+tHg6lfFJA1rE8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2562,6 +2562,7 @@ pbDelStep:()=>pbDelStep,
 pbDeletePb:()=>pbDeletePb,
 pbDuplicate:()=>pbDuplicate,
 pbExample:()=>pbExample,
+pbFinanceStarter:()=>pbFinanceStarter,
 pbNewModal:()=>pbNewModal,
 pbOpen:()=>pbOpen,
 pbRestoreVer:()=>pbRestoreVer,
@@ -4532,7 +4533,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=161;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=162;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8359,8 +8360,8 @@ function renderPlaybooks(){
     return `<button class="pb-card" onclick="pbOpen('${jsq(q.id)}')"><b>${escHtml(q.name||'Untitled')}</b><span class="pb-oc">${escHtml(q.outcome||'No outcome written yet')}</span><span class="pb-meta"><span class="chip">${n} step${n===1?'':'s'}</span>${n?`<span class="chip">${escHtml(t)} day${t===1?'':'s'} end to end</span>`:''}<span class="chip">${q.trigger==='repeat'?'Repeats':'One-off'}</span>${q.archived?'<span class="chip">Archived</span>':''}</span></button>`;};
   return `<div class="fu"><div class="page-hd"><div class="page-title"><em>Playbooks</em></div><button class="btn btn-acc btn-sm" onclick="pbNewModal()">+ New Playbook</button></div>
   <p class="pb-lede">A Playbook is a process you draw once and run again and again: the steps, who does them, how long they take and where the work lives.</p>
-  ${list.length?`<div class="pb-grid">${list.map(card).join('')}</div>`:`<div class="empty"><div class="empty-txt">No Playbooks yet.<br>Start from the YouTube example, or write your own.</div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="pbExample()">Start with the YouTube example</button><button class="btn btn-ghost btn-sm" onclick="pbNewModal()">Write my own</button></div></div>`}
-  ${all.length?`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-xs" onclick="pbExample()">+ Add the YouTube example</button>${arch.length?`<button class="btn btn-ghost btn-xs" onclick="pbToggleArch()">${_pbUI.arch?'Hide':'Show'} archived (${arch.length})</button>`:''}</div>`:''}</div>`;
+  ${list.length?`<div class="pb-grid">${list.map(card).join('')}</div>`:`<div class="empty"><div class="empty-txt">No Playbooks yet.<br>Start from the YouTube example, or write your own.</div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="pbExample()">Start with the YouTube example</button><button class="btn btn-ghost btn-sm" onclick="pbFinanceStarter()">Quarterly finance review</button><button class="btn btn-ghost btn-sm" onclick="pbNewModal()">Write my own</button></div></div>`}
+  ${all.length?`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-xs" onclick="pbExample()">+ Add the YouTube example</button><button class="btn btn-ghost btn-xs" onclick="pbFinanceStarter()">+ Add the quarterly finance review</button>${arch.length?`<button class="btn btn-ghost btn-xs" onclick="pbToggleArch()">${_pbUI.arch?'Hide':'Show'} archived (${arch.length})</button>`:''}</div>`:''}</div>`;
 }
 function _pbMapHtml(p,stat){
   const st=p.steps,by={};st.forEach(s=>{by[s.id]=s;});
@@ -8497,12 +8498,27 @@ const PB_EXAMPLE=[ // [name, days, tool, gate, after (indices), column, row, che
   ['Thumbnail',1,'Figma',0,[5],5,0,[],['Design the thumbnail']],
   ['Title and description',0.5,'',0,[5],5,1,[],['Write title, description and tags']],
   ['Publish and promote',1,'YouTube',0,[6,7],6,0.5,['Scheduled','Shared on socials'],['Schedule the upload','Post on socials']]];
-function pbExample(){
+/* rows: [name, days, tool, gate, after (indices), column, row, checks, tasks, finance task key]. A finance key links the step to that recurring finance task (see _pbMakeRun). */
+function _pbFromRows(rows,p0){
+  const ids=rows.map(()=>uid());
+  const steps=rows.map((e,i)=>{const d=e[9]?FIN_TASKS.find(x=>x.key===e[9]):null;
+    return Object.assign({id:ids[i],name:d?d.name:e[0],owner:'',days:e[1],inp:'',out:'',toolName:e[2],toolUrl:'',gate:!!e[3],c:e[5],r:e[6],after:e[4].map(k=>ids[k]),checks:e[7].map(t=>({id:uid(),text:t})),tasks:e[8].map(t=>({id:uid(),text:t}))},e[9]?{fk:e[9]}:{});});
+  const p=Object.assign({id:uid(),trigger:'once',updated:_localToday(),steps},p0);
+  _pbList().push(p);_pbUI.pb=p.id;_pbUI.step='';_pbUI.run='';save();render();
+}
+function pbExample(){saveWithUndo('Add playbook');_pbFromRows(PB_EXAMPLE,{name:'YouTube video',outcome:'A published video that hits the weekly slot',trigger:'repeat'});}
+/* The quarterly finance review: the four quarterly finance tasks, then the forecast and the review meeting. Monthly and yearly finance tasks stay as they are. */
+const PB_FINANCE=[
+  ['',1,'Finance',0,[],0,0,[],[],'teampay'],
+  ['',1,'Finance',0,[],0,1,[],[],'subs'],
+  ['',1,'Finance',0,[],0,2,[],[],'targets'],
+  ['',1,'Finance',0,[2],1,2,[],[],'savings'],
+  ['Prepare the next quarter forecast',1,'Finance',0,[0,1,2,3],2,1,['Budget compared with actual','Events and sponsor income included'],[]],
+  ['Hold the finance review',1,'',1,[4],3,1,['Decisions written in the review notes'],[]]];
+function pbFinanceStarter(){
+  if(_pbList().some(q=>q.link==='finreview'&&!q.archived)){const q=_pbList().find(x=>x.link==='finreview'&&!x.archived);return pbOpen(q.id);}
   saveWithUndo('Add playbook');
-  const ids=PB_EXAMPLE.map(()=>uid());
-  const steps=PB_EXAMPLE.map((e,i)=>({id:ids[i],name:e[0],owner:'',days:e[1],inp:'',out:'',toolName:e[2],toolUrl:'',gate:!!e[3],c:e[5],r:e[6],after:e[4].map(k=>ids[k]),checks:e[7].map(t=>({id:uid(),text:t})),tasks:e[8].map(t=>({id:uid(),text:t}))}));
-  const p={id:uid(),name:'YouTube video',outcome:'A published video that hits the weekly slot',trigger:'repeat',updated:_localToday(),steps};
-  _pbList().push(p);_pbUI.pb=p.id;_pbUI.step='';save();render();
+  _pbFromRows(PB_FINANCE,{name:'Quarterly finance review',outcome:'The books are checked and the next quarter is planned before the review meeting',link:'finreview'});
 }
 /* drag a step to a new place on the grid; a tap just selects it */
 function pbInitMap(){
@@ -8561,7 +8577,8 @@ function _pbRunsHtml(p){
 function pbRunModal(){
   const p=_pbCur();if(!p||!p.steps.length)return;
   if(_pbRunsOf(p).length>=PB_MAX_RUNS)return showToast('This Playbook has '+PB_MAX_RUNS+' runs. Delete an old project first.');
-  const def=addDays(_localToday(),Math.ceil(_pbCalc(p).total)+2);
+  let def=addDays(_localToday(),Math.ceil(_pbCalc(p).total)+2);
+  if(p.link==='finreview'&&typeof finReviewState==='function'){try{const st=finReviewState(),d=(st.review&&st.review.date)||st.dueBy;if(d&&d>=_localToday())def=d;}catch(_){}}
   const body=`<div class="field"><label class="flbl">Publish date *</label><input class="inp" type="date" id="pb-r-date" value="${escHtml(def)}" oninput="pbRunPreview()"></div>
   <div id="pb-r-pv" class="pb-hint" style="margin:-4px 0 10px;"></div>
   <div class="field"><label class="flbl">Project name</label><input class="inp" id="pb-r-name" maxlength="80" placeholder="${escHtml((p.name||'Run')+' · publish date')}"></div>
@@ -8588,11 +8605,14 @@ function _pbMakeRun(p,date,nm,auto){
   const name=(nm||((p.name||'Run')+' · '+fmtD(date))).slice(0,80);
   const sc=_pbSchedule(p,date),first=Object.values(sc).reduce((m,x)=>x.start<m?x.start:m,date);
   const k=auto?'a'+date.replace(/-/g,''):'',run=auto?'ar'+k+p.id:uid(),pid=auto?'ap'+k+p.id:uid(),tid={};
-  p.steps.forEach(s=>{tid[s.id]=auto?'at'+k+s.id:uid();});
+  const reuse={};
+  p.steps.forEach(s=>{const ex=s.fk?(S.tasks||[]).find(t=>t.finKey===s.fk&&!t.done&&!t.pbRun&&!t.parentId):null;if(ex)reuse[s.id]=ex;tid[s.id]=ex?ex.id:(auto?'at'+k+s.id:uid());});
+  let linked=0;
   S.projects.push({id:pid,name,description:String(p.outcome||'').slice(0,160),area:'',priority:'',ownerId:'',isAirCon:false,type:'improvement',startDate:first,endDate:date,status:'active',color:COLORS[(S.projects.length)%COLORS.length],graphicsUrl:'',eventUrl:'',expenses:[],sponsors:[],okrs:[],phaseWeeks:{planning:null,prelaunch:null,postEvent:null}});
   const base={projectId:pid,labels:[],kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}};
   const made=[];
   p.steps.forEach(s=>{
+    if(reuse[s.id]){reuse[s.id].pbRun={pb:p.id,run,step:s.id};linked++;return;}
     const x=sc[s.id],own=S.members.some(m=>m.id===s.owner)?[s.owner]:[],link=s.toolUrl?_finSafeUrl(s.toolUrl):'';
     const desc=[s.out?'Produces: '+s.out:'',s.inp?'Needs: '+s.inp:'',s.toolName||link?'Where: '+(s.toolName||'')+(link?' '+link:''):'',s.gate?'Approval gate: someone signs off before the next step.':'',(s.checks||[]).length?'Done means:\n'+s.checks.map(c=>'• '+c.text).join('\n'):''].filter(Boolean).join('\n');
     const id=tid[s.id];
@@ -8602,7 +8622,7 @@ function _pbMakeRun(p,date,nm,auto){
   made.forEach(syncBlockedStatus);
   if(!Array.isArray(p.runs))p.runs=[];
   p.runs.push({id:run,name,date,projectId:pid,v:_pbSnap(p),created:_localToday()});p.updated=_localToday();
-  return made.length;
+  return made.length+linked;
 }
 
 /* ── Live view of a run: the map coloured by how each step's task is going ── */
@@ -8731,6 +8751,7 @@ function pbSaveRetro(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [162,'Playbooks: a quarterly finance review that reuses your recurring finance tasks'],
   [161,'Playbooks: run versions, retro with late steps, duplicate and archive'],
   [160,'Playbooks: live map coloured by task progress, and Playbooks that repeat on a schedule'],
   [159,'Playbooks: Start a run builds a project with tasks counted back from a publish date'],
@@ -8740,8 +8761,7 @@ const PF_CHANGELOG=[
   [155,'Company: contacts (accountant, bank, solicitor) and a compliance checklist'],
   [154,'Finance has a new Company pill: details, key dates, documents, directors and shareholders'],
   [153,'Team profiles show tasks done instead of hours per week'],
-  [152,'The Now / Next / Later board uses the full add bar (assignees, labels, due date, notes)'],
-  [151,'Bigger touch targets on phones and tablets']
+  [152,'The Now / Next / Later board uses the full add bar (assignees, labels, due date, notes)']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -10996,7 +11016,9 @@ function spawnRecurring(t){
   /* Dated tasks get an id made from the series and the due date, so two people ticking it off at once produce ONE next task, not two. */
   const id=(nextEnd||nextStart)?root+'_r'+(nextEnd||nextStart):uid();
   if(getTask(id)){t.recurNext=id;return;}
-  S.tasks.push({...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:t.parentId||null,recurRoot:root,recurNext:'',doneOn:''});
+  const nt={...t,id,done:false,kStatus:t.kStatus==='done'?'todo':t.kStatus,slackReminder:{},startDate:nextStart,endDate:nextEnd,parentId:t.parentId||null,recurRoot:root,recurNext:'',doneOn:''};
+  delete nt.pbRun;   // the next one belongs to no Playbook run
+  S.tasks.push(nt);
   t.recurNext=id;
   /* Subtasks (and their subtasks) come along: not done, dates moved by the same amount as the parent, no recurrence of their own.
      Their ids come from the new parent's id plus the original subtask's id, so the same copy is produced however many people tick at once. */
