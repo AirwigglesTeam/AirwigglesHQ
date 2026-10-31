@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5w0hwvmEC87Nr9A3fCaeYUzWlgImzyFV8pDh45xQbXg='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-Oz6MtcomFeQhT1W8MKfUHMtapGDhJ2xcmelahgrUuxo='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2409,6 +2409,8 @@ authResetPassword:()=>authResetPassword,
 authSignIn:()=>authSignIn,
 bellClose:()=>bellClose,
 bellDesktopToggle:()=>bellDesktopToggle,
+bellNotesOpen:()=>bellNotesOpen,
+bellNotesSnooze:()=>bellNotesSnooze,
 bellOpenTask:()=>bellOpenTask,
 bellSeenAll:()=>bellSeenAll,
 bellToggle:()=>bellToggle,
@@ -4573,7 +4575,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=175;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=176;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6441,7 +6443,9 @@ document.addEventListener('mouseover',e=>{
   TT.style.left=(r.right+10)+'px';
   TT.style.top=(r.top+r.height/2-TT.offsetHeight/2)+'px';
 });
-document.addEventListener('mouseout',e=>{if(!e.relatedTarget?.closest('[data-tip]'))TT.style.opacity='0';});
+/* the label that names a tab (shown on hover, and on a tap on phones) goes away as soon as the page scrolls; one capture listener covers every scrolling area */
+function hideNavTips(){if(TT.style.opacity==='1')TT.style.opacity='0';const ct=el('cowork-tooltip');if(ct&&ct.classList.contains('visible')&&typeof hideCoworkTip==='function')hideCoworkTip();}
+document.addEventListener('scroll',hideNavTips,{capture:true,passive:true});
 
 
 
@@ -7325,21 +7329,40 @@ function bellCompute(tasks,meId,seen,todayIso){
   }
   return out;
 }
-let _bellState=null;
+/* Notes reminder: dashboard notes that have not been marked Organised are easy to forget, so every 5 days the bell lists them until you open them or snooze it.
+   The date of the next reminder is kept on this device (each person is reminded on their own schedule); nothing here is synced. */
+const PF_NOTES_REM_DAYS=5,PF_NOTES_REM_KEY='pf_notes_rem';
+function notesRemCompute(notes,next,todayIso){
+  const open=(Array.isArray(notes)?notes:[]).filter(n=>n&&typeof n==='object'&&!n.org&&typeof n.html==='string'&&n.html.replace(/<[^>]*>/g,'').replace(/&nbsp;/g,' ').trim()).length;
+  return{open,due:open>0&&(!/^\d{4}-\d{2}-\d{2}$/.test(next||'')||next<=todayIso)};
+}
+function _notesRemNext(){try{return localStorage.getItem(PF_NOTES_REM_KEY)||'';}catch(_){return '';}}
+function _notesRemSet(iso){try{localStorage.setItem(PF_NOTES_REM_KEY,iso);}catch(_){}}
+function bellNotesSnooze(){_notesRemSet(addDays(_localToday(),PF_NOTES_REM_DAYS));_bellRefresh();}
+function bellNotesOpen(){
+  _notesRemSet(addDays(_localToday(),PF_NOTES_REM_DAYS));bellClose();
+  if(typeof nav==='function')nav('dashboard');
+  setTimeout(()=>{const n=el('dash-quick-notes');if(n&&n.scrollIntoView)n.scrollIntoView({behavior:'smooth',block:'center'});},120);
+  _bellRefresh();
+}
+let _bellState=null,_bellNotes=0;
 function _bellRefresh(){
   try{
     const me=getMyMember();
     const btn=el('rail-bell'),badge=el('rail-bell-badge');
     if(!btn)return;
-    if(!me){btn.style.display='none';_bellState=null;return;}
+    const nr=notesRemCompute(S.quickNotes,_notesRemNext(),_localToday());
+    _bellNotes=nr.due?nr.open:0;
+    if(!me&&!_bellNotes){btn.style.display='none';_bellState=null;return;}
     btn.style.display='';
-    const mine=(S.tasks||[]).filter(t=>!t.done&&(t.assignees||[]).includes(me.id)).map(t=>t.id);
+    const mid=me?me.id:null;
+    const mine=mid?(S.tasks||[]).filter(t=>!t.done&&(t.assignees||[]).includes(mid)).map(t=>t.id):[];
     let seen=_bellLoadSeen();
     if(!seen){seen=new Set(mine);_bellSaveSeen(seen);}          // first run on this device: don't flood
-    const g=bellCompute(S.tasks,me.id,seen,toISO(new Date()));
+    const g=bellCompute(S.tasks,mid,seen,toISO(new Date()));
     const prevFresh=_bellState?new Set(_bellState.fresh.map(t=>t.id)):null;
     _bellState=g;
-    const n=new Set([...g.fresh,...g.overdue,...g.today].map(t=>t.id)).size;
+    const n=new Set([...g.fresh,...g.overdue,...g.today].map(t=>t.id)).size+(_bellNotes?1:0);
     if(badge){badge.textContent=n>99?'99+':String(n);badge.style.display=n?'flex':'none';}
     btn.classList.toggle('has-alerts',n>0);
     // desktop alert for assignments that arrived while the app was open
@@ -7378,7 +7401,8 @@ function _bellRenderPanel(){
   if(!box){box=document.createElement('div');box.id='bell-panel';document.body.appendChild(box);}
   const g=_bellState||{fresh:[],overdue:[],today:[],blocked:[]};
   const sec=(label,col,list)=>list.length?`<div style="margin-bottom:10px;"><div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:${col};padding:2px 0 4px;">${label} · ${list.length}</div>${list.slice(0,6).map(t=>{const pr=getProject(t.projectId);return`<div class="bell-row" onclick="bellOpenTask('${t.projectId}')"><span style="width:6px;height:6px;border-radius:50%;background:${pr?pr.color:'#888'};flex-shrink:0;"></span><span style="flex:1;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">${escHtml(t.name)}</span>${t.endDate?`<span style="font-size:.62rem;color:var(--muted);font-family:'DM Mono',monospace;">${fmtD(t.endDate)}</span>`:''}</div>`;}).join('')}${list.length>6?`<div style="font-size:.66rem;color:var(--muted);padding:3px 0;">+${list.length-6} more — see My work on the dashboard</div>`:''}</div>`:'';
-  const body=sec('New for you','var(--acc)',g.fresh)+sec('Overdue','var(--red)',g.overdue)+sec('Due today','var(--text)',g.today)+sec('Blocked','var(--amber,#f59e0b)',g.blocked);
+  const notesSec=_bellNotes?`<div style="margin-bottom:10px;"><div style="font-size:.62rem;font-weight:700;text-transform:uppercase;letter-spacing:.07em;color:var(--acc);padding:2px 0 4px;">Notes waiting · ${_bellNotes}</div><div class="bell-row" style="flex-direction:column;align-items:flex-start;gap:6px;cursor:default;"><span style="font-size:.78rem;">${_bellNotes} note${_bellNotes===1?'':'s'} on the dashboard ${_bellNotes===1?'has':'have'} not been organised yet.</span><span style="display:flex;gap:6px;flex-wrap:wrap;"><button class="btn btn-acc btn-xs" onclick="bellNotesOpen()">Open notes</button><button class="btn btn-ghost btn-xs" onclick="bellNotesSnooze()">Remind me in 5 days</button></span></div></div>`:'';
+  const body=notesSec+sec('New for you','var(--acc)',g.fresh)+sec('Overdue','var(--red)',g.overdue)+sec('Due today','var(--text)',g.today)+sec('Blocked','var(--amber,#f59e0b)',g.blocked);
   box.innerHTML=`<div class="bell-hd"><b>Notifications</b>${g.fresh.length?`<button class="btn btn-ghost btn-xs" onclick="bellSeenAll()">Mark new as seen</button>`:''}<button class="btn btn-ghost btn-xs" onclick="bellClose()" aria-label="Close">✕</button></div>
   <div class="bell-bd">${body||'<div style="color:var(--muted);font-size:.78rem;padding:8px 0;">You\'re all caught up.</div>'}</div>
   <div class="bell-ft"><label style="display:flex;align-items:center;gap:8px;cursor:pointer;font-size:.72rem;color:var(--text2);"><input type="checkbox" ${_bellDesktopOn()?'checked ':''}onchange="bellDesktopToggle()"> Desktop alerts for new assignments</label></div>`;
@@ -7689,7 +7713,7 @@ function showTaskTip(e,id){
     if(!cur)return;
     const tip=el('cowork-tooltip');if(tip&&tip.classList.contains('visible'))_posCoworkTip(e,tip);
   });
-  document.addEventListener('mouseout',e=>{if(!e.relatedTarget&&cur){cur=null;hideCoworkTip();}});
+  document.addEventListener('mouseout',e=>{if(!e.relatedTarget){const t=document.getElementById('tooltip');if(t)t.style.opacity='0';if(cur){cur=null;hideCoworkTip();}}});
   document.addEventListener('click',()=>{if(cur){cur=null;hideCoworkTip();}},true);
 })();
 /* ── Revenue streams that are not tied to events ──
@@ -8999,6 +9023,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [176,'Notes reminder in the bell every 5 days; the tab name label hides when you scroll'],
   [175,'The Finances tab is called Business'],
   [174,'Finances is now Company, 10 more Sponsors icons, and a quieter, clearer storage warning'],
   [173,'Selected option pills and Finance tabs use the hover look too, so green fill means an action'],
@@ -9008,8 +9033,7 @@ const PF_CHANGELOG=[
   [169,'Workflows: Print / PDF sheet with the map, steps, notes, links and run dates'],
   [168,'Workflow steps can have notes and links that flow into the run tasks'],
   [167,'Workflow retro suggests giving late steps more days, one tap each'],
-  [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first'],
-  [165,'Playbooks are now called Workflows; steps show as a simple list on phones']
+  [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
