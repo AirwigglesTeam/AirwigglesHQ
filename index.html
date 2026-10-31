@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5dvqy/qd6Gz2Y0VOBFb6e8OLPAKZptPVd9MFfLVpgN4='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ctKMK02MlW9IhKN06ylG1DRva1JTJM4lAHxDsq4VQXw='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2073,6 +2073,11 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-hint{font-size:.68rem;color:var(--muted);}.pb-open{font-size:.72rem;color:var(--acc);text-decoration:none;margin-top:4px;display:inline-block;}
 @media(max-width:900px){.pb-layout.open{grid-template-columns:minmax(0,1fr);}}
 @media(max-width:600px){.pb-two{grid-template-columns:1fr;}}
+.pb-runs{margin-top:14px;}
+.pb-run{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--border);}
+.pb-run:last-child{border-bottom:0;}
+.pb-rn{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
+.pb-rn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 </style>
 </head>
 <body>
@@ -2535,11 +2540,14 @@ pbDeletePb:()=>pbDeletePb,
 pbExample:()=>pbExample,
 pbNewModal:()=>pbNewModal,
 pbOpen:()=>pbOpen,
+pbRunModal:()=>pbRunModal,
+pbRunPreview:()=>pbRunPreview,
 pbSaveSettings:()=>pbSaveSettings,
 pbSetField:()=>pbSetField,
 pbSetGate:()=>pbSetGate,
 pbSetName:()=>pbSetName,
 pbSettingsModal:()=>pbSettingsModal,
+pbStartRun:()=>pbStartRun,
 pbTidy:()=>pbTidy,
 pbToggleAfter:()=>pbToggleAfter,
 pdAddWinner:()=>pdAddWinner,
@@ -4495,7 +4503,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=158;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=159;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8263,7 +8271,7 @@ function _boardBarHtml(V,count,extra){
   const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
   return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
 }
-//@act pbCreate pbSaveSettings pbDeletePb   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+//@act pbCreate pbSaveSettings pbDeletePb pbStartRun pbRunPreview   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
 /* ── Playbooks: a process drawn once as a map of steps, run again and again ──
    S.playbooks=[{id,name,outcome,trigger:'once'|'repeat',updated,
      steps:[{id,name,owner(member id),days,inp,out,toolName,toolUrl,gate,c,r,after:[step ids],checks:[{id,text}],tasks:[{id,text}]}]}]
@@ -8340,12 +8348,12 @@ function _pbMapHtml(p){
 function _pbDesignHtml(p){
   const calc=_pbCalc(p),s=_pbStepOf(p,_pbUI.step);
   return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Playbooks">←</button> <em>Playbooks</em> / <input class="pb-name" value="${escHtml(p.name||'')}" onchange="pbSetName(this.value)" aria-label="Playbook name"></div>
-    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button><button class="btn btn-acc btn-sm" onclick="pbAddStep()">+ Add step</button></div></div>
+    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button><button class="btn btn-ghost btn-sm" onclick="pbAddStep()">+ Add step</button>${p.steps.length?`<button class="btn btn-acc btn-sm" onclick="pbRunModal()">Start a run</button>`:''}</div></div>
   ${p.outcome?`<p class="pb-lede">${escHtml(p.outcome)}</p>`:''}
   <div class="pb-layout${s?' open':''}"><div><div class="card">${p.steps.length?_pbMapHtml(p):`<div class="empty" style="padding:30px;"><div class="empty-txt">No steps yet. Add the first one.</div><button class="btn btn-acc btn-sm" onclick="pbAddStep()" style="margin-top:10px;">+ Add step</button></div>`}
     <div class="pb-legend"><span><i></i>Step</span><span><i class="g"></i>Approval gate</span><span>Click a step to edit it. Drag to move it. Use “Comes after” in the editor to connect steps.</span></div></div>
     ${p.steps.length?`<p class="pb-note">${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(calc.total)} day${calc.total===1?'':'s'}. A run counts back from the publish date so each step gets its due date.</p>`:''}</div>
-  ${s?_pbDrawerHtml(p,s):''}</div></div>`;
+  ${s?_pbDrawerHtml(p,s):''}</div>${_pbRunsHtml(p)}</div>`;
 }
 function _pbDrawerHtml(p,s){
   const mem=S.members||[];
@@ -8484,11 +8492,80 @@ function pbInitMap(){
   });
   map.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('pb-nd')){e.preventDefault();pbSelStep(e.target.dataset.sid);}});
 }
+
+/* ── Runs: one go through the Playbook, counted back from a publish date ──
+   A run creates an ordinary project and one task per step (the step's own tasks become subtasks). Steps that come after others
+   are blocked until those finish. p.runs=[{id,name,date,projectId,created}]; each task carries t.pbRun={pb,run,step}. */
+const PB_MAX_RUNS=60;
+function _pbDays(s){return Math.max(1,Math.ceil(_pbN(s.days,0,365,1)));}
+/* calendar days, working back: the last steps finish on the publish date, every earlier step finishes the day before the next one starts */
+function _pbSchedule(p,publish){
+  const by={},succ={};p.steps.forEach(s=>{by[s.id]=s;succ[s.id]=[];});
+  p.steps.forEach(s=>_pbAfter(s).forEach(a=>{if(by[a]&&a!==s.id)succ[a].push(s.id);}));
+  const out={};
+  const go=(s,seen)=>{
+    if(out[s.id])return out[s.id];
+    if(seen[s.id])return{start:publish,end:publish};
+    seen[s.id]=1;let end=publish;
+    succ[s.id].forEach(k=>{const e=addDays(go(by[k],seen).start,-1);if(e<end)end=e;});
+    seen[s.id]=0;
+    return(out[s.id]={end,start:addDays(end,-(_pbDays(s)-1))});
+  };
+  p.steps.forEach(s=>go(s,{}));
+  return out;
+}
+function _pbRunsOf(p){return Array.isArray(p.runs)?p.runs.filter(r=>r&&typeof r==='object'&&r.id):[];}
+function _pbRunsHtml(p){
+  const runs=_pbRunsOf(p);if(!runs.length)return '';
+  const row=r=>{const ts=(S.tasks||[]).filter(t=>t.pbRun&&t.pbRun.run===r.id&&!t.parentId),n=ts.length,d=ts.filter(t=>t.done).length,gone=!getProject(r.projectId);
+    return `<div class="pb-run"><div class="pb-rn"><b>${escHtml(r.name||'Run')}</b><span class="mut">publish ${escHtml(fmtD(r.date))}${gone?' · project deleted':` · ${d} of ${n} steps done`}</span></div>${gone?'':`<button class="btn btn-ghost btn-xs" onclick="openDetail('${jsq(r.projectId)}')">Open project</button>`}</div>`;};
+  return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Runs</span><span class="pill">${runs.length}</span></div><div class="card-bd">${runs.slice().reverse().map(row).join('')}</div></div>`;
+}
+function pbRunModal(){
+  const p=_pbCur();if(!p||!p.steps.length)return;
+  if(_pbRunsOf(p).length>=PB_MAX_RUNS)return showToast('This Playbook has '+PB_MAX_RUNS+' runs. Delete an old project first.');
+  const def=addDays(_localToday(),Math.ceil(_pbCalc(p).total)+2);
+  const body=`<div class="field"><label class="flbl">Publish date *</label><input class="inp" type="date" id="pb-r-date" value="${escHtml(def)}" oninput="pbRunPreview()"></div>
+  <div id="pb-r-pv" class="pb-hint" style="margin:-4px 0 10px;"></div>
+  <div class="field"><label class="flbl">Project name</label><input class="inp" id="pb-r-name" maxlength="80" placeholder="${escHtml((p.name||'Run')+' · publish date')}"></div>
+  <div class="pb-hint">Creates a project with one task per step, due dates counted back from the publish date. Steps wait on the steps before them.</div>`;
+  _coModal('Start a run',body,'pbStartRun()','');pbRunPreview();
+}
+function pbRunPreview(){
+  const p=_pbCur(),pv=el('pb-r-pv');if(!p||!pv)return;
+  const d=_coVal('pb-r-date');if(!d||addDays(d,0)!==d){pv.textContent='Pick a publish date.';return;}
+  const sc=_pbSchedule(p,d),first=Object.values(sc).reduce((m,x)=>x.start<m?x.start:m,d),td=_localToday();
+  pv.textContent=first<td?`The first step would have started ${fmtD(first)}, already in the past. Pick a later date.`:`First step starts ${fmtD(first)}. ${p.steps.length} step${p.steps.length===1?'':'s'}.`;
+}
+function pbStartRun(){
+  const p=_pbCur();if(!p||!p.steps.length)return;
+  const date=_coVal('pb-r-date');if(!date||addDays(date,0)!==date)return _coErr('Pick a publish date');
+  if(_pbRunsOf(p).length>=PB_MAX_RUNS)return _coErr('Too many runs on this Playbook');
+  const name=(_coVal('pb-r-name')||((p.name||'Run')+' · '+fmtD(date))).slice(0,80);
+  const sc=_pbSchedule(p,date),first=Object.values(sc).reduce((m,x)=>x.start<m?x.start:m,date);
+  saveWithUndo('Start run');
+  const run=uid(),pid=uid(),tid={};p.steps.forEach(s=>{tid[s.id]=uid();});
+  S.projects.push({id:pid,name,description:String(p.outcome||'').slice(0,160),area:'',priority:'',ownerId:'',isAirCon:false,type:'improvement',startDate:first,endDate:date,status:'active',color:COLORS[(S.projects.length)%COLORS.length],graphicsUrl:'',eventUrl:'',expenses:[],sponsors:[],okrs:[],phaseWeeks:{planning:null,prelaunch:null,postEvent:null}});
+  const base={projectId:pid,labels:[],kStatus:'todo',done:false,recur:{enabled:false,type:'weekly',interval:1},slackReminder:{}};
+  const made=[];
+  p.steps.forEach(s=>{
+    const x=sc[s.id],own=S.members.some(m=>m.id===s.owner)?[s.owner]:[],link=s.toolUrl?_finSafeUrl(s.toolUrl):'';
+    const desc=[s.out?'Produces: '+s.out:'',s.inp?'Needs: '+s.inp:'',s.toolName||link?'Where: '+(s.toolName||'')+(link?' '+link:''):'',s.gate?'Approval gate: someone signs off before the next step.':'',(s.checks||[]).length?'Done means:\n'+s.checks.map(c=>'• '+c.text).join('\n'):''].filter(Boolean).join('\n');
+    const id=tid[s.id];
+    S.tasks.push(Object.assign({id,name:String(s.name||'Step').slice(0,120),description:desc,parentId:null,priority:s.gate?'High':'Medium',phase:'',assignees:own,blockedBy:_pbAfter(s).filter(a=>tid[a]&&a!==s.id).map(a=>tid[a]),startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base));made.push(id);
+    (s.tasks||[]).forEach(t=>{const sid=uid();S.tasks.push(Object.assign({id:sid,name:String(t.text||'Task').slice(0,120),description:'',parentId:id,priority:'Medium',phase:'',assignees:own,blockedBy:[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base));made.push(sid);});
+  });
+  made.forEach(syncBlockedStatus);
+  if(!Array.isArray(p.runs))p.runs=[];
+  p.runs.push({id:run,name,date,projectId:pid,created:_localToday()});p.updated=_localToday();
+  save();closeModal();render();showToast('Run started: '+made.length+' tasks created');
+}
 /* ── What's new (Settings › Advanced) ──
    A short summary of the latest releases, newest first: [release number, one plain sentence].
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [159,'Playbooks: Start a run builds a project with tasks counted back from a publish date'],
   [158,'Playbooks: draw a process as a map of steps, with owners, tools, checks and tasks'],
   [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters'],
   [156,'A "What\u2019s new" list in Settings, under Advanced'],
@@ -8498,8 +8575,7 @@ const PF_CHANGELOG=[
   [152,'The Now / Next / Later board uses the full add bar (assignees, labels, due date, notes)'],
   [151,'Bigger touch targets on phones and tablets'],
   [150,'The ? shortcut sheet opens properly; help overlays can be switched off in Settings'],
-  [149,'Calmer screen: clearer grey text, quiet save indicator, helpful empty states'],
-  [148,'Soft placeholders instead of a blank screen while loading']
+  [149,'Calmer screen: clearer grey text, quiet save indicator, helpful empty states']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
