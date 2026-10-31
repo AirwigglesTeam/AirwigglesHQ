@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-wYt8Vm103Tr4Z41pZXMqhgUI8lonqtdhzUa21hVgBjM='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-np6e2104HT32HGNmWzuYxOFhoqkBrbZveeDZMZ+ruxs='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2095,6 +2095,11 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-stp{font-size:.66rem;font-weight:600;border-radius:6px;padding:2px 8px;background:var(--surface3);color:var(--text2);}
 .pb-stp.st-done{color:var(--green);}.pb-stp.st-doing{color:var(--acc);}.pb-stp.st-late{color:var(--red);}.pb-stp.st-wait{color:var(--yellow);}
 .pb-legend i.s-done{background:var(--green);}.pb-legend i.s-doing{background:var(--acc);}.pb-legend i.s-late{background:var(--red);}.pb-legend i.s-wait{background:var(--yellow);}
+.pb-lesson{background:var(--surface2);border-left:3px solid var(--yellow);border-radius:8px;padding:8px 12px;font-size:.72rem;color:var(--text2);margin:0 0 10px;display:flex;flex-direction:column;gap:2px;}
+.pb-lesson b{color:var(--text);font-size:.74rem;}
+.pb-retro{margin-top:14px;}
+.pb-rq{display:flex;flex-direction:column;gap:2px;padding:6px 0;font-size:.78rem;color:var(--text2);white-space:pre-wrap;overflow-wrap:anywhere;}
+.pb-rq b{font-size:.68rem;text-transform:uppercase;letter-spacing:.05em;color:var(--muted);}
 </style>
 </head>
 <body>
@@ -2548,17 +2553,22 @@ openSponsorProfile:()=>openSponsorProfile,
 openSponsorProfileClose:()=>openSponsorProfileClose,
 pbAddItem:()=>pbAddItem,
 pbAddStep:()=>pbAddStep,
+pbArchive:()=>pbArchive,
 pbBack:()=>pbBack,
 pbCloseStep:()=>pbCloseStep,
 pbCreate:()=>pbCreate,
 pbDelItem:()=>pbDelItem,
 pbDelStep:()=>pbDelStep,
 pbDeletePb:()=>pbDeletePb,
+pbDuplicate:()=>pbDuplicate,
 pbExample:()=>pbExample,
 pbNewModal:()=>pbNewModal,
 pbOpen:()=>pbOpen,
+pbRestoreVer:()=>pbRestoreVer,
+pbRetroModal:()=>pbRetroModal,
 pbRunModal:()=>pbRunModal,
 pbRunPreview:()=>pbRunPreview,
+pbSaveRetro:()=>pbSaveRetro,
 pbSaveSettings:()=>pbSaveSettings,
 pbSetField:()=>pbSetField,
 pbSetGate:()=>pbSetGate,
@@ -2568,6 +2578,7 @@ pbSettingsModal:()=>pbSettingsModal,
 pbStartRun:()=>pbStartRun,
 pbTidy:()=>pbTidy,
 pbToggleAfter:()=>pbToggleAfter,
+pbToggleArch:()=>pbToggleArch,
 pdAddWinner:()=>pdAddWinner,
 pdLogDelivery:()=>pdLogDelivery,
 pdRemoveWinner:()=>pdRemoveWinner,
@@ -4521,7 +4532,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=160;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=161;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8289,14 +8300,14 @@ function _boardBarHtml(V,count,extra){
   const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
   return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
 }
-//@act pbCreate pbSaveSettings pbDeletePb pbStartRun pbRunPreview   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+//@act pbCreate pbSaveSettings pbDeletePb pbStartRun pbRunPreview pbSaveRetro   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
 /* ── Playbooks: a process drawn once as a map of steps, run again and again ──
    S.playbooks=[{id,name,outcome,trigger:'once'|'repeat',updated,
      steps:[{id,name,owner(member id),days,inp,out,toolName,toolUrl,gate,c,r,after:[step ids],checks:[{id,text}],tasks:[{id,text}]}]}]
    Phase 1 is Design mode: the list, the map (drag to place, "Comes after" to connect, Tidy up) and the step drawer.
    Everything stored is plain text (escaped when shown); links are http(s) only; counts and lengths are capped. */
 const PB_MAX_STEPS=40,PB_SX=164,PB_SY=104,PB_W=132,PB_H=84,PB_PAD=14;
-let _pbUI={pb:'',step:'',run:''};
+let _pbUI={pb:'',step:'',run:'',arch:false};
 function _pbList(){if(!Array.isArray(S.playbooks))S.playbooks=[];if(S.playbooks.some(x=>!x||typeof x!=='object'||typeof x.id!=='string'))S.playbooks=S.playbooks.filter(x=>x&&typeof x==='object'&&typeof x.id==='string');return S.playbooks;}
 function _pbCur(){const p=_pbList().find(x=>x&&x.id===_pbUI.pb)||null;if(p&&!Array.isArray(p.steps))p.steps=[];return p;}
 function _pbStepOf(p,id){return p?(p.steps||[]).find(s=>s&&s.id===id)||null:null;}
@@ -8343,13 +8354,13 @@ function renderPlaybooks(){
   const p=_pbCur();
   if(p)return _pbDesignHtml(p);
   _pbUI.pb='';_pbUI.step='';
-  const list=_pbList();
+  const all=_pbList(),arch=all.filter(q=>q.archived),list=all.filter(q=>!q.archived||_pbUI.arch);
   const card=q=>{const n=(q.steps||[]).length,t=_pbCalc(Object.assign({},q,{steps:q.steps||[]})).total;
-    return `<button class="pb-card" onclick="pbOpen('${jsq(q.id)}')"><b>${escHtml(q.name||'Untitled')}</b><span class="pb-oc">${escHtml(q.outcome||'No outcome written yet')}</span><span class="pb-meta"><span class="chip">${n} step${n===1?'':'s'}</span>${n?`<span class="chip">${escHtml(t)} day${t===1?'':'s'} end to end</span>`:''}<span class="chip">${q.trigger==='repeat'?'Repeats':'One-off'}</span></span></button>`;};
+    return `<button class="pb-card" onclick="pbOpen('${jsq(q.id)}')"><b>${escHtml(q.name||'Untitled')}</b><span class="pb-oc">${escHtml(q.outcome||'No outcome written yet')}</span><span class="pb-meta"><span class="chip">${n} step${n===1?'':'s'}</span>${n?`<span class="chip">${escHtml(t)} day${t===1?'':'s'} end to end</span>`:''}<span class="chip">${q.trigger==='repeat'?'Repeats':'One-off'}</span>${q.archived?'<span class="chip">Archived</span>':''}</span></button>`;};
   return `<div class="fu"><div class="page-hd"><div class="page-title"><em>Playbooks</em></div><button class="btn btn-acc btn-sm" onclick="pbNewModal()">+ New Playbook</button></div>
   <p class="pb-lede">A Playbook is a process you draw once and run again and again: the steps, who does them, how long they take and where the work lives.</p>
   ${list.length?`<div class="pb-grid">${list.map(card).join('')}</div>`:`<div class="empty"><div class="empty-txt">No Playbooks yet.<br>Start from the YouTube example, or write your own.</div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="pbExample()">Start with the YouTube example</button><button class="btn btn-ghost btn-sm" onclick="pbNewModal()">Write my own</button></div></div>`}
-  ${list.length?`<div style="margin-top:14px;"><button class="btn btn-ghost btn-xs" onclick="pbExample()">+ Add the YouTube example</button></div>`:''}</div>`;
+  ${all.length?`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-xs" onclick="pbExample()">+ Add the YouTube example</button>${arch.length?`<button class="btn btn-ghost btn-xs" onclick="pbToggleArch()">${_pbUI.arch?'Hide':'Show'} archived (${arch.length})</button>`:''}</div>`:''}</div>`;
 }
 function _pbMapHtml(p,stat){
   const st=p.steps,by={};st.forEach(s=>{by[s.id]=s;});
@@ -8373,7 +8384,7 @@ function _pbDesignHtml(p){
   <div class="pb-layout${s?' open':''}"><div><div class="card">${p.steps.length?_pbMapHtml(p):`<div class="empty" style="padding:30px;"><div class="empty-txt">No steps yet. Add the first one.</div><button class="btn btn-acc btn-sm" onclick="pbAddStep()" style="margin-top:10px;">+ Add step</button></div>`}
     <div class="pb-legend"><span><i></i>Step</span><span><i class="g"></i>Approval gate</span><span>Click a step to edit it. Drag to move it. Use “Comes after” in the editor to connect steps.</span></div></div>
     ${p.steps.length?`<p class="pb-note">${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(calc.total)} day${calc.total===1?'':'s'}. A run counts back from the publish date so each step gets its due date.</p>`:''}</div>
-  ${s?_pbDrawerHtml(p,s):''}</div>${_pbRunsHtml(p)}</div>`;
+  ${s?_pbDrawerHtml(p,s):''}</div>${_pbRunsHtml(p)}${_pbVersHtml(p)}</div>`;
 }
 function _pbDrawerHtml(p,s){
   const mem=S.members||[];
@@ -8470,6 +8481,7 @@ function pbSettingsModal(){
   <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-s-trig"><option value="once"${p.trigger!=='repeat'?' selected':''}>One-off</option><option value="repeat"${p.trigger==='repeat'?' selected':''}>Repeats</option></select></div>
   <div class="field"><label class="flbl">Repeats every</label><select class="sel" id="pb-s-ev">${[['week','Week'],['2weeks','2 weeks'],['month','Month']].map(o=>`<option value="${escHtml(o[0])}"${(p.repeat&&p.repeat.every||'week')===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select></div>
   <div class="field"><label class="flbl">Next publish date</label><input class="inp" type="date" id="pb-s-next" value="${escHtml((p.repeat&&p.repeat.next)||'')}"></div>
+  <div class="field" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="pbDuplicate()">Duplicate</button><button class="btn btn-ghost btn-sm" onclick="pbArchive()">${p.archived?'Restore from archive':'Archive'}</button></div>
   <div class="pb-hint">Only used when it repeats. Each time, the run is created about 3 days before its first step is due, when someone opens the app.</div>`;
   _coModal('Playbook settings',body,'pbSaveSettings()','pbDeletePb()');
 }
@@ -8497,8 +8509,8 @@ function pbInitMap(){
   const map=el('pb-map');if(!map)return;
   map.addEventListener('pointerdown',e=>{
     const nd=e.target.closest&&e.target.closest('.pb-nd');if(!nd||e.button>0)return;
+    if(_pbUI.run){pbSelStep(nd.dataset.sid);return;}
     const p=_pbCur(),s=_pbStepOf(p,nd.dataset.sid);if(!s)return;
-    if(_pbUI.run){pbSelStep(s.id);return;}
     const sx=e.clientX,sy=e.clientY,x0=parseFloat(nd.style.left),y0=parseFloat(nd.style.top);let moved=false;
     const touch=e.pointerType==='touch';
     try{nd.setPointerCapture(e.pointerId);}catch(_){}
@@ -8543,7 +8555,7 @@ function _pbRunsOf(p){return Array.isArray(p.runs)?p.runs.filter(r=>r&&typeof r=
 function _pbRunsHtml(p){
   const runs=_pbRunsOf(p);if(!runs.length)return '';
   const row=r=>{const ts=(S.tasks||[]).filter(t=>t.pbRun&&t.pbRun.run===r.id&&!t.parentId),n=ts.length,d=ts.filter(t=>t.done).length,gone=!getProject(r.projectId);
-    return `<div class="pb-run"><div class="pb-rn"><b>${escHtml(r.name||'Run')}</b><span class="mut">publish ${escHtml(fmtD(r.date))}${gone?' · project deleted':` · ${d} of ${n} steps done`}</span></div>${gone?'':`<button class="btn btn-ghost btn-xs" onclick="pbSetView('${jsq(r.id)}')">Live map</button><button class="btn btn-ghost btn-xs" onclick="openDetail('${jsq(r.projectId)}')">Open project</button>`}</div>`;};
+    return `<div class="pb-run"><div class="pb-rn"><b>${escHtml(r.name||'Run')}</b><span class="mut">publish ${escHtml(fmtD(r.date))}${(()=>{const v=_pbVers(p).find(x=>x.id===r.v);return v?' · version '+escHtml(v.n):'';})()}${r.retro?' · retro written':''}${gone?' · project deleted':` · ${d} of ${n} steps done`}</span></div>${gone?'':`<button class="btn btn-ghost btn-xs" onclick="pbSetView('${jsq(r.id)}')">Live map</button><button class="btn btn-ghost btn-xs" onclick="openDetail('${jsq(r.projectId)}')">Open project</button>`}</div>`;};
   return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Runs</span><span class="pill">${runs.length}</span></div><div class="card-bd">${runs.slice().reverse().map(row).join('')}</div></div>`;
 }
 function pbRunModal(){
@@ -8553,6 +8565,7 @@ function pbRunModal(){
   const body=`<div class="field"><label class="flbl">Publish date *</label><input class="inp" type="date" id="pb-r-date" value="${escHtml(def)}" oninput="pbRunPreview()"></div>
   <div id="pb-r-pv" class="pb-hint" style="margin:-4px 0 10px;"></div>
   <div class="field"><label class="flbl">Project name</label><input class="inp" id="pb-r-name" maxlength="80" placeholder="${escHtml((p.name||'Run')+' · publish date')}"></div>
+  ${(()=>{const l=_pbRunsOf(p).slice().reverse().find(r=>r.retro&&r.retro.change);return l?`<div class="pb-lesson"><b>Change from last time</b>${escHtml(l.retro.change)}</div>`:'';})()}
   <div class="pb-hint">Creates a project with one task per step, due dates counted back from the publish date. Steps wait on the steps before them.</div>`;
   _coModal('Start a run',body,'pbStartRun()','');pbRunPreview();
 }
@@ -8588,7 +8601,7 @@ function _pbMakeRun(p,date,nm,auto){
   });
   made.forEach(syncBlockedStatus);
   if(!Array.isArray(p.runs))p.runs=[];
-  p.runs.push({id:run,name,date,projectId:pid,created:_localToday()});p.updated=_localToday();
+  p.runs.push({id:run,name,date,projectId:pid,v:_pbSnap(p),created:_localToday()});p.updated=_localToday();
   return made.length;
 }
 
@@ -8611,7 +8624,8 @@ function _pbViewBar(p){
   const runs=_pbRunsOf(p);if(!runs.length)return '';
   return `<div class="pb-vw" role="tablist"><button class="${_pbUI.run?'':'on'}" onclick="pbSetView('')">Design</button>${runs.slice(-6).map(r=>`<button class="${_pbUI.run===r.id?'on':''}" onclick="pbSetView('${jsq(r.id)}')">${escHtml(r.name||'Run')}</button>`).join('')}</div>`;
 }
-function _pbRunViewHtml(p,run){
+function _pbRunViewHtml(p0,run){
+  const ver=_pbVers(p0).find(v=>v.id===run.v),p=ver?Object.assign({},p0,{steps:ver.steps}):p0;
   const stat=_pbStat(p,run),vals=Object.values(stat),n=p.steps.length,today=_localToday();
   const cnt=k=>vals.filter(v=>v.k===k).length;
   const next=p.steps.filter(s=>stat[s.id]&&(stat[s.id].k==='todo'||stat[s.id].k==='doing'||stat[s.id].k==='late')).sort((a,b)=>String(stat[a.id].task&&stat[a.id].task.endDate||'9').localeCompare(String(stat[b.id].task&&stat[b.id].task.endDate||'9')))[0];
@@ -8622,10 +8636,10 @@ function _pbRunViewHtml(p,run){
     ${isBlocked(sv.task)?`<div class="pb-hint">Waiting on: ${escHtml(blockerNames(sv.task).join(', '))}</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="openModal('task','${jsq(sv.task.id)}')">Open task</button><button class="btn btn-ghost btn-sm" onclick="openDetail('${jsq(run.projectId)}')">Open project</button></div>`:'<div class="pb-hint">This step\'s task was deleted from the project.</div>'}</div>`:'';
   return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Playbooks">←</button> <em>${escHtml(p.name||'Playbook')}</em> / ${escHtml(run.name||'Run')}</div>
-    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbRunModal()">Start another run</button></div></div>
-  ${_pbViewBar(p)}
+    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbRetroModal()">${run.retro?'Edit retro':'Retro'}</button><button class="btn btn-ghost btn-sm" onclick="pbRunModal()">Start another run</button></div></div>
+  ${_pbViewBar(p0)}
   <div class="pb-sum"><span><b>${escHtml(fmtD(run.date))}</b>publish${days>=0?' · in '+days+'d':' · '+(-days)+'d ago'}</span><span><b>${cnt('done')} / ${n}</b>steps done</span><span class="${cnt('late')?'bad':''}"><b>${cnt('late')}</b>late</span><span><b>${escHtml(next?next.name:'All done')}</b>${next?'next up':''}</span></div>
-  <div class="pb-layout${sel?' open':''}"><div><div class="card">${_pbMapHtml(p,stat)}<div class="pb-legend"><span><i class="s-done"></i>Done</span><span><i class="s-doing"></i>In progress</span><span><i class="s-late"></i>Late</span><span><i class="s-wait"></i>Waiting</span><span>Click a step for its task. Change the map in Design.</span></div></div></div>${info}</div></div>`;
+  <div class="pb-layout${sel?' open':''}"><div><div class="card">${_pbMapHtml(p,stat)}<div class="pb-legend"><span><i class="s-done"></i>Done</span><span><i class="s-doing"></i>In progress</span><span><i class="s-late"></i>Late</span><span><i class="s-wait"></i>Waiting</span><span>Click a step for its task. Change the map in Design.</span></div></div>${_pbRetroCard(run)}</div>${info}</div></div>`;
 }
 /* ── Repeating Playbooks: p.repeat={every:'week'|'2weeks'|'month',next:'YYYY-MM-DD' (next publish date)} ──
    Checked once after the server copy loads. A run is made about 3 days before its first step is due; dates already past are skipped.
@@ -8647,11 +8661,77 @@ function pbAutoRuns(){
   if(made){save();render();showToast(made+' Playbook run'+(made===1?'':'s')+' started');}
   return made;
 }
+
+/* ── Versions: each run keeps the map exactly as it ran, so editing the Playbook later never rewrites an old run ──
+   p.versions=[{id:'v<n>',n,date,sig,steps}] (newest 8). A run stores run.v; restoring copies a version back into the editable map. */
+const PB_MAX_VER=8;
+function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),(s.tasks||[]).map(c=>c&&c.text)]));}
+function _pbVers(p){return Array.isArray(p.versions)?p.versions.filter(v=>v&&typeof v==='object'&&typeof v.id==='string'&&Array.isArray(v.steps)):[];}
+function _pbSnap(p){
+  const sig=_pbSig(p);let vs=_pbVers(p);const hit=vs.find(x=>x.sig===sig);if(hit)return hit.id;
+  const n=vs.reduce((m,x)=>Math.max(m,x.n|0),0)+1,v={id:'v'+n,n,date:_localToday(),sig,steps:PFSync.clone(p.steps)};
+  vs.push(v);
+  while(vs.length>PB_MAX_VER){const used=new Set(_pbRunsOf(p).map(r=>r.v));const i=vs.findIndex(x=>!used.has(x.id)&&x.id!==v.id);vs.splice(i<0?0:i,1);}
+  p.versions=vs;return v.id;
+}
+function _pbVersHtml(p){
+  const vs=_pbVers(p);if(!vs.length)return '';const cur=_pbSig(p);
+  const row=v=>{const k=_pbRunsOf(p).filter(r=>r.v===v.id).length;return `<div class="pb-run pb-ver"><div class="pb-rn"><b>Version ${escHtml(v.n)}</b><span class="mut">${escHtml(fmtD(v.date))} · ${escHtml(v.steps.length)} steps · ${escHtml(k)} run${k===1?'':'s'}</span></div>${v.sig===cur?'<span class="pill ok">Current</span>':`<button class="btn btn-ghost btn-xs" onclick="pbRestoreVer('${jsq(v.id)}')">Restore</button>`}</div>`;};
+  return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Versions</span><span class="mut" style="margin-left:auto;font-size:.68rem;">saved each time a run starts</span></div><div class="card-bd">${vs.slice().reverse().map(row).join('')}</div></div>`;
+}
+function pbRestoreVer(id){
+  const p=_pbCur();if(!p)return;const v=_pbVers(p).find(x=>x.id===id);if(!v)return;
+  saveWithUndo('Restore version');if(p.steps.length)_pbSnap(p);
+  p.steps=PFSync.clone(v.steps);_pbUI.step='';p.updated=_localToday();save();render();showToast('Restored version '+v.n);
+}
+/* ── Library: duplicate and archive ── */
+function pbToggleArch(){_pbUI.arch=!_pbUI.arch;render();}
+function pbDuplicate(){
+  const p=_pbCur();if(!p)return;
+  saveWithUndo('Duplicate playbook');
+  const m={};p.steps.forEach(s=>{m[s.id]=uid();});
+  const q={id:uid(),name:String(p.name||'Playbook').slice(0,70)+' (copy)',outcome:p.outcome||'',trigger:'once',updated:_localToday(),
+    steps:p.steps.map(s=>Object.assign({},s,{id:m[s.id],after:_pbAfter(s).filter(a=>m[a]).map(a=>m[a]),checks:(s.checks||[]).map(c=>({id:uid(),text:c.text})),tasks:(s.tasks||[]).map(c=>({id:uid(),text:c.text}))}))};
+  _pbList().push(q);_pbUI.pb=q.id;_pbUI.step='';_pbUI.run='';save();closeModal();render();showToast('Duplicated');
+}
+function pbArchive(){const p=_pbCur();if(!p)return;saveWithUndo('Edit playbook');p.archived=!p.archived;if(p.archived)p.trigger='once';p.updated=_localToday();save();closeModal();if(p.archived){_pbUI.pb='';}render();}
+/* ── Retro: what happened on a run, and one change for next time ──
+   run.retro={well,slow,change,date}. Finish dates come from the tasks themselves (t.doneOn is kept for Playbook tasks). */
+function _pbLate(p0,run){
+  const p=Object.assign({},p0,{steps:(_pbVers(p0).find(v=>v.id===run.v)||p0).steps}),out=[];let ok=0,n=0;
+  const ts=(S.tasks||[]).filter(t=>t.pbRun&&t.pbRun.run===run.id&&!t.parentId);
+  p.steps.forEach(s=>{
+    const t=ts.find(x=>x.pbRun.step===s.id);if(!t||!(t.done||taskComp(t)>=100))return;
+    const kd=kids(t.id),fin=[t.doneOn].concat(kd.map(c=>c.doneOn)).filter(Boolean).sort().pop();
+    n++;if(!fin||!t.endDate||fin<=t.endDate){ok++;return;}
+    out.push({name:s.name||'Step',days:Math.round((new Date(fin+'T12:00:00Z')-new Date(t.endDate+'T12:00:00Z'))/864e5)});
+  });
+  return{ok,n,late:out};
+}
+function _pbRetroCard(run){
+  const r=run.retro;if(!r)return '';
+  const q=(t,v)=>v?`<div class="pb-rq"><b>${escHtml(t)}</b><span>${escHtml(v)}</span></div>`:'';
+  return `<div class="card pb-retro"><div class="card-hd"><span class="card-title">Retro</span><span class="mut" style="margin-left:auto;font-size:.68rem;">${escHtml(fmtD(r.date))}</span></div><div class="card-bd">${q('What went well',r.well)}${q('What slowed us down',r.slow)}${q('Change for next time',r.change)}</div></div>`;
+}
+function pbRetroModal(){
+  const p=_pbCur();const run=p&&_pbRunsOf(p).find(r=>r.id===_pbUI.run);if(!run)return;
+  const L=_pbLate(p,run),r=run.retro||{};
+  const sum=L.n?`<div class="pb-lesson"><b>${L.ok} of ${L.n} finished steps were on time</b>${L.late.length?escHtml(L.late.map(x=>x.name+' (+'+x.days+'d)').join(', '))+' ran late. Consider giving them more days in the Playbook.':'Nothing ran late.'}</div>`:'<div class="pb-hint" style="margin-bottom:8px;">No steps are finished yet. You can write the retro any time.</div>';
+  const ta=(id,l,v)=>`<div class="field"><label class="flbl">${l}</label><textarea class="inp" id="${id}" rows="2" maxlength="400">${escHtml(v||'')}</textarea></div>`;
+  _coModal('Retro: '+(run.name||'Run'),sum+ta('pb-rt-well','What went well',r.well)+ta('pb-rt-slow','What slowed us down',r.slow)+ta('pb-rt-change','One change for next time',r.change),'pbSaveRetro()','');
+}
+function pbSaveRetro(){
+  const p=_pbCur();const run=p&&_pbRunsOf(p).find(r=>r.id===_pbUI.run);if(!run)return;
+  saveWithUndo('Edit retro');
+  run.retro={well:_coVal('pb-rt-well').slice(0,400),slow:_coVal('pb-rt-slow').slice(0,400),change:_coVal('pb-rt-change').slice(0,400),date:_localToday()};
+  p.updated=_localToday();save();closeModal();render();
+}
 /* ── What's new (Settings › Advanced) ──
    A short summary of the latest releases, newest first: [release number, one plain sentence].
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [161,'Playbooks: run versions, retro with late steps, duplicate and archive'],
   [160,'Playbooks: live map coloured by task progress, and Playbooks that repeat on a schedule'],
   [159,'Playbooks: Start a run builds a project with tasks counted back from a publish date'],
   [158,'Playbooks: draw a process as a map of steps, with owners, tools, checks and tasks'],
@@ -8661,8 +8741,7 @@ const PF_CHANGELOG=[
   [154,'Finance has a new Company pill: details, key dates, documents, directors and shareholders'],
   [153,'Team profiles show tasks done instead of hours per week'],
   [152,'The Now / Next / Later board uses the full add bar (assignees, labels, due date, notes)'],
-  [151,'Bigger touch targets on phones and tablets'],
-  [150,'The ? shortcut sheet opens properly; help overlays can be switched off in Settings']
+  [151,'Bigger touch targets on phones and tablets']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -10845,8 +10924,8 @@ function toggleDone(id){
   const ch=kids(id);
   // Snapshot for undo ONLY if needed — defer for perf
   t.done=!t.done;
-  if(t.done){t.kStatus='done';if(t.finKey)t.doneOn=_localToday();}
-  else{syncBlockedStatus(id);if(t.finKey)t.doneOn='';}
+  if(t.done){t.kStatus='done';if(t.finKey||t.pbRun)t.doneOn=_localToday();}
+  else{syncBlockedStatus(id);if(t.finKey||t.pbRun)t.doneOn='';}
   const didSpawn=t.done&&t.recur?.enabled;
   if(didSpawn)spawnRecurring(t);
   // Cascade done/undone state to all children
