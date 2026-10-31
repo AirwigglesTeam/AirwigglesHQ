@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ahMSv88qEw7gPejpzgLn75AFNaRwkMKfAxeBseSlmCM='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VKz4ppCXzODEaqSzdoY0Ss8OVkw3RAEfXsePYmduVwY='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2073,6 +2073,9 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-hint{font-size:.68rem;color:var(--muted);}.pb-open{font-size:.72rem;color:var(--acc);text-decoration:none;margin-top:4px;display:inline-block;}
 @media(max-width:900px){.pb-layout.open{grid-template-columns:minmax(0,1fr);}}
 @media(max-width:600px){.pb-two{grid-template-columns:1fr;}}
+.pb-dry{border:1px solid var(--border);border-radius:10px;background:var(--surface2);max-height:200px;overflow:auto;}
+.pb-dry-h{font-size:.66rem;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--border);}
+.pb-dry-r{display:flex;gap:10px;justify-content:space-between;font-size:.74rem;padding:5px 10px;color:var(--text2);}.pb-dry-r span{min-width:0;overflow-wrap:anywhere;}.pb-dry-r em{flex:none;font-style:normal;color:var(--text);}.pb-dry-r.past em{color:var(--red);}
 .pb-sl{display:none;}
 .pb-sli{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
 .pb-sli:last-child{border-bottom:0;}.pb-sli:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
@@ -2578,6 +2581,7 @@ pbDuplicate:()=>pbDuplicate,
 pbExample:()=>pbExample,
 pbFinanceStarter:()=>pbFinanceStarter,
 pbNewModal:()=>pbNewModal,
+pbNewPreview:()=>pbNewPreview,
 pbOpen:()=>pbOpen,
 pbRestoreVer:()=>pbRestoreVer,
 pbRetroModal:()=>pbRetroModal,
@@ -4550,7 +4554,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=165;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=166;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8322,7 +8326,7 @@ function _boardBarHtml(V,count,extra){
   const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
   return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
 }
-//@act pbCreate pbSaveSettings pbDeletePb pbStartRun pbRunPreview pbSaveRetro   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+//@act pbCreate pbSaveSettings pbDeletePb pbStartRun pbRunPreview pbSaveRetro pbNewPreview   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
 /* ── Workflows: a process drawn once as a map of steps, run again and again ──
    S.playbooks=[{id,name,outcome,trigger:'once'|'repeat',updated,
      steps:[{id,name,owner(member id),days,inp,out,toolName,toolUrl,gate,c,r,after:[step ids],checks:[{id,text}],tasks:[{id,text}]}]}]
@@ -8482,16 +8486,28 @@ function pbDelStep(sid){
   p.steps=p.steps.filter(s=>s.id!==sid);p.steps.forEach(s=>{s.after=_pbAfter(s).filter(x=>x!==sid);});
   _pbUI.step='';save();render();
 }
+/* one line per step: "Script, 3" or "Script - 3 days" sets the days; a leading "!" makes it an approval gate */
+function _pbParseLines(text){
+  return String(text||'').split(/\n/).slice(0,PB_MAX_STEPS*3).map(x=>{
+    let t=String(x).trim(),gate=false,days=1;if(t[0]==='!'){gate=true;t=t.slice(1).trim();}
+    const m=/^(.*?)\s*[,|\-\u2013]\s*(\d{1,3})\s*(?:d|days?)?$/i.exec(t);if(m&&m[1]){t=m[1];days=_pbN(m[2],0,365,1);}
+    const name=_pbT(t,80);return name?{name,gate,days}:null;
+  }).filter(Boolean).slice(0,PB_MAX_STEPS);
+}
 function _pbStepsFromLines(text){
-  const names=String(text||'').split(/\n/).map(x=>_pbT(x,80)).filter(Boolean).slice(0,PB_MAX_STEPS);
-  return names.map((n,i)=>({id:uid(),name:n,owner:'',days:1,inp:'',out:'',toolName:'',toolUrl:'',gate:false,c:i,r:0,after:[],checks:[],tasks:[]}))
+  return _pbParseLines(text).map((x,i)=>({id:uid(),name:x.name,owner:'',days:x.days,inp:'',out:'',toolName:'',toolUrl:'',gate:x.gate,c:i,r:0,after:[],checks:[],tasks:[]}))
     .map((s,i,a)=>{if(i)s.after=[a[i-1].id];return s;});
+}
+function pbNewPreview(){
+  const pv=el('pb-n-pv');if(!pv)return;const L=_pbParseLines(el('pb-n-steps')&&el('pb-n-steps').value);
+  const d=L.reduce((a,x)=>a+x.days,0),g=L.filter(x=>x.gate).length;
+  pv.textContent=L.length?`${L.length} step${L.length===1?'':'s'} · ${d} day${d===1?'':'s'} end to end${g?' · '+g+' approval gate'+(g===1?'':'s'):''}`:'';
 }
 function pbNewModal(){
   const body=`<div class="field"><label class="flbl">Name *</label><input class="inp" id="pb-n-name" placeholder="YouTube video"></div>
   <div class="field"><label class="flbl">Outcome: what does done look like?</label><input class="inp" id="pb-n-out" placeholder="A published video that hits the weekly slot"></div>
   <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-n-trig"><option value="once">One-off</option><option value="repeat">Repeats</option></select></div>
-  <div class="field"><label class="flbl">Steps, one per line (any order is fine, you can rearrange later)</label><textarea class="inp" id="pb-n-steps" rows="6" placeholder="Idea&#10;Script&#10;Record&#10;Edit&#10;Publish"></textarea></div>`;
+  <div class="field"><label class="flbl">Brain-dump the steps, one per line</label><textarea class="inp" id="pb-n-steps" rows="6" oninput="pbNewPreview()" placeholder="Idea&#10;Script, 3&#10;Record, 1&#10;!Approve edit&#10;Publish"></textarea><div class="pb-hint" style="margin-top:4px;">Add the days after a comma (Script, 3). Start a line with ! for an approval gate. You can add owners, tools and checks next.</div><div class="pb-hint" id="pb-n-pv" style="margin-top:2px;color:var(--acc);"></div></div>`;
   _coModal('New Workflow',body,'pbCreate()','');
 }
 function pbCreate(){
@@ -8674,9 +8690,12 @@ function pbRunModal(){
 }
 function pbRunPreview(){
   const p=_pbCur(),pv=el('pb-r-pv');if(!p||!pv)return;
-  const d=_coVal('pb-r-date');if(!d||addDays(d,0)!==d){pv.textContent='Pick a publish date.';return;}
-  const sc=_pbSchedule(p,d),first=Object.values(sc).reduce((m,x)=>x.start<m?x.start:m,d),td=_localToday();
-  pv.textContent=first<td?`The first step would have started ${fmtD(first)}, already in the past. Pick a later date.`:`First step starts ${fmtD(first)}. ${p.steps.length} step${p.steps.length===1?'':'s'}.`;
+  const d=_coVal('pb-r-date');if(!d||addDays(d,0)!==d){pv.textContent='Pick a date.';return;}
+  const sc=_pbSchedule(p,d),td=_localToday();
+  const rows=p.steps.map(s=>({s,x:sc[s.id]})).filter(r=>r.x).sort((a,b)=>a.x.start<b.x.start?-1:a.x.start>b.x.start?1:a.x.end<b.x.end?-1:a.x.end>b.x.end?1:0);
+  const first=rows.length?rows[0].x.start:d;
+  const warn=first<td?`<div class="pb-lesson" style="margin:0 0 6px;"><b>Already in the past</b>The first step would have started ${escHtml(fmtD(first))}. Pick a later date.</div>`:'';
+  pv.innerHTML=warn+`<div class="pb-dry"><div class="pb-dry-h">Dry run: nothing is created until you press Start</div>${rows.map(r=>`<div class="pb-dry-r${r.x.start<td?' past':''}"><span>${escHtml(r.s.name||'Step')}${r.s.gate?' · gate':''}</span><em>${escHtml(fmtD(r.x.start))}${r.x.end!==r.x.start?' → '+escHtml(fmtD(r.x.end)):''}</em></div>`).join('')}</div>`;
 }
 function pbStartRun(){
   const p=_pbCur();if(!p||!p.steps.length)return;
@@ -8874,6 +8893,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first'],
   [165,'Playbooks are now called Workflows; steps show as a simple list on phones'],
   [164,'Playbook Templates tab, Event and Product starters, run date can be the event day'],
   [163,'Playbook steps can be ticked in any order (the lock is now optional); audit and tune-up'],
@@ -8883,8 +8903,7 @@ const PF_CHANGELOG=[
   [159,'Playbooks: Start a run builds a project with tasks counted back from a publish date'],
   [158,'Playbooks: draw a process as a map of steps, with owners, tools, checks and tasks'],
   [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters'],
-  [156,'A "What\u2019s new" list in Settings, under Advanced'],
-  [155,'Company: contacts (accountant, bank, solicitor) and a compliance checklist']
+  [156,'A "What\u2019s new" list in Settings, under Advanced']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
