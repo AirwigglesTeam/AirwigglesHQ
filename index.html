@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-VKz4ppCXzODEaqSzdoY0Ss8OVkw3RAEfXsePYmduVwY='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-3w4GWRqSAlQAYuDWTcSkIiCDDkMLnYONTP2NGYLwF50='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2076,6 +2076,8 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-dry{border:1px solid var(--border);border-radius:10px;background:var(--surface2);max-height:200px;overflow:auto;}
 .pb-dry-h{font-size:.66rem;color:var(--muted);padding:7px 10px;border-bottom:1px solid var(--border);}
 .pb-dry-r{display:flex;gap:10px;justify-content:space-between;font-size:.74rem;padding:5px 10px;color:var(--text2);}.pb-dry-r span{min-width:0;overflow-wrap:anywhere;}.pb-dry-r em{flex:none;font-style:normal;color:var(--text);}.pb-dry-r.past em{color:var(--red);}
+.pb-sugs{margin:0 0 10px;display:flex;flex-direction:column;gap:6px;}
+.pb-sug{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:.76rem;color:var(--text2);padding:6px 10px;border:1px solid var(--border);border-radius:9px;background:var(--surface2);}.pb-sug span{min-width:0;overflow-wrap:anywhere;}.pb-sug button{flex:none;min-height:32px;}
 .pb-sl{display:none;}
 .pb-sli{all:unset;box-sizing:border-box;display:flex;align-items:center;gap:10px;width:100%;min-height:48px;padding:8px 14px;border-bottom:1px solid var(--border);cursor:pointer;}
 .pb-sli:last-child{border-bottom:0;}.pb-sli:focus-visible{outline:2px solid var(--acc);outline-offset:-2px;}
@@ -2572,6 +2574,7 @@ pbAddStarter:()=>pbAddStarter,
 pbAddStep:()=>pbAddStep,
 pbArchive:()=>pbArchive,
 pbBack:()=>pbBack,
+pbBumpDays:()=>pbBumpDays,
 pbCloseStep:()=>pbCloseStep,
 pbCreate:()=>pbCreate,
 pbDelItem:()=>pbDelItem,
@@ -4554,7 +4557,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=166;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=167;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8836,7 +8839,7 @@ function _pbLate(p0,run){
     const t=ts.find(x=>x.pbRun.step===s.id);if(!t||!(t.done||taskComp(t)>=100))return;
     const kd=kids(t.id),fin=[t.doneOn].concat(kd.map(c=>c.doneOn)).filter(Boolean).sort().pop();
     n++;if(!fin||!t.endDate||fin<=t.endDate){ok++;return;}
-    out.push({name:s.name||'Step',days:Math.round((new Date(fin+'T12:00:00Z')-new Date(t.endDate+'T12:00:00Z'))/864e5)});
+    out.push({id:s.id,name:s.name||'Step',days:Math.round((new Date(fin+'T12:00:00Z')-new Date(t.endDate+'T12:00:00Z'))/864e5)});
   });
   return{ok,n,late:out};
 }
@@ -8850,7 +8853,18 @@ function pbRetroModal(){
   const L=_pbLate(p,run),r=run.retro||{};
   const sum=L.n?`<div class="pb-lesson"><b>${L.ok} of ${L.n} finished steps were on time</b>${L.late.length?escHtml(L.late.map(x=>x.name+' (+'+x.days+'d)').join(', '))+' ran late. Consider giving them more days in the Workflow.':'Nothing ran late.'}</div>`:'<div class="pb-hint" style="margin-bottom:8px;">No steps are finished yet. You can write the retro any time.</div>';
   const ta=(id,l,v)=>`<div class="field"><label class="flbl">${l}</label><textarea class="inp" id="${id}" rows="2" maxlength="400">${escHtml(v||'')}</textarea></div>`;
-  _coModal('Retro: '+(run.name||'Run'),sum+ta('pb-rt-well','What went well',r.well)+ta('pb-rt-slow','What slowed us down',r.slow)+ta('pb-rt-change','One change for next time',r.change),'pbSaveRetro()','');
+  /* one-tap fixes: give a late step the days it overran by, in the Workflow itself (later runs use it) */
+  const sug=L.late.map(x=>({x,cur:_pbStepOf(p,x.id)})).filter(o=>o.cur&&_pbN(o.cur.days,0,365,1)<365).slice(0,8).map(o=>{const add=Math.min(Math.max(1,o.x.days),365-_pbN(o.cur.days,0,365,1)),d0=_pbN(o.cur.days,0,365,1);
+    return `<div class="pb-sug"><span>${escHtml(o.x.name)}: ${d0} → ${d0+add} day${d0+add===1?'':'s'}</span><button class="btn btn-ghost btn-xs" onclick="pbBumpDays(this,'${jsq(o.cur.id)}',${d0},${add})">Give +${add}d</button></div>`;}).join('');
+  _coModal('Retro: '+(run.name||'Run'),sum+(sug?`<div class="pb-sugs"><div class="pb-hint">Suggested changes to the Workflow. Each applies when you tap it.</div>${sug}</div>`:'')+ta('pb-rt-well','What went well',r.well)+ta('pb-rt-slow','What slowed us down',r.slow)+ta('pb-rt-change','One change for next time',r.change),'pbSaveRetro()','');
+}
+function pbBumpDays(btn,sid,from,add){
+  const p=_pbCur(),st=p&&_pbStepOf(p,sid);if(!st)return;
+  from=_pbN(from,0,365,1);add=_pbN(add,1,365,1);
+  if(_pbN(st.days,0,365,1)!==from){if(btn){btn.disabled=true;btn.textContent='Already changed';}return;}
+  saveWithUndo('Give step more days');st.days=Math.min(365,from+add);p.updated=_localToday();save();
+  if(btn){btn.disabled=true;btn.textContent='Done ✓';const sp=btn.previousElementSibling;if(sp)sp.style.opacity='.6';}
+  showToast(`${st.name||'Step'} now has ${st.days} day${st.days===1?'':'s'}`);
 }
 function pbSaveRetro(){
   const p=_pbCur();const run=p&&_pbRunsOf(p).find(r=>r.id===_pbUI.run);if(!run)return;
@@ -8893,6 +8907,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [167,'Workflow retro suggests giving late steps more days, one tap each'],
   [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first'],
   [165,'Playbooks are now called Workflows; steps show as a simple list on phones'],
   [164,'Playbook Templates tab, Event and Product starters, run date can be the event day'],
@@ -8902,8 +8917,7 @@ const PF_CHANGELOG=[
   [160,'Playbooks: live map coloured by task progress, and Playbooks that repeat on a schedule'],
   [159,'Playbooks: Start a run builds a project with tasks counted back from a publish date'],
   [158,'Playbooks: draw a process as a map of steps, with owners, tools, checks and tasks'],
-  [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters'],
-  [156,'A "What\u2019s new" list in Settings, under Advanced']
+  [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
