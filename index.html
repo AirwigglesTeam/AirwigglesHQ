@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-CckTMZC1qDiXowXHpCfY5fXjEUObp/UnnZ41U9um9a0='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5w0hwvmEC87Nr9A3fCaeYUzWlgImzyFV8pDh45xQbXg='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2203,7 +2203,7 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
     <button class="rbtn" data-v="playbooks" data-tip="Workflows" onclick="nav('playbooks')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="7.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="2.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="12.5" width="4.5" height="5" rx="1.2"/><path d="M6 10h3.5M9.5 10V5H14M9.5 10v5H14"/></svg>
     </button>
-    <button class="rbtn" data-v="finance" data-tip="Company" onclick="nav('finance')">
+    <button class="rbtn" data-v="finance" data-tip="Business" onclick="nav('finance')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>
     </button>
     <button class="rbtn" data-v="sponsors" data-tip="Sponsors" onclick="nav('sponsors')">
@@ -2249,7 +2249,7 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
     <div class="nav-row"><div class="nitem" data-v="kanban" onclick="nav('kanban')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>Board</div></div>
     <div class="nav-row"><div class="nitem" data-v="playbooks" onclick="nav('playbooks')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="7.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="2.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="12.5" width="4.5" height="5" rx="1.2"/><path d="M6 10h3.5M9.5 10V5H14M9.5 10v5H14"/></svg>Workflows</div></div>
     <div class="pnav-sep"></div>
-    <div class="nav-row"><div class="nitem" data-v="finance" onclick="nav('finance')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>Company</div></div>
+    <div class="nav-row"><div class="nitem" data-v="finance" onclick="nav('finance')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>Business</div></div>
     <div class="nav-row"><div class="nitem" data-v="sponsors" onclick="nav('sponsors')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l1.8 3.6L16 6.4l-3 2.9.7 4.1L10 11.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>Sponsors</div></div>
   </nav>
   <div class="pnav-sep" style="margin-top:auto;"></div>
@@ -4573,7 +4573,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=174;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=175;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -6167,7 +6167,7 @@ function scHelpOpen(){
       {action:'dashboard',label:'Dashboard'},
       {action:'kanban',label:'Board: Status view'},
       {action:'campaign',label:'Board: Labels view'},
-      {action:'finance',label:'Company'},
+      {action:'finance',label:'Business'},
       {action:'sponsors',label:'Sponsors'},
       {action:'templates',label:'Templates'},
       {action:'settings',label:'Settings'},
@@ -6262,7 +6262,7 @@ function _scLabel(action){
   return{
     search:'Search',shortcuts:'Shortcuts Help',newProject:'New Project',newTask:'New Task',redo:'Redo',
     newSponsor:'New Sponsor',undo:'Undo',dashboard:'Dashboard',kanban:'Board (Status)',
-    campaign:'Board (Labels)',finance:'Company',sponsors:'Sponsors',templates:'Templates',
+    campaign:'Board (Labels)',finance:'Business',sponsors:'Sponsors',templates:'Templates',
     settings:'Settings',toggleDone:'Toggle Done',clearFilters:'Clear Filters',
     prevProject:'Prev Project',nextProject:'Next Project',
   }[action]||action;
@@ -8236,7 +8236,7 @@ function saveFinTasksSetup(){
    team hours, bank balances), so nothing is typed in twice. */
 function _finHeadHtml(tab){
   const years=getFinYears().map(y=>`<option value="${escHtml(y)}" ${(S.finance.finYear||0)===y?'selected':''}>${getFYLabel(y)}${y===S.finance.finYear?' · ends 31 Jan':''}</option>`).join('');
-  return `<div class="fh-top"><div class="page-title">Company</div>
+  return `<div class="fh-top"><div class="page-title">Business</div>
     <select class="fsel" aria-label="Financial year" onchange="setFinYear(this.value)">${years}</select>
     <button class="btn btn-ghost btn-xs" onclick="generateFinanceReport()" title="Export PDF report">Export PDF</button>
     <button class="btn btn-ghost btn-xs" onclick="lockFinance()" title="Lock finance">Lock</button></div>
@@ -8999,6 +8999,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [175,'The Finances tab is called Business'],
   [174,'Finances is now Company, 10 more Sponsors icons, and a quieter, clearer storage warning'],
   [173,'Selected option pills and Finance tabs use the hover look too, so green fill means an action'],
   [172,'Selected filters look like the hover state; green fill is kept for actions'],
@@ -9008,8 +9009,7 @@ const PF_CHANGELOG=[
   [168,'Workflow steps can have notes and links that flow into the run tasks'],
   [167,'Workflow retro suggests giving late steps more days, one tap each'],
   [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first'],
-  [165,'Playbooks are now called Workflows; steps show as a simple list on phones'],
-  [164,'Playbook Templates tab, Event and Product starters, run date can be the event day']
+  [165,'Playbooks are now called Workflows; steps show as a simple list on phones']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -13018,7 +13018,7 @@ const FIN_GROUPS=[
   {k:'overview',l:'Overview',t:['overview']},
   {k:'spend',l:'Budget & spending',t:['budget','recurring','oneoff','categories']},
   {k:'events',l:'Events',t:['projects']},
-  {k:'company',l:'Company details',t:['company']},
+  {k:'company',l:'Company',t:['company']},
   {k:'pay',l:'Savings & pay',t:['savings','payout','tax','assets']}];
 const FIN_TAB_LABEL={oneoff:'One-off',payout:'Team Payout',savings:'Savings & pay',budget:'Budgets',projects:'Events'};
 function _finGroupOf(tab){return FIN_GROUPS.find(g=>g.t.includes(tab))||FIN_GROUPS[0];}
@@ -13182,7 +13182,7 @@ function renderAssetsPage(){
 
   var h='';
   // Page header
-  h+='<div class="fu"><div class="page-hd"><div class="page-title">Company <em>/ Assets</em></div></div>';
+  h+='<div class="fu"><div class="page-hd"><div class="page-title">Business <em>/ Assets</em></div></div>';
 
   // Sub nav (same as other finance tabs)
   h+=_finLinksHtml();
@@ -13931,7 +13931,7 @@ function renderSettings(){
 <div class="settings-sec">
   <div class="settings-ttl"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg> Navigation</div>
   <p style="font-size:.76rem;color:var(--text2);margin-bottom:12px;font-weight:300;">Choose the icon for each section of the side menu and whether it is shown.</p>
-  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Company'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>{
+  ${[{v:'dashboard',l:'Dashboard'},{v:'kanban',l:'Board'},{v:'templates',l:'Templates'},{v:'finance',l:'Business'},{v:'sponsors',l:'Sponsors'},{v:'settings',l:'Settings'}].map(item=>{
     const view=item.v;
     const opts=NAV_ICON_OPTIONS[view]||[];
     const curId=S.settings?.navIcons?.[view]||opts[0]?.id;
@@ -13990,7 +13990,7 @@ ${_airconSettingsHtml()}
         {action:'dashboard',label:'Dashboard'},
         {action:'kanban',label:'Board: Status view'},
         {action:'campaign',label:'Board: Labels view'},
-        {action:'finance',label:'Company'},
+        {action:'finance',label:'Business'},
         {action:'sponsors',label:'Sponsors'},
         {action:'templates',label:'Templates'},
         {action:'settings',label:'Settings'},
