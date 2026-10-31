@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ToKAj0Bs/enkqtO8zjQkncDueuLPOaYpNMTyNt60/WQ='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-5dvqy/qd6Gz2Y0VOBFb6e8OLPAKZptPVd9MFfLVpgN4='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2037,6 +2037,42 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
   .bd-count{margin-left:0;}
 }
 @media (pointer:coarse),(max-width:700px){.bd-seg button,.bf-clear,.bf-toggle{min-height:40px;}}
+/* Playbooks */
+.pb-lede{font-size:.8rem;color:var(--text2);max-width:70ch;margin:0 0 16px;}
+.pb-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(260px,1fr));gap:12px;}
+.pb-card{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-height:40px;transition:var(--tr-ui);}
+.pb-card:hover,.pb-card:focus-visible{border-color:var(--acc);}
+.pb-card b{font-size:.9rem;font-weight:600;}.pb-oc{font-size:.76rem;color:var(--text2);line-height:1.4;}
+.pb-meta{display:flex;gap:6px;flex-wrap:wrap;margin-top:2px;}
+.chip{display:inline-flex;align-items:center;gap:5px;font-size:.66rem;font-weight:600;border-radius:6px;padding:2px 8px;background:var(--surface3);color:var(--text2);}
+.pb-name{background:transparent;border:1px solid transparent;border-radius:8px;color:var(--text);font:inherit;font-weight:600;padding:2px 8px;min-width:0;width:min(320px,60vw);}
+.pb-name:hover,.pb-name:focus{border-color:var(--border2);background:var(--surface2);outline:none;}
+.pb-layout{display:grid;grid-template-columns:minmax(0,1fr);gap:16px;align-items:start;}
+.pb-layout.open{grid-template-columns:minmax(0,1fr) 360px;}
+.pb-mapbox{overflow:auto;padding:14px;background:radial-gradient(circle,rgba(255,255,255,.05) 1px,transparent 1px) 0 0/22px 22px,var(--surface);border-radius:12px 12px 0 0;}
+.pb-mapin{position:relative;}.pb-mapin svg{position:absolute;inset:0;pointer-events:none;}
+.pb-nd{position:absolute;width:132px;height:84px;background:var(--surface2);border:1px solid var(--border2);border-radius:11px;padding:9px 10px;display:flex;flex-direction:column;justify-content:space-between;cursor:grab;touch-action:pan-x pan-y;user-select:none;transition:border-color var(--d1),box-shadow var(--d1);}
+.pb-nd:focus-visible{outline:2px solid var(--acc);outline-offset:2px;}
+.pb-nd b{font-size:.76rem;font-weight:600;line-height:1.25;overflow:hidden;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;}
+.pb-nd.gate{border-style:dashed;border-color:var(--yellow);}
+.pb-nd.sel{border-color:var(--acc);box-shadow:0 0 0 3px var(--teal-dim);}
+.pb-nd.drag{cursor:grabbing;z-index:5;box-shadow:0 8px 20px rgba(0,0,0,.4);transition:none;}
+.pb-gt{color:var(--yellow);font-weight:500;}
+.pb-m{display:flex;align-items:center;gap:6px;font-size:.66rem;color:var(--muted);}
+.pb-tl{margin-left:auto;font-size:.6rem;padding:1px 6px;border-radius:5px;background:var(--surface3);color:var(--text2);font-weight:600;max-width:60px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pb-legend{display:flex;gap:14px;flex-wrap:wrap;font-size:.68rem;color:var(--muted);padding:8px 16px 12px;}
+.pb-legend i{display:inline-block;width:9px;height:9px;border-radius:3px;margin-right:6px;border:1px solid var(--border2);background:var(--surface3);}.pb-legend i.g{border:1px dashed var(--yellow);background:none;}
+.pb-note{font-size:.72rem;color:var(--muted);margin:10px 2px 0;}
+.pb-dr{padding:16px;display:flex;flex-direction:column;gap:12px;}
+.pb-dr-hd{display:flex;align-items:center;gap:8px;font-size:.9rem;}
+.pb-two{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.pb-gate{display:flex;gap:8px;align-items:flex-start;font-size:.76rem;color:var(--text2);cursor:pointer;}
+.pb-after{display:flex;flex-direction:column;gap:6px;max-height:150px;overflow:auto;}.pb-after label{display:flex;gap:8px;align-items:center;font-size:.76rem;color:var(--text2);cursor:pointer;}
+.pb-li{display:flex;align-items:center;gap:8px;font-size:.78rem;color:var(--text2);padding:4px 0;border-bottom:1px solid var(--border);}.pb-li span{flex:1;min-width:0;overflow-wrap:anywhere;}
+.pb-add{display:flex;gap:6px;margin-top:6px;}.pb-add .inp{flex:1;min-width:0;}
+.pb-hint{font-size:.68rem;color:var(--muted);}.pb-open{font-size:.72rem;color:var(--acc);text-decoration:none;margin-top:4px;display:inline-block;}
+@media(max-width:900px){.pb-layout.open{grid-template-columns:minmax(0,1fr);}}
+@media(max-width:600px){.pb-two{grid-template-columns:1fr;}}
 </style>
 </head>
 <body>
@@ -2117,6 +2153,9 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
     <button class="rbtn" data-v="kanban" data-tip="Board" onclick="nav('kanban')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>
     </button>
+    <button class="rbtn" data-v="playbooks" data-tip="Playbooks" onclick="nav('playbooks')">
+      <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="7.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="2.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="12.5" width="4.5" height="5" rx="1.2"/><path d="M6 10h3.5M9.5 10V5H14M9.5 10v5H14"/></svg>
+    </button>
     <button class="rbtn" data-v="finance" data-tip="Finances" onclick="nav('finance')">
       <svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>
     </button>
@@ -2161,6 +2200,7 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
     <div class="nav-row"><div class="nitem active" data-v="dashboard" onclick="nav('dashboard')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="2" width="7" height="7" rx="1.5"/><rect x="11" y="2" width="7" height="7" rx="1.5"/><rect x="2" y="11" width="7" height="7" rx="1.5"/><rect x="11" y="11" width="7" height="7" rx="1.5"/></svg>Dashboard</div></div>
     <div id="panel-bookmarks"></div>
     <div class="nav-row"><div class="nitem" data-v="kanban" onclick="nav('kanban')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><rect x="1.5" y="3" width="5" height="14" rx="1.2"/><rect x="7.5" y="3" width="5" height="10" rx="1.2"/><rect x="13.5" y="3" width="5" height="12" rx="1.2"/></svg>Board</div></div>
+    <div class="nav-row"><div class="nitem" data-v="playbooks" onclick="nav('playbooks')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><rect x="1.5" y="7.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="2.5" width="4.5" height="5" rx="1.2"/><rect x="14" y="12.5" width="4.5" height="5" rx="1.2"/><path d="M6 10h3.5M9.5 10V5H14M9.5 10v5H14"/></svg>Playbooks</div></div>
     <div class="pnav-sep"></div>
     <div class="nav-row"><div class="nitem" data-v="finance" onclick="nav('finance')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round"><path d="M2 14l4-5 4 3 4-6 4 3"/><path d="M2 17h16"/></svg>Finances</div></div>
     <div class="nav-row"><div class="nitem" data-v="sponsors" onclick="nav('sponsors')"><svg viewBox="0 0 20 20" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round"><path d="M10 2l1.8 3.6L16 6.4l-3 2.9.7 4.1L10 11.4l-3.7 2 .7-4.1-3-2.9 4.2-.8z"/></svg>Sponsors</div></div>
@@ -2484,6 +2524,24 @@ openRevenueStreams:()=>openRevenueStreams,
 openSpMatch:()=>openSpMatch,
 openSponsorProfile:()=>openSponsorProfile,
 openSponsorProfileClose:()=>openSponsorProfileClose,
+pbAddItem:()=>pbAddItem,
+pbAddStep:()=>pbAddStep,
+pbBack:()=>pbBack,
+pbCloseStep:()=>pbCloseStep,
+pbCreate:()=>pbCreate,
+pbDelItem:()=>pbDelItem,
+pbDelStep:()=>pbDelStep,
+pbDeletePb:()=>pbDeletePb,
+pbExample:()=>pbExample,
+pbNewModal:()=>pbNewModal,
+pbOpen:()=>pbOpen,
+pbSaveSettings:()=>pbSaveSettings,
+pbSetField:()=>pbSetField,
+pbSetGate:()=>pbSetGate,
+pbSetName:()=>pbSetName,
+pbSettingsModal:()=>pbSettingsModal,
+pbTidy:()=>pbTidy,
+pbToggleAfter:()=>pbToggleAfter,
 pdAddWinner:()=>pdAddWinner,
 pdLogDelivery:()=>pdLogDelivery,
 pdRemoveWinner:()=>pdRemoveWinner,
@@ -4437,7 +4495,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=157;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=158;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -5202,7 +5260,7 @@ async function load(){
 }
 
 function _applyDefaults(){
-  ['labels','areas','sponsors','projectTemplates','sponsorIdeas','sponsorMaterials','sponsorSends'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];});
+  ['labels','areas','sponsors','projectTemplates','sponsorIdeas','sponsorMaterials','sponsorSends','playbooks'].forEach(k=>{if(!Array.isArray(S[k]))S[k]=[];});
   if(S.slackWebhook===undefined)S.slackWebhook='';
   if(S.detailId===undefined)S.detailId=null;
   if(S.activeMember===undefined)S.activeMember=null;
@@ -5372,6 +5430,7 @@ let S={
   expandedTasks:[],expandedGantt:[],
   settings:{logoUrl:null,brandName:'airwiggles — ProjectFlow',navVisible:{dashboard:true,kanban:true,campaign:true,templates:true,finance:true,sponsors:true,settings:true},bookmarks:[]},
   projectTemplates:[],
+  playbooks:[],
   sponsors:[],sponsorIdeas:[],sponsorMaterials:[],sponsorSends:[],
   finance:{revenue:0,recurring:[],oneoff:[],finTab:'overview'},
   dashFilters:{project:'',member:'',label:''},
@@ -6922,6 +6981,7 @@ function _renderImpl(){
     case'kanban':c.innerHTML=renderKanban();setTimeout(()=>initAllDnD(),80);return;
     case'campaign':c.innerHTML=renderCampaign();setTimeout(()=>{scrollGanttToday();initCoworkTooltips();},60);break;
 
+    case'playbooks':c.innerHTML=renderPlaybooks();setTimeout(pbInitMap,0);break;
     case'labels':c.innerHTML=renderLabels();break;
     case'templates':c.innerHTML=renderTemplates();break;
     case'finance':
@@ -8203,11 +8263,233 @@ function _boardBarHtml(V,count,extra){
   const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
   return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
 }
+//@act pbCreate pbSaveSettings pbDeletePb   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+/* ── Playbooks: a process drawn once as a map of steps, run again and again ──
+   S.playbooks=[{id,name,outcome,trigger:'once'|'repeat',updated,
+     steps:[{id,name,owner(member id),days,inp,out,toolName,toolUrl,gate,c,r,after:[step ids],checks:[{id,text}],tasks:[{id,text}]}]}]
+   Phase 1 is Design mode: the list, the map (drag to place, "Comes after" to connect, Tidy up) and the step drawer.
+   Everything stored is plain text (escaped when shown); links are http(s) only; counts and lengths are capped. */
+const PB_MAX_STEPS=40,PB_SX=164,PB_SY=104,PB_W=132,PB_H=84,PB_PAD=14;
+let _pbUI={pb:'',step:''};
+function _pbList(){if(!Array.isArray(S.playbooks))S.playbooks=[];if(S.playbooks.some(x=>!x||typeof x!=='object'||typeof x.id!=='string'))S.playbooks=S.playbooks.filter(x=>x&&typeof x==='object'&&typeof x.id==='string');return S.playbooks;}
+function _pbCur(){const p=_pbList().find(x=>x&&x.id===_pbUI.pb)||null;if(p&&!Array.isArray(p.steps))p.steps=[];return p;}
+function _pbStepOf(p,id){return p?(p.steps||[]).find(s=>s&&s.id===id)||null:null;}
+const _pbN=(v,lo,hi,d)=>{v=Number(v);return isFinite(v)?Math.min(hi,Math.max(lo,v)):d;};
+const _pbT=(v,n)=>String(v==null?'':v).replace(/\s+/g,' ').trim().slice(0,n);
+function _pbAfter(s){return Array.isArray(s.after)?s.after:[];}
+/* depth = number of steps that must come before (longest chain); finish = days until the step is done along the longest chain */
+function _pbCalc(p){
+  const by={};p.steps.forEach(s=>{by[s.id]=s;});const depth={},fin={};
+  const go=(s,seen)=>{
+    if(depth[s.id]!==undefined)return;if(seen[s.id]){depth[s.id]=0;fin[s.id]=_pbN(s.days,0,365,1);return;}
+    seen[s.id]=1;let d=0,f=0;
+    _pbAfter(s).forEach(a=>{const b=by[a];if(!b)return;go(b,seen);d=Math.max(d,depth[b.id]+1);f=Math.max(f,fin[b.id]);});
+    seen[s.id]=0;depth[s.id]=d;fin[s.id]=f+_pbN(s.days,0,365,1);
+  };
+  p.steps.forEach(s=>go(s,{}));
+  return{depth,fin,total:p.steps.reduce((m,s)=>Math.max(m,fin[s.id]||0),0)};
+}
+/* would adding "aid comes before sid" make a loop? yes when aid already depends on sid */
+function _pbDependsOn(p,aid,sid){
+  const by={};p.steps.forEach(s=>{by[s.id]=s;});const seen={};
+  const walk=id=>{if(id===sid)return true;if(seen[id])return false;seen[id]=1;const s=by[id];return s?_pbAfter(s).some(walk):false;};
+  return walk(aid);
+}
+function _pbPlace(p,s){            // first free spot in the step's column
+  const d=_pbCalc(p).depth[s.id]||0;let r=0;
+  p.steps.forEach(o=>{if(o!==s&&o.c===d&&o.r>=r)r=o.r+1;});
+  s.c=d;s.r=r;
+}
+function pbTidy(){
+  const p=_pbCur();if(!p||!p.steps.length)return;
+  saveWithUndo('Tidy playbook');
+  const depth=_pbCalc(p).depth,cols={};
+  p.steps.forEach((s,i)=>{(cols[depth[s.id]||0]=cols[depth[s.id]||0]||[]).push({s,i});});
+  let maxN=0;Object.keys(cols).forEach(c=>{maxN=Math.max(maxN,cols[c].length);});
+  Object.keys(cols).forEach(c=>{
+    const L=cols[c].sort((a,b)=>(Number(a.s.r)||0)-(Number(b.s.r)||0)||a.i-b.i);
+    L.forEach((x,i)=>{x.s.c=Number(c);x.s.r=(maxN-L.length)/2+i;});
+  });
+  save();render();
+}
+/* ── pages ── */
+function renderPlaybooks(){
+  const p=_pbCur();
+  if(p)return _pbDesignHtml(p);
+  _pbUI.pb='';_pbUI.step='';
+  const list=_pbList();
+  const card=q=>{const n=(q.steps||[]).length,t=_pbCalc(Object.assign({},q,{steps:q.steps||[]})).total;
+    return `<button class="pb-card" onclick="pbOpen('${jsq(q.id)}')"><b>${escHtml(q.name||'Untitled')}</b><span class="pb-oc">${escHtml(q.outcome||'No outcome written yet')}</span><span class="pb-meta"><span class="chip">${n} step${n===1?'':'s'}</span>${n?`<span class="chip">${escHtml(t)} day${t===1?'':'s'} end to end</span>`:''}<span class="chip">${q.trigger==='repeat'?'Repeats':'One-off'}</span></span></button>`;};
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><em>Playbooks</em></div><button class="btn btn-acc btn-sm" onclick="pbNewModal()">+ New Playbook</button></div>
+  <p class="pb-lede">A Playbook is a process you draw once and run again and again: the steps, who does them, how long they take and where the work lives.</p>
+  ${list.length?`<div class="pb-grid">${list.map(card).join('')}</div>`:`<div class="empty"><div class="empty-txt">No Playbooks yet.<br>Start from the YouTube example, or write your own.</div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="pbExample()">Start with the YouTube example</button><button class="btn btn-ghost btn-sm" onclick="pbNewModal()">Write my own</button></div></div>`}
+  ${list.length?`<div style="margin-top:14px;"><button class="btn btn-ghost btn-xs" onclick="pbExample()">+ Add the YouTube example</button></div>`:''}</div>`;
+}
+function _pbMapHtml(p){
+  const st=p.steps,by={};st.forEach(s=>{by[s.id]=s;});
+  let maxC=0,maxR=0;st.forEach(s=>{maxC=Math.max(maxC,_pbN(s.c,0,60,0));maxR=Math.max(maxR,_pbN(s.r,0,60,0));});
+  const w=(maxC+1)*PB_SX+PB_W/2+PB_PAD*2,h=(maxR+1)*PB_SY+PB_PAD*2;
+  const X=s=>PB_PAD+_pbN(s.c,0,60,0)*PB_SX,Y=s=>PB_PAD+_pbN(s.r,0,60,0)*PB_SY;
+  let svg=`<svg width="${w}" height="${h}" viewBox="0 0 ${w} ${h}" aria-hidden="true"><defs><marker id="pb-ar" viewBox="0 0 8 8" refX="7" refY="4" markerWidth="7" markerHeight="7" orient="auto"><path d="M0 0L8 4L0 8z" fill="#8c8c8c"/></marker></defs>`;
+  st.forEach(s=>_pbAfter(s).forEach(a=>{const b=by[a];if(!b)return;const x1=X(b)+PB_W,y1=Y(b)+PB_H/2,x2=X(s),y2=Y(s)+PB_H/2,m=(x1+x2)/2;
+    svg+=`<path d="M${x1} ${y1} C${m} ${y1} ${m} ${y2} ${x2-2} ${y2}" fill="none" stroke="#5a5a5a" stroke-width="2" marker-end="url(#pb-ar)"/>`;}));
+  svg+='</svg>';
+  const nodes=st.map(s=>{const av=[s.owner].filter(o=>o&&S.members.some(m=>m.id===o)).map(o=>avHtml(o,20)).join('');return `<div class="pb-nd${s.gate?' gate':''}${_pbUI.step===s.id?' sel':''}" data-sid="${escHtml(s.id)}" style="left:${X(s)}px;top:${Y(s)}px;" tabindex="0" role="button" aria-label="${escHtml(s.name||'Step')}"><b>${escHtml(s.name||'New step')}${s.gate?' <span class="pb-gt">· gate</span>':''}</b><div class="pb-m">${av}<span>${escHtml(_pbN(s.days,0,365,1))}d</span>${s.toolName?`<span class="pb-tl">${escHtml(s.toolName)}</span>`:''}</div></div>`;}).join('');
+  return `<div class="pb-mapbox"><div class="pb-mapin" id="pb-map" style="width:${w}px;height:${h}px;">${svg}${nodes}</div></div>`;
+}
+function _pbDesignHtml(p){
+  const calc=_pbCalc(p),s=_pbStepOf(p,_pbUI.step);
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Playbooks">←</button> <em>Playbooks</em> / <input class="pb-name" value="${escHtml(p.name||'')}" onchange="pbSetName(this.value)" aria-label="Playbook name"></div>
+    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button><button class="btn btn-acc btn-sm" onclick="pbAddStep()">+ Add step</button></div></div>
+  ${p.outcome?`<p class="pb-lede">${escHtml(p.outcome)}</p>`:''}
+  <div class="pb-layout${s?' open':''}"><div><div class="card">${p.steps.length?_pbMapHtml(p):`<div class="empty" style="padding:30px;"><div class="empty-txt">No steps yet. Add the first one.</div><button class="btn btn-acc btn-sm" onclick="pbAddStep()" style="margin-top:10px;">+ Add step</button></div>`}
+    <div class="pb-legend"><span><i></i>Step</span><span><i class="g"></i>Approval gate</span><span>Click a step to edit it. Drag to move it. Use “Comes after” in the editor to connect steps.</span></div></div>
+    ${p.steps.length?`<p class="pb-note">${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(calc.total)} day${calc.total===1?'':'s'}. A run counts back from the publish date so each step gets its due date.</p>`:''}</div>
+  ${s?_pbDrawerHtml(p,s):''}</div></div>`;
+}
+function _pbDrawerHtml(p,s){
+  const mem=S.members||[];
+  const inp=(label,html)=>`<div class="fld"><span class="lbl">${escHtml(label)}</span>${html}</div>`;
+  const others=p.steps.filter(o=>o.id!==s.id);
+  return `<div class="card pb-dr" id="pb-drawer"><div class="pb-dr-hd"><b>Step</b><span class="sp"></span><button class="btn btn-ghost btn-xs" onclick="pbCloseStep()" aria-label="Close">✕</button></div>
+  ${inp('Name',`<input class="inp" value="${escHtml(s.name||'')}" onchange="pbSetField('${jsq(s.id)}','name',this.value)" aria-label="Step name">`)}
+  <div class="pb-two">${inp('Owner',`<select class="sel" onchange="pbSetField('${jsq(s.id)}','owner',this.value)" aria-label="Owner"><option value="">Unassigned</option>${mem.map(m=>`<option value="${escHtml(m.id)}"${s.owner===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('')}</select>`)}
+    ${inp('Time (days)',`<input class="inp" type="number" min="0" max="365" step="0.5" value="${escHtml(_pbN(s.days,0,365,1))}" onchange="pbSetField('${jsq(s.id)}','days',this.value)" aria-label="Days">`)}</div>
+  <div class="pb-two">${inp('Comes in',`<input class="inp" value="${escHtml(s.inp||'')}" onchange="pbSetField('${jsq(s.id)}','inp',this.value)" placeholder="e.g. Approved idea" aria-label="What comes in">`)}
+    ${inp('Goes out',`<input class="inp" value="${escHtml(s.out||'')}" onchange="pbSetField('${jsq(s.id)}','out',this.value)" placeholder="e.g. Final script" aria-label="What goes out">`)}</div>
+  ${inp('Where the work lives',`<div class="pb-two"><input class="inp" value="${escHtml(s.toolName||'')}" onchange="pbSetField('${jsq(s.id)}','toolName',this.value)" placeholder="Miro, Google Doc…" aria-label="Tool name"><input class="inp" value="${escHtml(s.toolUrl||'')}" onchange="pbSetField('${jsq(s.id)}','toolUrl',this.value)" placeholder="https://…" aria-label="Tool link"></div>${safeUrl(s.toolUrl)?`<a class="pb-open" href="${escHtml(safeUrl(s.toolUrl))}" target="_blank" rel="noopener">Open ${escHtml(s.toolName||'link')} ↗</a>`:''}`)}
+  <label class="pb-gate"><input type="checkbox" ${s.gate?'checked':''} onchange="pbSetGate('${jsq(s.id)}',this.checked)"> Approval gate: someone signs off before the next step</label>
+  ${inp('Comes after',others.length?`<div class="pb-after">${others.map(o=>`<label><input type="checkbox" ${_pbAfter(s).includes(o.id)?'checked':''} onchange="pbToggleAfter('${jsq(s.id)}','${jsq(o.id)}',this.checked)"> ${escHtml(o.name||'Step')}</label>`).join('')}</div>`:'<span class="pb-hint">Add more steps to connect them.</span>')}
+  ${inp('Done means',`${(s.checks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','checks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-checks" placeholder="Add a check" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','checks')" aria-label="New check"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','checks')">Add</button></div>`)}
+  ${inp('Tasks this step creates',`${(s.tasks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','tasks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-tasks" placeholder="Add a task" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','tasks')" aria-label="New task"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','tasks')">Add</button></div><span class="pb-hint">Each task is due when the step ends, once you start a run.</span>`)}
+  <div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="pbDelStep('${jsq(s.id)}')">Delete step</button></div></div>`;
+}
+/* ── actions ── */
+function pbOpen(id){if(!_pbList().some(p=>p.id===id))return;_pbUI.pb=id;_pbUI.step='';render();}
+function pbBack(){_pbUI.pb='';_pbUI.step='';render();}
+function pbSelStep(id){_pbUI.step=_pbUI.step===id?'':id;render();}
+function pbCloseStep(){_pbUI.step='';render();}
+function pbSetName(v){const p=_pbCur();if(!p)return;saveWithUndo('Rename playbook');p.name=_pbT(v,80)||'Untitled';p.updated=_localToday();save();render();}
+const _PB_FIELDS={name:80,inp:80,out:80,toolName:40};
+function pbSetField(sid,k,v){
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
+  if(k==='days')v=_pbN(v,0,365,1);
+  else if(k==='toolUrl'){v=_pbT(v,300);if(v){const u=_finSafeUrl(v);if(!u){render();return;}v=u;}}
+  else if(k==='owner'){v=S.members.some(m=>m.id===v)?v:'';}
+  else if(_PB_FIELDS[k])v=_pbT(v,_PB_FIELDS[k]);
+  else return;
+  if(k==='name'&&!v)v='New step';
+  saveWithUndo('Edit step');s[k]=v;p.updated=_localToday();save();render();
+}
+function pbSetGate(sid,on){const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;saveWithUndo('Edit step');s.gate=!!on;save();render();}
+function pbToggleAfter(sid,aid,on){
+  const p=_pbCur(),s=_pbStepOf(p,sid),a=_pbStepOf(p,aid);if(!s||!a||sid===aid)return;
+  let L=_pbAfter(s).filter(x=>x!==aid);
+  if(on){if(_pbDependsOn(p,aid,sid)){render();return;}L.push(aid);}   // a loop is refused: the box un-ticks when the editor redraws
+  saveWithUndo('Edit step');s.after=L;_pbPlace(p,s);save();render();
+}
+function pbAddItem(sid,kind){
+  if(kind!=='checks'&&kind!=='tasks')return;
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
+  const inp=el('pb-new-'+kind),t=_pbT(inp&&inp.value,120);if(!t)return;
+  if(!Array.isArray(s[kind]))s[kind]=[];if(s[kind].length>=20)return;
+  saveWithUndo('Edit step');s[kind].push({id:uid(),text:t});save();render();
+  const n=el('pb-new-'+kind);if(n)n.focus();
+}
+function pbDelItem(sid,kind,iid){
+  if(kind!=='checks'&&kind!=='tasks')return;
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
+  saveWithUndo('Edit step');s[kind]=(s[kind]||[]).filter(x=>x.id!==iid);save();render();
+}
+function pbAddStep(){
+  const p=_pbCur();if(!p||p.steps.length>=PB_MAX_STEPS)return;
+  saveWithUndo('Add step');
+  const prev=_pbStepOf(p,_pbUI.step)||p.steps[p.steps.length-1]||null;
+  const s={id:uid(),name:'New step',owner:'',days:1,inp:'',out:'',toolName:'',toolUrl:'',gate:false,c:0,r:0,after:prev?[prev.id]:[],checks:[],tasks:[]};
+  p.steps.push(s);_pbPlace(p,s);_pbUI.step=s.id;p.updated=_localToday();save();render();
+}
+function pbDelStep(sid){
+  const p=_pbCur();if(!p||!_pbStepOf(p,sid))return;
+  saveWithUndo('Delete step');
+  p.steps=p.steps.filter(s=>s.id!==sid);p.steps.forEach(s=>{s.after=_pbAfter(s).filter(x=>x!==sid);});
+  _pbUI.step='';save();render();
+}
+function _pbStepsFromLines(text){
+  const names=String(text||'').split(/\n/).map(x=>_pbT(x,80)).filter(Boolean).slice(0,PB_MAX_STEPS);
+  return names.map((n,i)=>({id:uid(),name:n,owner:'',days:1,inp:'',out:'',toolName:'',toolUrl:'',gate:false,c:i,r:0,after:[],checks:[],tasks:[]}))
+    .map((s,i,a)=>{if(i)s.after=[a[i-1].id];return s;});
+}
+function pbNewModal(){
+  const body=`<div class="field"><label class="flbl">Name *</label><input class="inp" id="pb-n-name" placeholder="YouTube video"></div>
+  <div class="field"><label class="flbl">Outcome: what does done look like?</label><input class="inp" id="pb-n-out" placeholder="A published video that hits the weekly slot"></div>
+  <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-n-trig"><option value="once">One-off</option><option value="repeat">Repeats</option></select></div>
+  <div class="field"><label class="flbl">Steps, one per line (any order is fine, you can rearrange later)</label><textarea class="inp" id="pb-n-steps" rows="6" placeholder="Idea&#10;Script&#10;Record&#10;Edit&#10;Publish"></textarea></div>`;
+  _coModal('New Playbook',body,'pbCreate()','');
+}
+function pbCreate(){
+  const name=_coVal('pb-n-name').slice(0,80);if(!name)return _coErr('Give the Playbook a name');
+  const trig=_coVal('pb-n-trig')==='repeat'?'repeat':'once';
+  saveWithUndo('Add playbook');
+  const p={id:uid(),name,outcome:_coVal('pb-n-out').slice(0,160),trigger:trig,updated:_localToday(),steps:_pbStepsFromLines(el('pb-n-steps')&&el('pb-n-steps').value)};
+  _pbList().push(p);_pbUI.pb=p.id;_pbUI.step='';
+  _pbCur();pbTidyQuiet(p);save();closeModal();render();
+}
+function pbTidyQuiet(p){const depth=_pbCalc(p).depth;p.steps.forEach(s=>{s.c=depth[s.id]||0;s.r=0;});}
+function pbSettingsModal(){
+  const p=_pbCur();if(!p)return;
+  const body=`<div class="field"><label class="flbl">Outcome</label><input class="inp" id="pb-s-out" value="${escHtml(p.outcome||'')}"></div>
+  <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-s-trig"><option value="once"${p.trigger!=='repeat'?' selected':''}>One-off</option><option value="repeat"${p.trigger==='repeat'?' selected':''}>Repeats</option></select></div>`;
+  _coModal('Playbook settings',body,'pbSaveSettings()','pbDeletePb()');
+}
+function pbSaveSettings(){const p=_pbCur();if(!p)return;saveWithUndo('Edit playbook');p.outcome=_coVal('pb-s-out').slice(0,160);p.trigger=_coVal('pb-s-trig')==='repeat'?'repeat':'once';p.updated=_localToday();save();closeModal();render();}
+function pbDeletePb(){const p=_pbCur();if(!p)return;saveWithUndo('Delete playbook');S.playbooks=_pbList().filter(x=>x.id!==p.id);_pbUI.pb='';_pbUI.step='';saveNow();closeModal();render();}
+const PB_EXAMPLE=[ // [name, days, tool, gate, after (indices), column, row, checks, tasks]
+  ['Idea',1,'',0,[],0,0,['One-line pitch written'],['Pick the topic']],
+  ['Script',2,'Google Doc',0,[0],1,0,['Hook in the first 15 seconds','Sources linked','Call to action added'],['Draft the script','Revise from comments']],
+  ['Storyboard',1,'Miro',0,[1],2,0,['Every scene has a shot'],['Build the storyboard']],
+  ['Record',1,'',0,[1],2,1,['Audio checked','All scenes covered'],['Record the video']],
+  ['Edit',3,'Drive',0,[2,3],3,0.5,['Cut matches the script'],['First cut','Final cut']],
+  ['Review',1,'',1,[4],4,0.5,['Everyone has commented'],['Sign off the video']],
+  ['Thumbnail',1,'Figma',0,[5],5,0,[],['Design the thumbnail']],
+  ['Title and description',0.5,'',0,[5],5,1,[],['Write title, description and tags']],
+  ['Publish and promote',1,'YouTube',0,[6,7],6,0.5,['Scheduled','Shared on socials'],['Schedule the upload','Post on socials']]];
+function pbExample(){
+  saveWithUndo('Add playbook');
+  const ids=PB_EXAMPLE.map(()=>uid());
+  const steps=PB_EXAMPLE.map((e,i)=>({id:ids[i],name:e[0],owner:'',days:e[1],inp:'',out:'',toolName:e[2],toolUrl:'',gate:!!e[3],c:e[5],r:e[6],after:e[4].map(k=>ids[k]),checks:e[7].map(t=>({id:uid(),text:t})),tasks:e[8].map(t=>({id:uid(),text:t}))}));
+  const p={id:uid(),name:'YouTube video',outcome:'A published video that hits the weekly slot',trigger:'repeat',updated:_localToday(),steps};
+  _pbList().push(p);_pbUI.pb=p.id;_pbUI.step='';save();render();
+}
+/* drag a step to a new place on the grid; a tap just selects it */
+function pbInitMap(){
+  const map=el('pb-map');if(!map)return;
+  map.addEventListener('pointerdown',e=>{
+    const nd=e.target.closest&&e.target.closest('.pb-nd');if(!nd||e.button>0)return;
+    const p=_pbCur(),s=_pbStepOf(p,nd.dataset.sid);if(!s)return;
+    const sx=e.clientX,sy=e.clientY,x0=parseFloat(nd.style.left),y0=parseFloat(nd.style.top);let moved=false;
+    const touch=e.pointerType==='touch';
+    try{nd.setPointerCapture(e.pointerId);}catch(_){}
+    nd.onpointermove=ev=>{
+      if(touch)return;const dx=ev.clientX-sx,dy=ev.clientY-sy;
+      if(!moved&&Math.abs(dx)+Math.abs(dy)<5)return;
+      moved=true;nd.classList.add('drag');nd.style.left=(x0+dx)+'px';nd.style.top=(y0+dy)+'px';
+    };
+    nd.onpointerup=ev=>{
+      nd.onpointermove=null;nd.onpointerup=null;nd.onpointercancel=null;
+      if(!moved){pbSelStep(s.id);return;}
+      const c=_pbN(Math.round((parseFloat(nd.style.left)-PB_PAD)/PB_SX),0,60,s.c),r=_pbN(Math.round((parseFloat(nd.style.top)-PB_PAD)/(PB_SY/2))/2,0,60,s.r);
+      saveWithUndo('Move step');s.c=c;s.r=r;save();render();
+    };
+    nd.onpointercancel=()=>{nd.onpointermove=null;nd.onpointerup=null;nd.onpointercancel=null;nd.classList.remove('drag');render();};
+  });
+  map.addEventListener('keydown',e=>{if((e.key==='Enter'||e.key===' ')&&e.target.classList&&e.target.classList.contains('pb-nd')){e.preventDefault();pbSelStep(e.target.dataset.sid);}});
+}
 /* ── What's new (Settings › Advanced) ──
    A short summary of the latest releases, newest first: [release number, one plain sentence].
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [158,'Playbooks: draw a process as a map of steps, with owners, tools, checks and tasks'],
   [157,'Kanban and Campaign are one Board: Status | Labels switch, shared filters, Clear all filters'],
   [156,'A "What\u2019s new" list in Settings, under Advanced'],
   [155,'Company: contacts (accountant, bank, solicitor) and a compliance checklist'],
@@ -8217,8 +8499,7 @@ const PF_CHANGELOG=[
   [151,'Bigger touch targets on phones and tablets'],
   [150,'The ? shortcut sheet opens properly; help overlays can be switched off in Settings'],
   [149,'Calmer screen: clearer grey text, quiet save indicator, helpful empty states'],
-  [148,'Soft placeholders instead of a blank screen while loading'],
-  [147,'Deleting something shows a short Undo message']
+  [148,'Soft placeholders instead of a blank screen while loading']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
