@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-q7qnXo90KVIRxVAqy6XdDeIh4fbrMUznuAA5P8m6jb0='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ebvIQsoD6FNOwOH427GWRtYsX0ddeNI2P/vLXse6FDw='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2040,6 +2040,20 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
   .qa-sum:not(:empty){display:block;}
   .qa-bar.qa-open .qa-sum{display:none;}
 }
+
+.tm-rel{display:flex;align-items:center;justify-content:space-between;gap:10px;margin-top:10px;padding:8px 10px;border:1px solid var(--border);border-radius:8px;font-size:.78rem}
+.cw-plan{display:flex;flex-direction:column;gap:4px;max-height:180px;overflow:auto}
+.cw-plan-row{display:flex;flex-direction:column;align-items:flex-start;gap:1px;text-align:left;padding:7px 10px;background:var(--surface2);border:1px solid var(--border);border-radius:8px;color:var(--text);cursor:pointer;min-height:40px}
+.cw-plan-row b{font-size:.8rem;font-weight:600;overflow-wrap:anywhere}
+.cw-plan-row span{font-size:.68rem;color:var(--muted)}
+/* Workflows on phones: tool rows wrap, subtasks keep room for the text, small buttons get a finger-sized target */
+@media (max-width:640px){
+  .bd-tools{flex-wrap:wrap;gap:8px;margin-left:0;max-width:100%}
+  .pb-og-sub{margin-left:0;flex-wrap:wrap}.pb-og-sub span{flex:1 1 60%}
+  .pb-og-mv button{min-width:40px;min-height:30px}
+  .pb-li .fl-x,.pb-og-sub .fl-x{min-width:40px;min-height:34px}
+  .pb-name{min-height:34px}
+}
 </style>
 </head>
 <body>
@@ -2509,6 +2523,7 @@ pbAddLink:()=>pbAddLink,
 pbAddStarter:()=>pbAddStarter,
 pbAddStep:()=>pbAddStep,
 pbArchive:()=>pbArchive,
+pbAskDelete:()=>pbAskDelete,
 pbBack:()=>pbBack,
 pbCloseStep:()=>pbCloseStep,
 pbCreate:()=>pbCreate,
@@ -2520,9 +2535,12 @@ pbDueCw:()=>pbDueCw,
 pbDuplicate:()=>pbDuplicate,
 pbExample:()=>pbExample,
 pbFinanceStarter:()=>pbFinanceStarter,
+pbNewBack:()=>pbNewBack,
 pbNewModal:()=>pbNewModal,
+pbNewNext:()=>pbNewNext,
 pbNewPreview:()=>pbNewPreview,
 pbOpen:()=>pbOpen,
+pbOpenRel:()=>pbOpenRel,
 pbOpenRun:()=>pbOpenRun,
 pbOrgAdd:()=>pbOrgAdd,
 pbOrgAddSub:()=>pbOrgAddSub,
@@ -4511,7 +4529,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=191;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=192;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -7647,6 +7665,7 @@ function taskTipHtml(t,opt){
   if(p)h+='<div class="cwtt-row"><span style="width:7px;height:7px;border-radius:50%;background:'+escHtml(p.color||'var(--acc)')+';display:inline-block;margin-top:5px;flex-shrink:0;"></span><span>'+escHtml(p.name)+'</span></div>';
   const wf=typeof pbNameOf==='function'?pbNameOf(t):'';
   if(wf)h+='<div class="cwtt-row"><span>Workflow: <b>'+escHtml(wf)+'</b></span></div>';
+  if(t.pbRel&&typeof _pbRelOk==='function'&&_pbRelOk(t.pbRel))h+='<div class="cwtt-row"><span>Linked to <b>'+escHtml(_pbRelName(t.pbRel))+'</b></span></div>';
   h+='<div class="cwtt-row"><span>'+(rng?escHtml(rng)+' · ':'')+'<span class="tt-'+w.cls+'">'+escHtml(w.txt)+'</span></span></div>';
   h+='<div class="cwtt-row"><span>'+escHtml(t.priority||'Medium')+' priority · '+(who?escHtml(who):'Unassigned')+'</span></div>';
   const lines=[];_ttTree(top,t.id,lines,0);
@@ -8342,7 +8361,7 @@ function _boardBarHtml(V,count,extra){
   const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
   return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
 }
-//@act pbCreate pbSaveSettings pbDeletePb pbSaveBack pbRetroUse pbPickDate pbDueCw pbSaveRetro pbNewPreview   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+//@act pbCreate pbSaveSettings pbDeletePb pbSaveBack pbRetroUse pbPickDate pbDueCw pbSaveRetro pbNewPreview pbNewNext pbNewBack pbAskDelete   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
 /* ── Workflows: a process drawn once as a map of steps, run again and again ──
    S.playbooks=[{id,name,outcome,trigger:'once'|'repeat',updated,
      steps:[{id,name,owner(member id),days,inp,out,toolName,toolUrl,gate,c,r,after:[step ids],checks:[{id,text}],tasks:[{id,text}]}]}]
@@ -8462,6 +8481,7 @@ function _pbDrawerHtml(p,s){
   <div class="pb-two">${inp('Comes in',`<input class="inp" value="${escHtml(s.inp||'')}" onchange="pbSetField('${jsq(s.id)}','inp',this.value)" placeholder="e.g. Approved idea" aria-label="What comes in">`)}
     ${inp('Goes out',`<input class="inp" value="${escHtml(s.out||'')}" onchange="pbSetField('${jsq(s.id)}','out',this.value)" placeholder="e.g. Final script" aria-label="What goes out">`)}</div>
   ${inp('Where the work lives',`<div class="pb-two"><input class="inp" value="${escHtml(s.toolName||'')}" onchange="pbSetField('${jsq(s.id)}','toolName',this.value)" placeholder="Miro, Google Doc…" aria-label="Tool name"><input class="inp" value="${escHtml(s.toolUrl||'')}" onchange="pbSetField('${jsq(s.id)}','toolUrl',this.value)" placeholder="https://…" aria-label="Tool link"></div>${safeUrl(s.toolUrl)?`<a class="pb-open" href="${escHtml(safeUrl(s.toolUrl))}" target="_blank" rel="noopener">Open ${escHtml(s.toolName||'link')} ↗</a>`:''}`)}
+  ${inp('Connects to',_pbRelSel(s))}
   <label class="pb-gate"><input type="checkbox" ${s.gate?'checked':''} onchange="pbSetGate('${jsq(s.id)}',this.checked)"> Approval gate: someone signs off before the next step</label>
   ${inp('Notes',`<textarea class="inp" rows="3" maxlength="600" onchange="pbSetField('${jsq(s.id)}','notes',this.value)" placeholder="Tips, links to examples, what good looks like…" aria-label="Step notes">${escHtml(s.notes||'')}</textarea>`)}
   ${inp('Links and files',`${(Array.isArray(s.links)?s.links:[]).map(c=>{const u=c&&_finSafeUrl(c.url);return u?`<div class="pb-li"><span><a class="pb-open" style="margin:0;" href="${escHtml(u)}" target="_blank" rel="noopener noreferrer">${escHtml(c.text||'Link')}</a></span><button class="fl-x" aria-label="Remove" onclick="pbDelLink('${jsq(s.id)}','${jsq(c.id)}')">✕</button></div>`:'';}).join('')}<div class="pb-two" style="margin-top:6px;"><input class="inp" id="pb-new-lk-t" maxlength="40" placeholder="Name (Brief, Folder…)" aria-label="Link name"><input class="inp" id="pb-new-lk-u" placeholder="https://… (Drive, Dropbox)" onkeydown="if(event.key==='Enter')pbAddLink('${jsq(s.id)}')" aria-label="Link address"></div><div class="pb-add"><span class="pb-hint" style="flex:1;">Paste a link to the file. Files stay where they live.</span><button class="btn btn-ghost btn-xs" onclick="pbAddLink('${jsq(s.id)}')">Add</button></div>`)}
@@ -8478,6 +8498,13 @@ function pbSetView(id){_pbUI.run=id||'';_pbUI.tab='proj';_pbUI.step='';render();
 function pbSelStep(id){_pbUI.step=_pbUI.step===id?'':id;render();}
 function pbCloseStep(){_pbUI.step='';render();}
 function pbSetName(v){const p=_pbCur();if(!p)return;saveWithUndo('Rename workflow');p.name=_pbT(v,80)||'Untitled';p.updated=_localToday();save();render();}
+/* A step can connect to a page: "sponsors", "finance", or one sponsor ("sp:<id>"). The task made from it carries t.pbRel and shows an Open button. */
+function _pbRelOk(v){v=String(v||'');return v==='sponsors'||v==='finance'||(v.slice(0,3)==='sp:'&&(S.sponsors||[]).some(x=>x&&x.id===v.slice(3)));}
+function _pbRelName(v){v=String(v||'');if(v==='sponsors')return 'Sponsors';if(v==='finance')return 'Finance';const x=v.slice(0,3)==='sp:'?(S.sponsors||[]).find(q=>q&&q.id===v.slice(3)):null;return x?'Sponsor: '+(x.name||'Sponsor'):'';}
+function _pbRelSel(s){const cur=_pbRelOk(s.rel)?s.rel:'';
+  return `<select class="sel" onchange="pbSetField('${jsq(s.id)}','rel',this.value)" aria-label="Connects to"><option value="">Nothing</option><option value="sponsors"${cur==='sponsors'?' selected':''}>Sponsors page</option><option value="finance"${cur==='finance'?' selected':''}>Finance page</option>${(S.sponsors||[]).length?`<optgroup label="A sponsor">${S.sponsors.map(x=>`<option value="${escHtml('sp:'+x.id)}"${cur==='sp:'+x.id?' selected':''}>${escHtml(x.name||'Sponsor')}</option>`).join('')}</optgroup>`:''}</select>`;}
+function pbRelRow(t){const v=t&&t.pbRel,n=_pbRelOk(v)?_pbRelName(v):'';return n?`<div class="tm-rel"><span>Linked to <b>${escHtml(n)}</b></span><button type="button" class="btn btn-ghost btn-sm" onclick="pbOpenRel('${jsq(t.id)}')">Open</button></div>`:'';}
+function pbOpenRel(tid){const t=getTask(tid),v=t&&t.pbRel;if(!_pbRelOk(v))return;closeModal();if(v==='finance')nav('finance');else if(v==='sponsors')nav('sponsors');else openSponsorProfile(v.slice(3));}
 const _PB_FIELDS={name:80,inp:80,out:80,toolName:40};
 function pbSetField(sid,k,v){
   const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
@@ -8485,6 +8512,7 @@ function pbSetField(sid,k,v){
   else if(k==='toolUrl'){v=_pbT(v,300);if(v){const u=_finSafeUrl(v);if(!u){render();return;}v=u;}}
   else if(k==='owner'){v=S.members.some(m=>m.id===v)?v:'';}
   else if(k==='ph'){v=PHASES.includes(v)?v:'';}
+  else if(k==='rel'){v=_pbRelOk(v)?String(v):'';}
   else if(k==='notes'){v=String(v==null?'':v).replace(/\r/g,'').split('\n').map(l=>l.replace(/[ \t]+/g,' ').trim()).join('\n').replace(/\n{3,}/g,'\n\n').trim().slice(0,600);}
   else if(_PB_FIELDS[k])v=_pbT(v,_PB_FIELDS[k]);
   else return;
@@ -8554,19 +8582,34 @@ function pbNewPreview(){
   const g=L.filter(x=>x.gate).length;
   pv.textContent=L.length?`${L.length} step${L.length===1?'':'s'}${g?' · '+g+' approval gate'+(g===1?'':'s'):''}`:'';
 }
-function pbNewModal(){
-  const body=`<div class="field"><label class="flbl">Name *</label><input class="inp" id="pb-n-name" placeholder="YouTube video"></div>
-  <div class="field"><label class="flbl">Outcome: what does done look like?</label><input class="inp" id="pb-n-out" placeholder="A published video that hits the weekly slot"></div>
-  <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-n-trig"><option value="once">One-off</option><option value="repeat">Repeats</option></select></div>
-  <div class="field"><label class="flbl">Brain-dump the steps, one per line</label><textarea class="inp" id="pb-n-steps" rows="6" oninput="pbNewPreview()" placeholder="Idea&#10;Script, 3&#10;Record, 1&#10;!Approve edit&#10;Publish"></textarea><div class="pb-hint" style="margin-top:4px;">Add the days after a comma (Script, 3). Start a line with ! for an approval gate. You can add owners, tools and checks next.</div><div class="pb-hint" id="pb-n-pv" style="margin-top:2px;color:var(--acc);"></div></div>`;
-  _coModal('New Workflow',body,'pbCreate()','');
+/* New Workflow is two steps: the basics, then the steps. Back keeps what was typed. */
+let _pbNw={name:'',out:'',trig:'once',steps:''};
+function pbNewModal(){_pbNw={name:'',out:'',trig:'once',steps:''};_pbNewStep1();}
+function _pbNewStep1(){
+  const body=`<div class="pb-hint" style="margin-bottom:8px;">Step 1 of 2: the basics</div><div class="field"><label class="flbl">Name *</label><input class="inp" id="pb-n-name" placeholder="YouTube video" value="${escHtml(_pbNw.name)}"></div>
+  <div class="field"><label class="flbl">Outcome: what does done look like?</label><input class="inp" id="pb-n-out" placeholder="A published video that hits the weekly slot" value="${escHtml(_pbNw.out)}"></div>
+  <div class="field"><label class="flbl">How often</label><select class="sel" id="pb-n-trig"><option value="once">One-off</option><option value="repeat"${_pbNw.trig==='repeat'?' selected':''}>Repeats</option></select></div>`;
+  _coModal('New Workflow',body,'pbNewNext()','','Next');
 }
+function _pbNewKeep(){
+  if(el('pb-n-name'))_pbNw.name=_coVal('pb-n-name').slice(0,80);
+  if(el('pb-n-out'))_pbNw.out=_coVal('pb-n-out').slice(0,160);
+  if(el('pb-n-trig'))_pbNw.trig=_coVal('pb-n-trig')==='repeat'?'repeat':'once';
+  if(el('pb-n-steps'))_pbNw.steps=el('pb-n-steps').value;
+}
+function pbNewNext(){
+  _pbNewKeep();if(!_pbNw.name)return _coErr('Give the Workflow a name');
+  const body=`<div class="pb-hint" style="margin-bottom:8px;">Step 2 of 2: the steps for “${escHtml(_pbNw.name)}”</div><div class="field"><label class="flbl">Brain-dump the steps, one per line</label><textarea class="inp" id="pb-n-steps" rows="6" oninput="pbNewPreview()" placeholder="Idea&#10;Script, 3&#10;Record, 1&#10;!Approve edit&#10;Publish">${escHtml(_pbNw.steps)}</textarea><div class="pb-hint" style="margin-top:4px;">Add the days after a comma (Script, 3). Start a line with ! for an approval gate. You can add owners, tools and checks next.</div><div class="pb-hint" id="pb-n-pv" style="margin-top:2px;color:var(--acc);"></div></div>`;
+  _coModal('New Workflow',body,'pbCreate()','','Create workflow','pbNewBack()');
+  pbNewPreview();
+}
+function pbNewBack(){_pbNewKeep();_pbNewStep1();}
 function pbCreate(){
-  const name=_coVal('pb-n-name').slice(0,80);if(!name)return _coErr('Give the Workflow a name');
+  _pbNewKeep();const name=_pbNw.name;if(!name)return _coErr('Give the Workflow a name');
   if(_pbList().length>=PB_MAX_PB)return _coErr('You have '+PB_MAX_PB+' Workflows. Archive or delete one first.');
-  const trig=_coVal('pb-n-trig')==='repeat'?'repeat':'once';
+  const trig=_pbNw.trig;
   saveWithUndo('Add workflow');
-  const p={id:uid(),name,outcome:_coVal('pb-n-out').slice(0,160),trigger:trig,updated:_localToday(),steps:_pbStepsFromLines(el('pb-n-steps')&&el('pb-n-steps').value)};
+  const p={id:uid(),name,outcome:_pbNw.out,trigger:trig,updated:_localToday(),steps:_pbStepsFromLines(_pbNw.steps)};
   _pbList().push(p);_pbUI.pb=p.id;_pbUI.step='';
   _pbCur();pbTidyQuiet(p);save();closeModal();if(V!=='playbooks')nav('playbooks');else render();
 }
@@ -8578,11 +8621,12 @@ function pbSettingsModal(){
   <div class="field"><label class="flbl">Repeats every</label><select class="sel" id="pb-s-ev">${[['week','Week'],['2weeks','2 weeks'],['month','Month']].map(o=>`<option value="${escHtml(o[0])}"${(p.repeat&&p.repeat.every||'week')===o[0]?' selected':''}>${o[1]}</option>`).join('')}</select></div>
   <div class="field"><label class="flbl">Next project starts</label><input class="inp" type="date" id="pb-s-next" value="${escHtml((p.repeat&&p.repeat.next)||'')}"></div>
   <div class="field"><label class="flbl">Creates</label><select class="sel" id="pb-s-type"><option value="improvement"${p.projType!=='event'?' selected':''}>A project</option><option value="event"${p.projType==='event'?' selected':''}>An event (with phases, sponsors and prizes)</option></select></div>
-  <div class="field" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="pbDuplicate()">Duplicate</button><button class="btn btn-ghost btn-sm" onclick="pbArchive()">${p.archived?'Restore from archive':'Archive'}</button></div>
+  <div class="field" style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-sm" onclick="pbDuplicate()">Duplicate</button><button class="btn btn-ghost btn-sm" onclick="pbArchive()">${p.archived?'Restore from archive':'Archive'}</button><button class="btn btn-ghost btn-sm" id="pb-del-btn" style="color:var(--red);" onclick="pbAskDelete()">Delete workflow</button></div>
   <div class="pb-hint">Only used when it repeats. A project starts on that date (or the first time someone opens the app after it). Its tasks get no dates: add them when they matter.</div>`;
-  _coModal('Workflow settings',body,'pbSaveSettings()','pbDeletePb()');
+  _coModal('Workflow settings',body,'pbSaveSettings()','');
 }
 function pbSaveSettings(){const p=_pbCur();if(!p)return;saveWithUndo('Edit workflow');p.outcome=_coVal('pb-s-out').slice(0,160);p.trigger=_coVal('pb-s-trig')==='repeat'?'repeat':'once';{p.projType=_coVal('pb-s-type')==='event'?'event':'improvement';}{const ev=_coVal('pb-s-ev'),nx=_coVal('pb-s-next');p.repeat={every:ev==='2weeks'||ev==='month'?ev:'week',next:nx&&addDays(nx,0)===nx?nx:''};}p.updated=_localToday();save();closeModal();render();}
+function pbAskDelete(){const b=el('pb-del-btn');if(!b)return;if(b.dataset.sure==='1')return pbDeletePb();b.dataset.sure='1';b.textContent='Tap again to delete for good';b.style.background='var(--red)';b.style.color='#fff';const h=b.parentNode.nextElementSibling;if(h)h.insertAdjacentHTML('beforebegin','<div class="pb-hint" style="color:var(--red);">Projects already started from it stay. You can Undo right after.</div>');}
 function pbDeletePb(){const p=_pbCur();if(!p)return;saveWithUndo('Delete workflow');S.playbooks=_pbList().filter(x=>x.id!==p.id);_pbUI.pb='';_pbUI.step='';saveNow();closeModal();render();}
 const PB_EXAMPLE=[ // [name, days, tool, gate, after (indices), column, row, checks, tasks]
   ['Idea',1,'',0,[],0,0,['One-line pitch written'],['Pick the topic']],
@@ -8713,6 +8757,7 @@ function _pbOrganiserHtml(p){
     return `<div class="pb-og${s.gate?' gate':''}"><div class="pb-og-h"><span class="pb-og-mv"><button onclick="pbOrgMove('${jsq(s.id)}',-1)" aria-label="Move up">▲</button><button onclick="pbOrgMove('${jsq(s.id)}',1)" aria-label="Move down">▼</button></span><i class="pb-og-n">${n}</i><input class="inp pb-og-name" value="${escHtml(s.name||'')}" onchange="pbSetField('${jsq(s.id)}','name',this.value)" aria-label="Step name"><label class="pb-og-gate"><input type="checkbox" ${s.gate?'checked':''} onchange="pbSetGate('${jsq(s.id)}',this.checked)"> Needs approval</label></div>
     <div class="pb-og-r"><select class="sel" onchange="pbSetField('${jsq(s.id)}','owner',this.value)" aria-label="Owner"><option value="">Unassigned</option>${mem.map(m=>`<option value="${escHtml(m.id)}"${s.owner===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('')}</select>${_pbCanSub(p,s,ord)?`<button class="btn btn-ghost btn-xs" onclick="pbOrgMakeSub('${jsq(s.id)}')">Make a subtask</button>`:''}<button class="btn btn-ghost btn-xs pb-og-del" onclick="pbDelStep('${jsq(s.id)}')">Delete</button></div>
     <div class="pb-og-r"><span class="pb-og-l">After</span>${aft.length?aft.map(a=>`<button class="pb-chp on" onclick="pbToggleAfter('${jsq(s.id)}','${jsq(a.id)}',false)" aria-label="Remove ${escHtml(a.name||'step')}">${escHtml(a.name||'Step')} ×</button>`).join(''):'<span class="pb-hint">Nothing, starts first</span>'}<button class="pb-chp" onclick="pbOrgPick('${jsq(k)}')">+ After</button></div>
+    <div class="pb-og-r"><span class="pb-og-l">Page</span>${_pbRelSel(s)}</div>
     <div class="pb-og-r"><span class="pb-og-l">Labels</span>${S.labels.length?_pbLabs(s).map(id=>{const l=getLabel(id);return `<button class="pb-chp on" onclick="pbToggleLabel('${jsq(s.id)}','${jsq(id)}')" aria-label="Remove ${escHtml(l.name)}"><i class="pb-ld" style="background:${safeColor(l.color)}"></i>${escHtml(l.name)} ×</button>`;}).join('')+`<button class="pb-chp" onclick="pbOrgPick('${jsq('l:'+s.id)}')">+ Label</button>`:'<span class="pb-hint">No labels yet. Create them in Settings.</span>'}</div>
     ${_pbUI.pick==='l:'+s.id?`<div class="pb-og-r pb-og-o">${S.labels.filter(l=>!_pbLabs(s).includes(l.id)).map(l=>`<button class="pb-chp" onclick="pbToggleLabel('${jsq(s.id)}','${jsq(l.id)}')"><i class="pb-ld" style="background:${safeColor(l.color)}"></i>${escHtml(l.name)}</button>`).join('')||'<span class="pb-hint">Every label is already on this step.</span>'}</div>`:''}
     <div class="pb-og-subs"><span class="pb-og-l">Subtasks</span>${(s.tasks||[]).map(t=>`<div class="pb-og-sub"><i>↳</i><span>${escHtml(t.text)}</span><button class="btn btn-ghost btn-xs" onclick="pbOrgOwn('${jsq(s.id)}','${jsq(t.id)}')">Make its own step</button><button class="fl-x" aria-label="Remove subtask" onclick="pbDelItem('${jsq(s.id)}','tasks','${jsq(t.id)}')">✕</button></div>`).join('')}<div class="pb-og-sub"><input class="inp" data-sub="${escHtml(s.id)}" maxlength="120" placeholder="Add a subtask" aria-label="New subtask" onkeydown="if(event.key==='Enter')pbOrgAddSub('${jsq(s.id)}')"><button class="btn btn-ghost btn-xs" onclick="pbOrgAddSub('${jsq(s.id)}')">Add</button></div></div>
@@ -8724,7 +8769,7 @@ function _pbOrganiserHtml(p){
 /* a step can fold into the step above it as a subtask when it carries nothing that would be lost (subtasks of its own, notes, links, checks, a finance link, the project date anchor) */
 function _pbCanSub(p,s,ord){
   const i=ord.indexOf(s);if(i<1)return false;
-  return !(s.tasks||[]).length&&!(s.notes||'')&&!(Array.isArray(s.links)&&s.links.length)&&!(s.checks||[]).length&&!s.fk&&p.anchor!==s.id&&(ord[i-1].tasks||[]).length<20;
+  return !(s.tasks||[]).length&&!(s.notes||'')&&!(Array.isArray(s.links)&&s.links.length)&&!(s.checks||[]).length&&!s.fk&&!_pbRelOk(s.rel)&&p.anchor!==s.id&&(ord[i-1].tasks||[]).length<20;
 }
 function pbOrgMakeSub(sid){
   const p=_pbCur();if(!p)return;const s=_pbStepOf(p,sid);if(!s)return;
@@ -8761,13 +8806,31 @@ function _pbSyncParent(t){
 }
 function pbOrgPick(k){_pbUI.pick=_pbUI.pick===k?'':k;render();}
 function pbOrgAdd(sid,aid){_pbUI.pick='';pbToggleAfter(sid,aid,true);}
+/* ▲ ▼ move a step one place in the list. Steps in the same column just swap; a step that waits directly for its neighbour trades places with it (the After links are rewired so the order really changes). */
 function pbOrgMove(sid,dir){
   const p=_pbCur();if(!p)return;const s=_pbStepOf(p,sid);if(!s)return;
-  const dep=_pbCalc(p).depth,d=dep[sid]||0;
-  const col=_pbOrder(p).filter(x=>(dep[x.id]||0)===d),i=col.indexOf(s),o=col[i+(dir<0?-1:1)];if(!o)return;
+  const ord=_pbOrder(p),i=ord.indexOf(s),o=ord[i+(dir<0?-1:1)];if(!o)return;
+  const top=dir<0?o:s,bot=dir<0?s:o,dep=_pbCalc(p).depth;
+  if((dep[top.id]||0)===(dep[bot.id]||0)){
+    saveWithUndo('Reorder steps');
+    const x=p.steps.indexOf(top),y=p.steps.indexOf(bot),r=top.r;top.r=bot.r;bot.r=r;
+    p.steps[x]=bot;p.steps[y]=top;p.updated=_localToday();save();render();return;
+  }
+  if(!_pbAfter(bot).includes(top.id))return showToast('“'+(bot.name||'This step')+'” has to come after other steps. Change its After to move it.');
+  const keep=_pbAfter(bot).filter(x=>x!==top.id);
+  if(keep.some(x=>_pbDependsOn(p,x,top.id)))return showToast('“'+(bot.name||'This step')+'” also waits for a step that follows “'+(top.name||'the one above')+'”. Change its After to move it.');
   saveWithUndo('Reorder steps');
-  const a=p.steps.indexOf(s),b=p.steps.indexOf(o),r=s.r;s.r=o.r;o.r=r;      // swap their place in the list and on the map
-  p.steps[a]=o;p.steps[b]=s;p.updated=_localToday();save();render();
+  const was=_pbAfter(top);
+  p.steps.forEach(q=>{if(q===top||q===bot)return;const L=_pbAfter(q);if(L.includes(bot.id)){q.after=L.filter(x=>x!==bot.id&&x!==top.id).concat(top.id);}});
+  bot.after=was.concat(keep.filter(x=>!was.includes(x)));
+  top.after=[bot.id];
+  const c=top.c,r=top.r;top.c=bot.c;top.r=bot.r;bot.c=c;bot.r=r;
+  pbTidy_(p);p.updated=_localToday();save();render();
+}
+function pbTidy_(p){   // re-place every step in its (new) column without overlaps, keeping the current order
+  const dep=_pbCalc(p).depth,cols=Object.create(null);
+  p.steps.forEach((s,i)=>{(cols[dep[s.id]||0]=cols[dep[s.id]||0]||[]).push({s,i});});
+  Object.keys(cols).forEach(c=>{cols[c].sort((a,b)=>(Number(a.s.r)||0)-(Number(b.s.r)||0)||a.i-b.i).forEach((x,k)=>{x.s.c=Number(c);x.s.r=k;});});
 }
 function _pbProjectsTabHtml(p){
   return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>Workflows</em> / ${escHtml(p.name||'Untitled')}</div></div>
@@ -8849,7 +8912,7 @@ function _pbMakeRun(p,date,nm,auto,lock,owners,meta){
     const who=owners&&Object.prototype.hasOwnProperty.call(owners,s.id)?owners[s.id]:s.owner,own=S.members.some(m=>m.id===who)?[who]:[],link=s.toolUrl?_finSafeUrl(s.toolUrl):'';
     const desc=[s.out?'Produces: '+s.out:'',s.inp?'Needs: '+s.inp:'',s.toolName||link?'Where: '+(s.toolName||'')+(link?' '+link:''):'',s.gate?'Approval gate: someone signs off before the next step.':'',(s.checks||[]).length?'Done means:\n'+s.checks.map(c=>'• '+c.text).join('\n'):'',s.notes?'Notes:\n'+s.notes:'',_pbLinkLines(s)].filter(Boolean).join('\n');
     const id=tid[s.id];
-    S.tasks.push(Object.assign({id,name:String(s.name||'Step').slice(0,120),description:desc,parentId:null,priority:s.gate?'High':'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:lock?_pbAfter(s).filter(a=>tid[a]&&a!==s.id).map(a=>tid[a]):[],startDate:'',endDate:'',pbRun:{pb:p.id,run,step:s.id}},base,{labels:_pbLabs(s)}));made.push(id);
+    S.tasks.push(Object.assign({id,name:String(s.name||'Step').slice(0,120),description:desc,parentId:null,priority:s.gate?'High':'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:lock?_pbAfter(s).filter(a=>tid[a]&&a!==s.id).map(a=>tid[a]):[],startDate:'',endDate:'',pbRun:{pb:p.id,run,step:s.id}},base,{labels:_pbLabs(s)},_pbRelOk(s.rel)?{pbRel:s.rel}:null));made.push(id);
     (s.tasks||[]).forEach(t=>{const sid=auto?'au'+k+t.id:uid();S.tasks.push(Object.assign({id:sid,name:String(t.text||'Task').slice(0,120),description:'',parentId:id,priority:'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:[],startDate:'',endDate:'',pbRun:{pb:p.id,run,step:s.id}},base,{labels:null}));made.push(sid);});
   });
   made.forEach(syncBlockedStatus);
@@ -8988,7 +9051,7 @@ function pbAutoRuns(){
 /* ── Versions: each run keeps the map exactly as it ran, so editing the Workflow later never rewrites an old run ──
    p.versions=[{id:'v<n>',n,date,sig,steps}] (newest 8). A run stores run.v; restoring copies a version back into the editable map. */
 const PB_MAX_VER=8;
-function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),s.notes||'',(Array.isArray(s.links)?s.links:[]).map(c=>c&&c.url),(s.tasks||[]).map(c=>c&&c.text)].concat(_pbLabs(s).length?[_pbLabs(s)]:[])));}
+function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),s.notes||'',(Array.isArray(s.links)?s.links:[]).map(c=>c&&c.url),(s.tasks||[]).map(c=>c&&c.text)].concat(_pbLabs(s).length?[_pbLabs(s)]:[]).concat(s.rel?['rel',s.rel]:[])));}
 function _pbVers(p){return Array.isArray(p.versions)?p.versions.filter(v=>v&&typeof v==='object'&&typeof v.id==='string'&&Array.isArray(v.steps)):[];}
 function _pbSnap(p){
   const sig=_pbSig(p);let vs=_pbVers(p);const hit=vs.find(x=>x.sig===sig);if(hit)return hit.id;
@@ -9167,6 +9230,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [192,'Workflows: arrows move steps, Back in New Workflow, Delete, steps link to Sponsors/Finance, co-working lists'],
   [191,'Phones: full task names, a shorter add-task bar; the edit window has Delete, Reminder, Dependencies, Subtask'],
   [190,'Undated tasks listed under project calendars; search finds workflows; projects get an owner and priority'],
   [189,'Switches, the date picker and bulk-select boxes use the hover look; the retro note stays when you edit it'],
@@ -9178,7 +9242,6 @@ const PF_CHANGELOG=[
   [183,'Workflow projects: dates are yours to set; the finish date is optional and tasks are never dated for you'],
   [182,'Workflow subtasks: add them in the Organiser; a step finishes itself when its last subtask is ticked'],
   [181,'Workflow steps can have labels; they carry onto the project tasks so the board can filter them'],
-  [180,'Workflows: a new Organiser tab lists the steps in order with owner, days, After and approval'],
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -9249,9 +9312,9 @@ function _finCompanyHtml(){
   return glance+dates+docs+people+contacts+checks;
 }
 /* ── editing ── */
-function _coModal(title,body,save,del){
+function _coModal(title,body,save,del,label,back){
   const mc=el('mc');mc.style.display='flex';
-  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:400px;"><div class="mo-hd"><span class="mo-title">${escHtml(title)}</span><button class="mo-close" onclick="closeModal()">×</button></div><div class="mo-body">${body}<div id="co-err" style="color:var(--red);font-size:.72rem;display:none;"></div></div><div class="mo-ft">${del?`<button class="btn btn-ghost" style="margin-right:auto;color:var(--red);" onclick="${del}">Delete</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="${save}">Save</button></div></div></div>`;
+  mc.innerHTML=`<div class="mo" onclick="if(event.target.classList.contains('mo'))closeModal()"><div class="mo-box" style="max-width:400px;"><div class="mo-hd"><span class="mo-title">${escHtml(title)}</span><button class="mo-close" onclick="closeModal()">×</button></div><div class="mo-body">${body}<div id="co-err" style="color:var(--red);font-size:.72rem;display:none;"></div></div><div class="mo-ft">${del?`<button class="btn btn-ghost" style="margin-right:auto;color:var(--red);" onclick="${del}">Delete</button>`:''}${back?`<button class="btn btn-ghost" style="margin-right:auto;" onclick="${back}">Back</button>`:''}<button class="btn btn-ghost" onclick="closeModal()">Cancel</button><button class="btn btn-acc" onclick="${save}">${escHtml(label||'Save')}</button></div></div></div>`;
   const i=mc.querySelector('input');if(i)i.focus();
 }
 function _coErr(m){const e=el('co-err');if(e){e.textContent=m;e.style.display='block';}}
@@ -11768,7 +11831,7 @@ function qaSubmit(barId,projectId,forcedPhase){
   saveNow();
   // Clear name and desc but KEEP assignees and priority sticky
   if(nameEl)nameEl.value='';
-  if(document.activeElement!==nameEl&&el(barId))el(barId).classList.remove('qa-open');   // tapped + (not Enter): fold the bar away
+  {const ev=window.event;if((document.activeElement!==nameEl||(ev&&ev.type==='click'))&&el(barId))el(barId).classList.remove('qa-open');}   // tapped + (not Enter): fold the bar away
   const descEl=el(`${barId}-desc`);
   if(descEl){descEl.value='';descEl.classList.remove('open');}
   // Reset meta row
@@ -11780,8 +11843,10 @@ function qaSubmit(barId,projectId,forcedPhase){
   }
   const dateEl=el(`${barId}-date`);if(dateEl)dateEl.value='';
   render();
-  // Re-focus bar after render — restore sticky assignees
+  // Re-focus bar after render — restore sticky assignees (not on a phone after a + tap: the bar stays folded)
+  const _skipFocus=!!el(barId)&&!el(barId).classList.contains('qa-open')&&matchMedia('(hover:none),(max-width:640px)').matches;
   setTimeout(()=>{
+    if(_skipFocus)return;
     const inp=document.querySelector(`#${barId}-name`)||document.querySelector('.qa-bar-input');
     if(inp)inp.focus();
   },60);
@@ -14974,7 +15039,7 @@ function taskModalHtml(data){
 
   ${defFromTmpl&&defFromTmpl.tasks?.length>0?`<div style="background:var(--surface2);border-radius:8px;padding:11px;"><div class="flbl" style="margin-bottom:8px;">Subtasks to create (${defFromTmpl.tasks.length})</div>${defFromTmpl.tasks.map(st=>`<div style="display:flex;align-items:center;gap:7px;padding:4px 0;font-size:.78rem;"><span class="badge bd-${(st.priority||'Medium').toLowerCase()}">${escHtml(st.priority)}</span>${escHtml(st.name)}${st.subtasks?.length?`<span style="color:var(--muted);font-size:.65rem;">(${st.subtasks.length} sub)</span>`:''}</div>`).join('')}</div>`:''}
 
-${task?`<div class="tm-acts"><div class="flbl">More</div><div class="tm-acts-row"><button type="button" class="btn btn-ghost btn-sm" onclick="tmGo('${jsq(task.id)}','rem')">Reminder${task.slackReminder&&task.slackReminder.datetime?' · set':''}</button><button type="button" class="btn btn-ghost btn-sm" onclick="tmGo('${jsq(task.id)}','dep')">Dependencies${(task.blockedBy||[]).length?' · '+(task.blockedBy||[]).length:''}</button>${task.parentId?'':`<button type="button" class="btn btn-ghost btn-sm" onclick="tmGo('${jsq(task.id)}','sub')">Add subtask</button>`}<button type="button" class="btn btn-ghost btn-sm tm-del" onclick="tmGo('${jsq(task.id)}','del')">Delete task</button></div></div>`:''}
+${task&&typeof pbRelRow==='function'?pbRelRow(task):''}${task?`<div class="tm-acts"><div class="flbl">More</div><div class="tm-acts-row"><button type="button" class="btn btn-ghost btn-sm" onclick="tmGo('${jsq(task.id)}','rem')">Reminder${task.slackReminder&&task.slackReminder.datetime?' · set':''}</button><button type="button" class="btn btn-ghost btn-sm" onclick="tmGo('${jsq(task.id)}','dep')">Dependencies${(task.blockedBy||[]).length?' · '+(task.blockedBy||[]).length:''}</button>${task.parentId?'':`<button type="button" class="btn btn-ghost btn-sm" onclick="tmGo('${jsq(task.id)}','sub')">Add subtask</button>`}<button type="button" class="btn btn-ghost btn-sm tm-del" onclick="tmGo('${jsq(task.id)}','del')">Delete task</button></div></div>`:''}
 
 </div>
 <div class="mo-ft">
@@ -15100,6 +15165,12 @@ function showCoworkInviteModal(day,label){
 }
 
 
+/* open tasks due on a co-working day, so the day shows what is planned for it */
+function cwPlannedHtml(date){
+  const L=(S.tasks||[]).filter(t=>t&&!t.parentId&&!t.done&&t.endDate===date).slice(0,30);
+  if(!L.length)return `<div class="field"><label class="flbl">Planned for this day</label><div class="pb-hint">No tasks are due on this day. Pick it as a due date on a task or when you start a Workflow project.</div></div>`;
+  return `<div class="field"><label class="flbl">Planned for this day (${L.length})</label><div class="cw-plan">${L.map(t=>{const p=getProject(t.projectId),w=typeof _ttWho==='function'?_ttWho(t):'';return `<button type="button" class="cw-plan-row" onclick="closeModal();openModal('task','${jsq(t.id)}')"><b>${escHtml(t.name)}</b><span>${escHtml((p?p.name:'')+(w?' · '+w:''))}</span></button>`;}).join('')}</div></div>`;
+}
 function coworkDayModalHtml(id){
   if(!S.coworkDays)S.coworkDays=[];
   const d=id?S.coworkDays.find(x=>x.id===id):null;
@@ -15115,6 +15186,7 @@ function coworkDayModalHtml(id){
   </div>
   <div class="field"><label class="flbl">Location</label><input class="inp" id="cw-notes" value="${escHtml(d?.notes||'')}" placeholder="Office address, Google Meet link\u2026"></div>
   <div class="field"><label class="flbl">What do we want to work on?</label><textarea class="txta" id="cw-objectives" style="min-height:72px;resize:vertical;" placeholder="Goals, tasks, projects to focus on\u2026">${escHtml(d?.objectives||'')}</textarea></div>
+  ${d&&d.date?cwPlannedHtml(d.date):''}
   <div class="field"><label class="flbl">Invite Members</label>
     <div style="display:flex;flex-wrap:wrap;gap:7px;margin-top:4px;">
       ${S.members.map(m=>{const sel=selMems.includes(m.id);return`<div data-cwm="${escHtml(m.id)}" onclick="toggleCwMember('${m.id}',this)" style="display:flex;align-items:center;gap:6px;padding:6px 10px;background:${sel?'var(--teal-dim)':'var(--surface2)'};border:1.5px solid ${sel?'var(--acc)':'var(--border)'};border-radius:8px;cursor:pointer;transition:var(--tr-ui);user-select:none;">
@@ -17001,7 +17073,7 @@ function spProdPickPayType(i,val){
   var pills=document.getElementById('sp-prod-pt-pills-'+i);
   if(!pills)return;
   pills.querySelectorAll('button').forEach(function(btn){
-    var active=btn.getAttribute('onclick').includes("'"+val+"'");
+    var active=(btn.getAttribute('onclick')||btn.getAttribute('data-onclick')||'').includes("'"+val+"'");
     btn.style.borderColor=active?'var(--acc)':'var(--border)';
     btn.style.background=active?'var(--teal-dim)':'transparent';
     btn.style.color=active?'var(--acc)':'var(--text2)';
