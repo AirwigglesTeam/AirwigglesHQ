@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ue5uSGhKugMEg51/AU76gzC8BQfiA0olKtYZZO2UTmI='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-GTuZYoxB0NrA/w0qGHLqym8W3yvgaAEMArl8GRenAlk='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1971,6 +1971,11 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-og-mv{display:flex;flex-direction:column;}.pb-og-mv button{background:none;border:0;color:var(--muted);padding:0 6px;line-height:1.1;min-width:28px;min-height:20px;cursor:pointer;font-size:.7rem;}.pb-og-mv button:hover{color:var(--acc);}
 .pb-og-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
 .pb-og-r .sel{width:auto;flex:0 1 200px;min-width:140px;}
+.pb-ld{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px;flex:none;vertical-align:middle;}
+.pb-lbs{display:inline-flex;gap:3px;align-items:center;margin-left:auto;}.pb-lbs .pb-ld{margin:0;}
+.pb-og-subs{display:flex;flex-direction:column;gap:6px;}
+.pb-og-sub{display:flex;gap:8px;align-items:center;margin-left:52px;font-size:.78rem;color:var(--text2);}.pb-og-sub i{font-style:normal;color:var(--muted);}.pb-og-sub span{flex:1;min-width:0;overflow-wrap:anywhere;}.pb-og-sub .inp{flex:1;min-width:0;}
+.pb-og-subs>.pb-og-l{margin-bottom:-2px;}
 .pb-og-l{font:500 .62rem/1 'DM Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);width:44px;flex:none;}
 .pb-og-days{display:inline-flex;gap:6px;align-items:center;font-size:.76rem;color:var(--muted);}.pb-og-days .inp{width:72px;}
 .pb-og-del{margin-left:auto;color:var(--red);}
@@ -2487,7 +2492,10 @@ pbNewPreview:()=>pbNewPreview,
 pbOpen:()=>pbOpen,
 pbOpenRun:()=>pbOpenRun,
 pbOrgAdd:()=>pbOrgAdd,
+pbOrgAddSub:()=>pbOrgAddSub,
+pbOrgMakeSub:()=>pbOrgMakeSub,
 pbOrgMove:()=>pbOrgMove,
+pbOrgOwn:()=>pbOrgOwn,
 pbOrgPick:()=>pbOrgPick,
 pbPrint:()=>pbPrint,
 pbRestoreVer:()=>pbRestoreVer,
@@ -2507,6 +2515,7 @@ pbStartRun:()=>pbStartRun,
 pbTidy:()=>pbTidy,
 pbToggleAfter:()=>pbToggleAfter,
 pbToggleArch:()=>pbToggleArch,
+pbToggleLabel:()=>pbToggleLabel,
 pbTplEdit:()=>pbTplEdit,
 pbTplUse:()=>pbTplUse,
 pbUnlockRun:()=>pbUnlockRun,
@@ -4462,7 +4471,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=180;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=182;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8270,6 +8279,21 @@ function _pbStepOf(p,id){return p?(p.steps||[]).find(s=>s&&s.id===id)||null:null
 const _pbN=(v,lo,hi,d)=>{v=Number(v);return isFinite(v)?Math.min(hi,Math.max(lo,v)):d;};
 const _pbT=(v,n)=>String(v==null?'':v).replace(/\s+/g,' ').trim().slice(0,n);
 function _pbAfter(s){return Array.isArray(s.after)?s.after:[];}
+/* a step's labels are ids of the workspace labels (Settings); ones that were deleted since are ignored */
+const PB_MAX_LABELS=6;
+function _pbLabs(s){return (Array.isArray(s.labels)?s.labels:[]).filter(id=>typeof id==='string'&&S.labels.some(l=>l.id===id));}
+function _pbLabDots(s){return _pbLabs(s).map(id=>{const l=getLabel(id);return `<i class="pb-ld" style="background:${safeColor(l.color)}" title="${escHtml(l.name)}"></i>`;}).join('');}
+function pbToggleLabel(sid,lid){
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s||!S.labels.some(l=>l.id===lid))return;
+  let L=_pbLabs(s);
+  if(L.includes(lid))L=L.filter(x=>x!==lid);else{if(L.length>=PB_MAX_LABELS)return showToast('A step can have up to '+PB_MAX_LABELS+' labels');L.push(lid);}
+  saveWithUndo('Edit step');s.labels=L;p.updated=_localToday();_pbUI.pick='';save();render();
+}
+function _pbLabChipsHtml(s,key){
+  const sel=_pbLabs(s);if(!S.labels.length)return '<span class="pb-hint">No labels yet. Create them in Settings, then pick them here.</span>';
+  const chip=(l,on)=>`<button class="pb-chp${on?' on':''}" onclick="pbToggleLabel('${jsq(s.id)}','${jsq(l.id)}')" aria-pressed="${on}"><i class="pb-ld" style="background:${safeColor(l.color)}"></i>${escHtml(l.name)}${on?' ×':''}</button>`;
+  return S.labels.map(l=>chip(l,sel.includes(l.id))).join('');
+}
 /* depth = number of steps that must come before (longest chain); finish = days until the step is done along the longest chain */
 function _pbCalc(p){
   const by=Object.create(null);p.steps.forEach(s=>{by[s.id]=s;});const depth=Object.create(null),fin=Object.create(null);
@@ -8327,7 +8351,7 @@ function _pbMapHtml(p,stat){
   st.forEach(s=>_pbAfter(s).forEach(a=>{const b=by[a];if(!b)return;const x1=X(b)+PB_W,y1=Y(b)+PB_H/2,x2=X(s),y2=Y(s)+PB_H/2,m=(x1+x2)/2;
     svg+=`<path d="M${x1} ${y1} C${m} ${y1} ${m} ${y2} ${x2-2} ${y2}" fill="none" stroke="#5a5a5a" stroke-width="2" marker-end="url(#pb-ar)"/>`;}));
   svg+='</svg>';
-  const nodes=st.map(s=>{const av=[s.owner].filter(o=>o&&S.members.some(m=>m.id===o)).map(o=>avHtml(o,20)).join('');return `<div class="pb-nd${s.gate?' gate':''}${stat&&stat[s.id]?' st-'+stat[s.id].k:''}${_pbUI.step===s.id?' sel':''}" data-sid="${escHtml(s.id)}" style="left:${X(s)}px;top:${Y(s)}px;" tabindex="0" role="button" aria-label="${escHtml(s.name||'Step')}"><b>${escHtml(s.name||'New step')}${s.gate?' <span class="pb-gt">· gate</span>':''}</b><div class="pb-m">${av}<span>${escHtml(_pbN(s.days,0,365,1))}d</span>${stat&&stat[s.id]?`<span class="pb-st">${escHtml(stat[s.id].t)}</span>`:s.toolName?`<span class="pb-tl">${escHtml(s.toolName)}</span>`:''}</div></div>`;}).join('');
+  const nodes=st.map(s=>{const av=[s.owner].filter(o=>o&&S.members.some(m=>m.id===o)).map(o=>avHtml(o,20)).join('');return `<div class="pb-nd${s.gate?' gate':''}${stat&&stat[s.id]?' st-'+stat[s.id].k:''}${_pbUI.step===s.id?' sel':''}" data-sid="${escHtml(s.id)}" style="left:${X(s)}px;top:${Y(s)}px;" tabindex="0" role="button" aria-label="${escHtml(s.name||'Step')}"><b>${escHtml(s.name||'New step')}${s.gate?' <span class="pb-gt">· gate</span>':''}</b><div class="pb-m">${av}<span>${escHtml(_pbN(s.days,0,365,1))}d</span>${_pbLabs(s).length?`<span class="pb-lbs">${_pbLabDots(s)}</span>`:''}${stat&&stat[s.id]?`<span class="pb-st">${escHtml(stat[s.id].t)}</span>`:s.toolName?`<span class="pb-tl">${escHtml(s.toolName)}</span>`:''}</div></div>`;}).join('');
   // phones: the same steps as a vertical list in order (the sideways map is hidden under 600px)
   const dep=_pbCalc(p).depth,ord=st.map((s,i)=>({s,i})).sort((a,b)=>(dep[a.s.id]||0)-(dep[b.s.id]||0)||(Number(a.s.r)||0)-(Number(b.s.r)||0)||a.i-b.i);
   const list=ord.map((x,n)=>{const s=x.s,af=_pbAfter(s).map(a=>by[a]).filter(Boolean).map(b=>b.name||'Step').join(', ');
@@ -8356,6 +8380,7 @@ function _pbDrawerHtml(p,s){
   ${inp('Name',`<input class="inp" value="${escHtml(s.name||'')}" onchange="pbSetField('${jsq(s.id)}','name',this.value)" aria-label="Step name">`)}
   <div class="pb-two">${inp('Owner',`<select class="sel" onchange="pbSetField('${jsq(s.id)}','owner',this.value)" aria-label="Owner"><option value="">Unassigned</option>${mem.map(m=>`<option value="${escHtml(m.id)}"${s.owner===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('')}</select>`)}
     ${inp('Time (days)',`<input class="inp" type="number" min="0" max="365" step="0.5" value="${escHtml(_pbN(s.days,0,365,1))}" onchange="pbSetField('${jsq(s.id)}','days',this.value)" aria-label="Days">`)}</div>
+  ${inp('Labels',`<div class="pb-og-r" style="gap:6px;">${_pbLabChipsHtml(s)}</div>`)}
   ${p.projType==='event'?inp('Event phase',`<select class="sel" onchange="pbSetField('${jsq(s.id)}','ph',this.value)" aria-label="Event phase"><option value="">No phase</option>${PHASES.map(h=>`<option value="${escHtml(h)}"${s.ph===h?' selected':''}>${escHtml(h)}</option>`).join('')}</select>`):''}
   <div class="pb-two">${inp('Comes in',`<input class="inp" value="${escHtml(s.inp||'')}" onchange="pbSetField('${jsq(s.id)}','inp',this.value)" placeholder="e.g. Approved idea" aria-label="What comes in">`)}
     ${inp('Goes out',`<input class="inp" value="${escHtml(s.out||'')}" onchange="pbSetField('${jsq(s.id)}','out',this.value)" placeholder="e.g. Final script" aria-label="What goes out">`)}</div>
@@ -8365,7 +8390,7 @@ function _pbDrawerHtml(p,s){
   ${inp('Links and files',`${(Array.isArray(s.links)?s.links:[]).map(c=>{const u=c&&_finSafeUrl(c.url);return u?`<div class="pb-li"><span><a class="pb-open" style="margin:0;" href="${escHtml(u)}" target="_blank" rel="noopener noreferrer">${escHtml(c.text||'Link')}</a></span><button class="fl-x" aria-label="Remove" onclick="pbDelLink('${jsq(s.id)}','${jsq(c.id)}')">✕</button></div>`:'';}).join('')}<div class="pb-two" style="margin-top:6px;"><input class="inp" id="pb-new-lk-t" maxlength="40" placeholder="Name (Brief, Folder…)" aria-label="Link name"><input class="inp" id="pb-new-lk-u" placeholder="https://… (Drive, Dropbox)" onkeydown="if(event.key==='Enter')pbAddLink('${jsq(s.id)}')" aria-label="Link address"></div><div class="pb-add"><span class="pb-hint" style="flex:1;">Paste a link to the file. Files stay where they live.</span><button class="btn btn-ghost btn-xs" onclick="pbAddLink('${jsq(s.id)}')">Add</button></div>`)}
   ${inp('Comes after',others.length?`<div class="pb-after">${others.map(o=>`<label><input type="checkbox" ${_pbAfter(s).includes(o.id)?'checked':''} onchange="pbToggleAfter('${jsq(s.id)}','${jsq(o.id)}',this.checked)"> ${escHtml(o.name||'Step')}</label>`).join('')}</div>`:'<span class="pb-hint">Add more steps to connect them.</span>')}
   ${inp('Done means',`${(s.checks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','checks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-checks" placeholder="Add a check" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','checks')" aria-label="New check"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','checks')">Add</button></div>`)}
-  ${inp('Tasks this step creates',`${(s.tasks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','tasks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-tasks" placeholder="Add a task" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','tasks')" aria-label="New task"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','tasks')">Add</button></div><span class="pb-hint">Each task is due when the step ends, once you start a run.</span>`)}
+  ${inp('Subtasks',`${(s.tasks||[]).map(c=>`<div class="pb-li"><span>${escHtml(c.text)}</span><button class="fl-x" aria-label="Remove" onclick="pbDelItem('${jsq(s.id)}','tasks','${jsq(c.id)}')">✕</button></div>`).join('')}<div class="pb-add"><input class="inp" id="pb-new-tasks" placeholder="Add a task" onkeydown="if(event.key==='Enter')pbAddItem('${jsq(s.id)}','tasks')" aria-label="New task"><button class="btn btn-ghost btn-xs" onclick="pbAddItem('${jsq(s.id)}','tasks')">Add</button></div><span class="pb-hint">Each becomes a subtask of this step's task. The step completes by itself when every subtask is ticked.</span>`)}
   <div style="margin-top:6px;"><button class="btn btn-ghost btn-sm" style="color:var(--red);" onclick="pbDelStep('${jsq(s.id)}')">Delete step</button></div></div>`;
 }
 /* ── actions ── */
@@ -8632,12 +8657,53 @@ function _pbOrganiserHtml(p){
     const aft=_pbAfter(s).map(a=>by[a]).filter(Boolean),k='a:'+s.id;
     const opts=_pbUI.pick===k?p.steps.filter(o=>o.id!==s.id&&!_pbAfter(s).includes(o.id)&&!_pbDependsOn(p,o.id,s.id)):null;
     return `<div class="pb-og${s.gate?' gate':''}"><div class="pb-og-h"><span class="pb-og-mv"><button onclick="pbOrgMove('${jsq(s.id)}',-1)" aria-label="Move up">▲</button><button onclick="pbOrgMove('${jsq(s.id)}',1)" aria-label="Move down">▼</button></span><i class="pb-og-n">${n}</i><input class="inp pb-og-name" value="${escHtml(s.name||'')}" onchange="pbSetField('${jsq(s.id)}','name',this.value)" aria-label="Step name"><label class="pb-og-gate"><input type="checkbox" ${s.gate?'checked':''} onchange="pbSetGate('${jsq(s.id)}',this.checked)"> Needs approval</label></div>
-    <div class="pb-og-r"><select class="sel" onchange="pbSetField('${jsq(s.id)}','owner',this.value)" aria-label="Owner"><option value="">Unassigned</option>${mem.map(m=>`<option value="${escHtml(m.id)}"${s.owner===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('')}</select><label class="pb-og-days"><input class="inp" type="number" min="0" max="365" step="0.5" value="${escHtml(_pbN(s.days,0,365,1))}" onchange="pbSetField('${jsq(s.id)}','days',this.value)" aria-label="Days"> days</label><button class="btn btn-ghost btn-xs pb-og-del" onclick="pbDelStep('${jsq(s.id)}')">Delete</button></div>
+    <div class="pb-og-r"><select class="sel" onchange="pbSetField('${jsq(s.id)}','owner',this.value)" aria-label="Owner"><option value="">Unassigned</option>${mem.map(m=>`<option value="${escHtml(m.id)}"${s.owner===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('')}</select><label class="pb-og-days"><input class="inp" type="number" min="0" max="365" step="0.5" value="${escHtml(_pbN(s.days,0,365,1))}" onchange="pbSetField('${jsq(s.id)}','days',this.value)" aria-label="Days"> days</label>${_pbCanSub(p,s,ord)?`<button class="btn btn-ghost btn-xs" onclick="pbOrgMakeSub('${jsq(s.id)}')">Make a subtask</button>`:''}<button class="btn btn-ghost btn-xs pb-og-del" onclick="pbDelStep('${jsq(s.id)}')">Delete</button></div>
     <div class="pb-og-r"><span class="pb-og-l">After</span>${aft.length?aft.map(a=>`<button class="pb-chp on" onclick="pbToggleAfter('${jsq(s.id)}','${jsq(a.id)}',false)" aria-label="Remove ${escHtml(a.name||'step')}">${escHtml(a.name||'Step')} ×</button>`).join(''):'<span class="pb-hint">Nothing, starts first</span>'}<button class="pb-chp" onclick="pbOrgPick('${jsq(k)}')">+ After</button></div>
+    <div class="pb-og-r"><span class="pb-og-l">Labels</span>${S.labels.length?_pbLabs(s).map(id=>{const l=getLabel(id);return `<button class="pb-chp on" onclick="pbToggleLabel('${jsq(s.id)}','${jsq(id)}')" aria-label="Remove ${escHtml(l.name)}"><i class="pb-ld" style="background:${safeColor(l.color)}"></i>${escHtml(l.name)} ×</button>`;}).join('')+`<button class="pb-chp" onclick="pbOrgPick('${jsq('l:'+s.id)}')">+ Label</button>`:'<span class="pb-hint">No labels yet. Create them in Settings.</span>'}</div>
+    ${_pbUI.pick==='l:'+s.id?`<div class="pb-og-r pb-og-o">${S.labels.filter(l=>!_pbLabs(s).includes(l.id)).map(l=>`<button class="pb-chp" onclick="pbToggleLabel('${jsq(s.id)}','${jsq(l.id)}')"><i class="pb-ld" style="background:${safeColor(l.color)}"></i>${escHtml(l.name)}</button>`).join('')||'<span class="pb-hint">Every label is already on this step.</span>'}</div>`:''}
+    <div class="pb-og-subs"><span class="pb-og-l">Subtasks</span>${(s.tasks||[]).map(t=>`<div class="pb-og-sub"><i>↳</i><span>${escHtml(t.text)}</span><button class="btn btn-ghost btn-xs" onclick="pbOrgOwn('${jsq(s.id)}','${jsq(t.id)}')">Make its own step</button><button class="fl-x" aria-label="Remove subtask" onclick="pbDelItem('${jsq(s.id)}','tasks','${jsq(t.id)}')">✕</button></div>`).join('')}<div class="pb-og-sub"><input class="inp" data-sub="${escHtml(s.id)}" maxlength="120" placeholder="Add a subtask" aria-label="New subtask" onkeydown="if(event.key==='Enter')pbOrgAddSub('${jsq(s.id)}')"><button class="btn btn-ghost btn-xs" onclick="pbOrgAddSub('${jsq(s.id)}')">Add</button></div></div>
     ${opts?`<div class="pb-og-r pb-og-o">${opts.length?opts.map(o=>`<button class="pb-chp" onclick="pbOrgAdd('${jsq(s.id)}','${jsq(o.id)}')">${escHtml(o.name||'Step')}</button>`).join(''):'<span class="pb-hint">No other step can come before this one.</span>'}</div>`:''}</div>`;};
   return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>Workflows</em> / ${escHtml(p.name||'Untitled')}</div></div>
   ${_pbHeadHtml(p)}
   <div class="card"><div class="card-hd"><span class="card-title">Who does each step, and in what order?</span></div><div class="card-bd pb-orgl">${ord.length?ord.map((s,i)=>card(s,i+1)).join(''):'<div class="empty-txt" style="padding:20px;">No steps yet.</div>'}<button class="pb-og-add" onclick="pbAddStep()"${p.steps.length>=PB_MAX_STEPS?' disabled':''}>+ Add step</button><p class="pb-hint">Steps are listed in the order their connections give. “After” says what has to finish first; steps with nothing in front of them can start at once.</p></div></div></div>`;
+}
+/* a step can fold into the step above it as a subtask when it carries nothing that would be lost (subtasks of its own, notes, links, checks, a finance link, the project date anchor) */
+function _pbCanSub(p,s,ord){
+  const i=ord.indexOf(s);if(i<1)return false;
+  return !(s.tasks||[]).length&&!(s.notes||'')&&!(Array.isArray(s.links)&&s.links.length)&&!(s.checks||[]).length&&!s.fk&&p.anchor!==s.id&&(ord[i-1].tasks||[]).length<20;
+}
+function pbOrgMakeSub(sid){
+  const p=_pbCur();if(!p)return;const s=_pbStepOf(p,sid);if(!s)return;
+  const ord=_pbOrder(p);if(!_pbCanSub(p,s,ord))return;
+  const par=ord[ord.indexOf(s)-1];
+  saveWithUndo('Remove step: made a subtask');
+  par.tasks=Array.isArray(par.tasks)?par.tasks:[];par.tasks.push({id:uid(),text:_pbT(s.name,120)||'Subtask'});
+  const was=_pbAfter(s);
+  p.steps.forEach(o=>{if(o===s||!_pbAfter(o).includes(sid))return;const L=_pbAfter(o).filter(x=>x!==sid);was.forEach(a=>{if(a!==o.id&&!L.includes(a))L.push(a);});o.after=L;});   // whatever waited for it now waits for what it waited for
+  p.steps=p.steps.filter(o=>o!==s);p.updated=_localToday();_pbUI.pick='';save();render();
+}
+function pbOrgOwn(sid,tid){
+  const p=_pbCur();if(!p)return;const s=_pbStepOf(p,sid);if(!s)return;
+  const t=(s.tasks||[]).find(x=>x.id===tid);if(!t||p.steps.length>=PB_MAX_STEPS)return;
+  saveWithUndo('Edit step');
+  const n={id:uid(),name:_pbT(t.text,80)||'New step',owner:s.owner||'',days:1,inp:'',out:'',toolName:'',toolUrl:'',gate:false,c:0,r:0,after:[sid],checks:[],tasks:[],labels:_pbLabs(s).slice()};
+  s.tasks=s.tasks.filter(x=>x.id!==tid);
+  p.steps.forEach(o=>{if(o!==s&&_pbAfter(o).includes(sid)&&!_pbAfter(o).includes(n.id))o.after=_pbAfter(o).concat(n.id);});   // what waited for the step still waits for this work
+  p.steps.push(n);_pbPlace(p,n);p.updated=_localToday();save();render();
+}
+function pbOrgAddSub(sid){
+  const p=_pbCur(),s=_pbStepOf(p,sid);if(!s)return;
+  const inp=[...document.querySelectorAll('input[data-sub]')].find(x=>x.dataset.sub===sid),t=_pbT(inp&&inp.value,120);if(!t)return;
+  if(!Array.isArray(s.tasks))s.tasks=[];if(s.tasks.length>=20)return;
+  saveWithUndo('Edit step');s.tasks.push({id:uid(),text:t});save();render();
+  const n=[...document.querySelectorAll('input[data-sub]')].find(x=>x.dataset.sub===sid);if(n)n.focus();
+}
+/* a project step's task finishes by itself when its last subtask is ticked, and reopens if one is unticked */
+function _pbSyncParent(t){
+  const par=t.parentId&&getTask(t.parentId);if(!par||!par.pbRun)return;
+  const ch=kids(par.id);if(!ch.length)return;
+  if(t.done&&!par.done&&ch.every(c=>c.done)){toggleDone(par.id);}
+  else if(!t.done&&par.done){par.done=false;par.doneOn='';syncBlockedStatus(par.id);S.tasks.filter(x=>(x.blockedBy||[]).includes(par.id)).forEach(x=>syncBlockedStatus(x.id));saveNow();render();}
 }
 function pbOrgPick(k){_pbUI.pick=_pbUI.pick===k?'':k;render();}
 function pbOrgAdd(sid,aid){_pbUI.pick='';pbToggleAfter(sid,aid,true);}
@@ -8704,8 +8770,8 @@ function _pbMakeRun(p,date,nm,auto,lock){
     const x=sc[s.id],own=S.members.some(m=>m.id===s.owner)?[s.owner]:[],link=s.toolUrl?_finSafeUrl(s.toolUrl):'';
     const desc=[s.out?'Produces: '+s.out:'',s.inp?'Needs: '+s.inp:'',s.toolName||link?'Where: '+(s.toolName||'')+(link?' '+link:''):'',s.gate?'Approval gate: someone signs off before the next step.':'',(s.checks||[]).length?'Done means:\n'+s.checks.map(c=>'• '+c.text).join('\n'):'',s.notes?'Notes:\n'+s.notes:'',_pbLinkLines(s)].filter(Boolean).join('\n');
     const id=tid[s.id];
-    S.tasks.push(Object.assign({id,name:String(s.name||'Step').slice(0,120),description:desc,parentId:null,priority:s.gate?'High':'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:lock?_pbAfter(s).filter(a=>tid[a]&&a!==s.id).map(a=>tid[a]):[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base));made.push(id);
-    (s.tasks||[]).forEach(t=>{const sid=auto?'au'+k+t.id:uid();S.tasks.push(Object.assign({id:sid,name:String(t.text||'Task').slice(0,120),description:'',parentId:id,priority:'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base));made.push(sid);});
+    S.tasks.push(Object.assign({id,name:String(s.name||'Step').slice(0,120),description:desc,parentId:null,priority:s.gate?'High':'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:lock?_pbAfter(s).filter(a=>tid[a]&&a!==s.id).map(a=>tid[a]):[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base,{labels:_pbLabs(s)}));made.push(id);
+    (s.tasks||[]).forEach(t=>{const sid=auto?'au'+k+t.id:uid();S.tasks.push(Object.assign({id:sid,name:String(t.text||'Task').slice(0,120),description:'',parentId:id,priority:'Medium',phase:PHASES.includes(s.ph)?s.ph:'',assignees:own,blockedBy:[],startDate:x.start,endDate:x.end,pbRun:{pb:p.id,run,step:s.id}},base,{labels:null}));made.push(sid);});
   });
   made.forEach(syncBlockedStatus);
   if(!Array.isArray(p.runs))p.runs=[];
@@ -8777,7 +8843,7 @@ function pbAutoRuns(){
 /* ── Versions: each run keeps the map exactly as it ran, so editing the Workflow later never rewrites an old run ──
    p.versions=[{id:'v<n>',n,date,sig,steps}] (newest 8). A run stores run.v; restoring copies a version back into the editable map. */
 const PB_MAX_VER=8;
-function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),s.notes||'',(Array.isArray(s.links)?s.links:[]).map(c=>c&&c.url),(s.tasks||[]).map(c=>c&&c.text)]));}
+function _pbSig(p){return JSON.stringify(p.steps.map(s=>[s.id,s.name,s.owner,s.days,s.inp,s.out,s.toolName,s.toolUrl,!!s.gate,s.c,s.r,_pbAfter(s),(s.checks||[]).map(c=>c&&c.text),s.notes||'',(Array.isArray(s.links)?s.links:[]).map(c=>c&&c.url),(s.tasks||[]).map(c=>c&&c.text)].concat(_pbLabs(s).length?[_pbLabs(s)]:[])));}
 function _pbVers(p){return Array.isArray(p.versions)?p.versions.filter(v=>v&&typeof v==='object'&&typeof v.id==='string'&&Array.isArray(v.steps)):[];}
 function _pbSnap(p){
   const sig=_pbSig(p);let vs=_pbVers(p);const hit=vs.find(x=>x.sig===sig);if(hit)return hit.id;
@@ -8804,7 +8870,7 @@ function pbDuplicate(){
   saveWithUndo('Duplicate workflow');
   const m=Object.create(null);p.steps.forEach(s=>{m[s.id]=uid();});
   const q={id:uid(),name:String(p.name||'Workflow').slice(0,70)+' (copy)',outcome:p.outcome||'',trigger:'once',updated:_localToday(),projType:p.projType==='event'?'event':'improvement',
-    steps:p.steps.map(s=>Object.assign({},s,{auto:undefined,id:m[s.id],after:_pbAfter(s).filter(a=>m[a]).map(a=>m[a]),checks:(s.checks||[]).map(c=>({id:uid(),text:c.text})),links:(Array.isArray(s.links)?s.links:[]).filter(c=>c&&typeof c==='object'&&_finSafeUrl(c.url)).map(c=>({id:uid(),text:_pbT(c.text,40)||'Link',url:_finSafeUrl(c.url)})),tasks:(s.tasks||[]).map(c=>({id:uid(),text:c.text}))}))};
+    steps:p.steps.map(s=>Object.assign({},s,{auto:undefined,labels:_pbLabs(s).slice(),id:m[s.id],after:_pbAfter(s).filter(a=>m[a]).map(a=>m[a]),checks:(s.checks||[]).map(c=>({id:uid(),text:c.text})),links:(Array.isArray(s.links)?s.links:[]).filter(c=>c&&typeof c==='object'&&_finSafeUrl(c.url)).map(c=>({id:uid(),text:_pbT(c.text,40)||'Link',url:_finSafeUrl(c.url)})),tasks:(s.tasks||[]).map(c=>({id:uid(),text:c.text}))}))};
   if(p.anchor&&m[p.anchor])q.anchor=m[p.anchor];
   _pbList().push(q);_pbUI.pb=q.id;_pbUI.step='';_pbUI.run='';save();closeModal();render();showToast('Duplicated');
 }
@@ -8945,6 +9011,8 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [182,'Workflow subtasks: add them in the Organiser; a step finishes itself when its last subtask is ticked'],
+  [181,'Workflow steps can have labels; they carry onto the project tasks so the board can filter them'],
   [180,'Workflows: a new Organiser tab lists the steps in order with owner, days, After and approval'],
   [179,'Workflows: a picker for your Workflows, and Flowchart and Projects tabs'],
   [178,'Settings: the Advanced tab sits with the other tabs'],
@@ -8955,8 +9023,6 @@ const PF_CHANGELOG=[
   [173,'Selected option pills and Finance tabs use the hover look too, so green fill means an action'],
   [172,'Selected filters look like the hover state; green fill is kept for actions'],
   [171,'Workflow tag on tasks; Tidy puts a step after the one you chose, not at the end'],
-  [170,'Workflows: runs are now called projects; start a project from a Workflow in New Project'],
-  [169,'Workflows: Print / PDF sheet with the map, steps, notes, links and run dates'],
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
@@ -11177,6 +11243,7 @@ function toggleDone(id){
     blockedByThis.forEach(x=>_updateTaskRowInPlace(x.id));
   }
   if(t.done)pfPopTask(id);   // the box gives a small pop when ticked
+  if(t.parentId)_pbSyncParent(t);   // a Workflow step's task completes itself when its last subtask is ticked
 }
 
 function _updateTaskRowInPlace(id){
@@ -17675,7 +17742,8 @@ function _calOutside(e){
 function deleteLabel(id){
   saveWithUndo('Delete label');
   S.labels=S.labels.filter(l=>l.id!==id);
-  S.tasks.forEach(t=>{t.labels=(t.labels||[]).filter(l=>l!==id);});
+  S.tasks.forEach(t=>{if(Array.isArray(t.labels))t.labels=t.labels.filter(l=>l!==id);});
+  (S.playbooks||[]).forEach(p=>(p&&p.steps||[]).forEach(s=>{if(Array.isArray(s.labels))s.labels=s.labels.filter(l=>l!==id);}));   // Workflow steps too
   saveNow();render();
 }
 
