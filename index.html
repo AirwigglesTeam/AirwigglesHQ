@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-cs75ptxmUErDfJFbAy3amxaLKZInwnOckO1s4OPanHw='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ue5uSGhKugMEg51/AU76gzC8BQfiA0olKtYZZO2UTmI='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -1952,9 +1952,33 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
 .pb-run:last-child{border-bottom:0;}
 .pb-rn{flex:1;min-width:0;display:flex;flex-direction:column;gap:2px;}
 .pb-rn b{overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pb-vw{display:flex;gap:6px;flex-wrap:wrap;margin:0 0 12px;}
-.pb-vw button{font:inherit;font-size:.72rem;font-weight:600;padding:6px 12px;min-height:32px;border-radius:20px;border:1.5px solid var(--border);background:var(--surface2);color:var(--text2);cursor:pointer;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-.pb-vw button.on{border-color:var(--acc);color:var(--acc);}
+.pb-pick{display:flex;gap:8px;flex-wrap:wrap;align-items:center;background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:10px 12px;margin:0 0 6px;}
+.pb-pk{font:500 .62rem/1 'DM Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin-right:4px;}
+.pb-pill{font:inherit;font-size:.76rem;font-weight:600;padding:6px 12px;min-height:32px;border-radius:20px;border:1.5px solid var(--border);background:transparent;color:var(--text2);cursor:pointer;max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+.pb-pill:hover,.pb-pill.on{border-color:var(--acc);color:var(--acc);}
+.pb-tabs{display:flex;gap:22px;flex-wrap:wrap;align-items:center;border-bottom:1px solid var(--border);margin:0 0 14px;}
+.pb-tabs button:not(.btn){font:inherit;font-size:.82rem;font-weight:600;background:none;border:0;border-bottom:2px solid transparent;border-radius:0;padding:10px 2px;margin-bottom:-1px;min-height:44px;color:var(--muted);cursor:pointer;}
+.pb-tabs button:not(.btn):hover{color:var(--text);}
+.pb-tabs button.on:not(.btn){color:var(--acc);border-bottom-color:var(--acc);}
+.pb-tabs .pb-go{margin-left:auto;margin-bottom:6px;}
+.pb-orgl{display:flex;flex-direction:column;gap:10px;}
+.pb-og{background:var(--surface2);border:1px solid var(--border);border-radius:14px;padding:12px 14px;display:flex;flex-direction:column;gap:10px;}
+.pb-og.gate{border-style:dashed;border-color:var(--yellow);}
+.pb-og-h{display:flex;gap:10px;align-items:center;flex-wrap:wrap;}
+.pb-og-n{flex:none;width:26px;height:26px;border-radius:50%;background:var(--bg);display:grid;place-items:center;font-size:.72rem;font-style:normal;color:var(--text2);}
+.pb-og-name{flex:1;min-width:140px;font-weight:600;}
+.pb-og-gate{display:inline-flex;gap:8px;align-items:center;font-size:.76rem;color:var(--text2);cursor:pointer;margin-left:auto;}
+.pb-og-mv{display:flex;flex-direction:column;}.pb-og-mv button{background:none;border:0;color:var(--muted);padding:0 6px;line-height:1.1;min-width:28px;min-height:20px;cursor:pointer;font-size:.7rem;}.pb-og-mv button:hover{color:var(--acc);}
+.pb-og-r{display:flex;gap:8px;align-items:center;flex-wrap:wrap;}
+.pb-og-r .sel{width:auto;flex:0 1 200px;min-width:140px;}
+.pb-og-l{font:500 .62rem/1 'DM Mono',ui-monospace,monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);width:44px;flex:none;}
+.pb-og-days{display:inline-flex;gap:6px;align-items:center;font-size:.76rem;color:var(--muted);}.pb-og-days .inp{width:72px;}
+.pb-og-del{margin-left:auto;color:var(--red);}
+.pb-og-o{padding-left:52px;}
+.pb-chp{font:inherit;font-size:.74rem;padding:4px 11px;min-height:30px;border-radius:99px;border:1px solid var(--border2);background:transparent;color:var(--text2);cursor:pointer;}
+.pb-chp:hover,.pb-chp.on{border-color:var(--acc);color:var(--acc);}
+.pb-og-add{all:unset;box-sizing:border-box;cursor:pointer;text-align:center;padding:12px;border:1px dashed var(--border2);border-radius:12px;color:var(--muted);font-size:.8rem;}
+.pb-og-add:hover{border-color:var(--acc);color:var(--acc);}
 .pb-sum{display:flex;gap:10px;flex-wrap:wrap;margin:0 0 12px;}
 .pb-sum span{flex:1 1 130px;min-width:0;background:var(--surface);border:1px solid var(--border);border-radius:11px;padding:9px 12px;font-size:.68rem;color:var(--muted);display:flex;flex-direction:column;gap:2px;}
 .pb-sum b{font-size:.9rem;color:var(--text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
@@ -2462,6 +2486,9 @@ pbNewModal:()=>pbNewModal,
 pbNewPreview:()=>pbNewPreview,
 pbOpen:()=>pbOpen,
 pbOpenRun:()=>pbOpenRun,
+pbOrgAdd:()=>pbOrgAdd,
+pbOrgMove:()=>pbOrgMove,
+pbOrgPick:()=>pbOrgPick,
 pbPrint:()=>pbPrint,
 pbRestoreVer:()=>pbRestoreVer,
 pbRetroModal:()=>pbRetroModal,
@@ -2473,6 +2500,7 @@ pbSelStep:()=>pbSelStep,
 pbSetField:()=>pbSetField,
 pbSetGate:()=>pbSetGate,
 pbSetName:()=>pbSetName,
+pbSetTab:()=>pbSetTab,
 pbSetView:()=>pbSetView,
 pbSettingsModal:()=>pbSettingsModal,
 pbStartRun:()=>pbStartRun,
@@ -4434,7 +4462,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=178;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=180;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8235,7 +8263,7 @@ function _boardBarHtml(V,count,extra){
    Phase 1 is Design mode: the list, the map (drag to place, "Comes after" to connect, Tidy up) and the step drawer.
    Everything stored is plain text (escaped when shown); links are http(s) only; counts and lengths are capped. */
 const PB_MAX_STEPS=40,PB_SX=164,PB_SY=104,PB_W=132,PB_H=84,PB_PAD=14;
-let _pbUI={pb:'',step:'',run:'',arch:false};
+let _pbUI={pb:'',step:'',run:'',arch:false,tab:'flow',pick:''};
 function _pbList(){if(!Array.isArray(S.playbooks))S.playbooks=[];if(S.playbooks.some(x=>!x||typeof x!=='object'||typeof x.id!=='string'))S.playbooks=S.playbooks.filter(x=>x&&typeof x==='object'&&typeof x.id==='string');return S.playbooks;}
 function _pbCur(){const p=_pbList().find(x=>x&&x.id===_pbUI.pb)||null;if(p&&!Array.isArray(p.steps))p.steps=[];return p;}
 function _pbStepOf(p,id){return p?(p.steps||[]).find(s=>s&&s.id===id)||null:null;}
@@ -8308,15 +8336,17 @@ function _pbMapHtml(p,stat){
 }
 function _pbDesignHtml(p){
   const rv=_pbRunsOf(p).find(r=>r.id===_pbUI.run);if(rv)return _pbRunViewHtml(p,rv);
+  if(_pbUI.tab==='proj')return _pbProjectsTabHtml(p);
+  if(_pbUI.tab==='org')return _pbOrganiserHtml(p);
   const calc=_pbCalc(p),s=_pbStepOf(p,_pbUI.step);
   return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>Workflows</em> / <input class="pb-name" value="${escHtml(p.name||'')}" onchange="pbSetName(this.value)" aria-label="Workflow name"></div>
-    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button>${p.steps.length?`<button class="btn btn-ghost btn-sm" onclick="pbPrint()">Print / PDF</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbAddStep()">+ Add step</button>${p.steps.length?`<button class="btn btn-acc btn-sm" onclick="pbRunModal()">Start a project</button>`:''}</div></div>
-  ${_pbViewBar(p)}
+    <div class="bd-tools"><button class="btn btn-ghost btn-sm" onclick="pbSettingsModal()">Settings</button><button class="btn btn-ghost btn-sm" onclick="pbTidy()">Tidy up</button>${p.steps.length?`<button class="btn btn-ghost btn-sm" onclick="pbPrint()">Print / PDF</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbAddStep()">+ Add step</button></div></div>
+  ${_pbHeadHtml(p)}
   ${p.outcome?`<p class="pb-lede">${escHtml(p.outcome)}</p>`:''}
   <div class="pb-layout${s?' open':''}"><div><div class="card">${p.steps.length?_pbMapHtml(p):`<div class="empty" style="padding:30px;"><div class="empty-txt">No steps yet. Add the first one.</div><button class="btn btn-acc btn-sm" onclick="pbAddStep()" style="margin-top:10px;">+ Add step</button></div>`}
     <div class="pb-legend"><span><i></i>Step</span><span><i class="g"></i>Approval gate</span><span>Click a step to edit it. Drag to move it. Use “Comes after” in the editor to connect steps.</span></div></div>
     ${p.steps.length?`<p class="pb-note">${p.steps.length} step${p.steps.length===1?'':'s'} · longest path ${escHtml(calc.total)} day${calc.total===1?'':'s'}. A project counts back from the publish date so each step gets its due date.</p>`:''}</div>
-  ${s?_pbDrawerHtml(p,s):''}</div>${_pbRunsHtml(p)}${_pbVersHtml(p)}</div>`;
+  ${s?_pbDrawerHtml(p,s):''}</div>${_pbVersHtml(p)}</div>`;
 }
 function _pbDrawerHtml(p,s){
   const mem=S.members||[];
@@ -8340,8 +8370,9 @@ function _pbDrawerHtml(p,s){
 }
 /* ── actions ── */
 function pbOpen(id){if(!_pbList().some(p=>p.id===id))return;_pbUI.pb=id;_pbUI.step='';_pbUI.run='';render();}
-function pbBack(){_pbUI.pb='';_pbUI.step='';_pbUI.run='';render();}
-function pbSetView(id){_pbUI.run=id||'';_pbUI.step='';render();}
+function pbSetTab(t){_pbUI.tab=t==='proj'?'proj':t==='org'?'org':'flow';_pbUI.run='';_pbUI.step='';_pbUI.pick='';render();}
+function pbBack(){_pbUI.pb='';_pbUI.step='';_pbUI.run='';_pbUI.tab='flow';render();}
+function pbSetView(id){_pbUI.run=id||'';_pbUI.tab='proj';_pbUI.step='';render();}
 function pbSelStep(id){_pbUI.step=_pbUI.step===id?'':id;render();}
 function pbCloseStep(){_pbUI.step='';render();}
 function pbSetName(v){const p=_pbCur();if(!p)return;saveWithUndo('Rename workflow');p.name=_pbT(v,80)||'Untitled';p.updated=_localToday();save();render();}
@@ -8588,10 +8619,39 @@ function _pbSchedule(p,publish){
 }
 function _pbRunsOf(p){return Array.isArray(p.runs)?p.runs.filter(r=>r&&typeof r==='object'&&r.id):[];}
 function _pbRunsHtml(p){
-  const runs=_pbRunsOf(p);if(!runs.length)return '';
+  const runs=_pbRunsOf(p);if(!runs.length)return `<div class="card pb-runs"><div class="empty" style="padding:30px;"><div class="empty-txt">No projects yet.<br>Start one from this Workflow.</div>${p.steps.length?'<button class="btn btn-acc btn-sm" style="margin-top:10px;" onclick="pbRunModal()">Start a project</button>':''}</div></div>`;
   const row=r=>{const ts=(S.tasks||[]).filter(t=>t.pbRun&&t.pbRun.run===r.id&&!t.parentId),n=ts.length,d=ts.filter(t=>t.done).length,gone=!getProject(r.projectId);
     return `<div class="pb-run"><div class="pb-rn"><b>${escHtml(r.name||'Project')}</b><span class="mut">publish ${escHtml(fmtD(r.date))}${(()=>{const v=_pbVers(p).find(x=>x.id===r.v);return v?' · version '+escHtml(v.n):'';})()}${r.retro?' · retro written':''}${gone?' · project deleted':` · ${d} of ${n} steps done`}</span></div>${gone?'':`<button class="btn btn-ghost btn-xs" onclick="pbSetView('${jsq(r.id)}')">Live map</button><button class="btn btn-ghost btn-xs" onclick="openDetail('${jsq(r.projectId)}')">Open project</button>`}</div>`;};
   return `<div class="card pb-runs"><div class="card-hd"><span class="card-title">Projects</span><span class="pill">${runs.length}</span></div><div class="card-bd">${runs.slice().reverse().map(row).join('')}</div></div>`;
+}
+/* Organiser: the same steps as an ordered list of cards (in the order the connections give), for people who think in lists */
+function _pbOrder(p){const dep=_pbCalc(p).depth;return p.steps.map((s,i)=>({s,i})).sort((a,b)=>(dep[a.s.id]||0)-(dep[b.s.id]||0)||(Number(a.s.r)||0)-(Number(b.s.r)||0)||a.i-b.i).map(x=>x.s);}
+function _pbOrganiserHtml(p){
+  const ord=_pbOrder(p),by=Object.create(null);p.steps.forEach(s=>{by[s.id]=s;});const mem=S.members||[];
+  const card=(s,n)=>{
+    const aft=_pbAfter(s).map(a=>by[a]).filter(Boolean),k='a:'+s.id;
+    const opts=_pbUI.pick===k?p.steps.filter(o=>o.id!==s.id&&!_pbAfter(s).includes(o.id)&&!_pbDependsOn(p,o.id,s.id)):null;
+    return `<div class="pb-og${s.gate?' gate':''}"><div class="pb-og-h"><span class="pb-og-mv"><button onclick="pbOrgMove('${jsq(s.id)}',-1)" aria-label="Move up">▲</button><button onclick="pbOrgMove('${jsq(s.id)}',1)" aria-label="Move down">▼</button></span><i class="pb-og-n">${n}</i><input class="inp pb-og-name" value="${escHtml(s.name||'')}" onchange="pbSetField('${jsq(s.id)}','name',this.value)" aria-label="Step name"><label class="pb-og-gate"><input type="checkbox" ${s.gate?'checked':''} onchange="pbSetGate('${jsq(s.id)}',this.checked)"> Needs approval</label></div>
+    <div class="pb-og-r"><select class="sel" onchange="pbSetField('${jsq(s.id)}','owner',this.value)" aria-label="Owner"><option value="">Unassigned</option>${mem.map(m=>`<option value="${escHtml(m.id)}"${s.owner===m.id?' selected':''}>${escHtml(m.name)}</option>`).join('')}</select><label class="pb-og-days"><input class="inp" type="number" min="0" max="365" step="0.5" value="${escHtml(_pbN(s.days,0,365,1))}" onchange="pbSetField('${jsq(s.id)}','days',this.value)" aria-label="Days"> days</label><button class="btn btn-ghost btn-xs pb-og-del" onclick="pbDelStep('${jsq(s.id)}')">Delete</button></div>
+    <div class="pb-og-r"><span class="pb-og-l">After</span>${aft.length?aft.map(a=>`<button class="pb-chp on" onclick="pbToggleAfter('${jsq(s.id)}','${jsq(a.id)}',false)" aria-label="Remove ${escHtml(a.name||'step')}">${escHtml(a.name||'Step')} ×</button>`).join(''):'<span class="pb-hint">Nothing, starts first</span>'}<button class="pb-chp" onclick="pbOrgPick('${jsq(k)}')">+ After</button></div>
+    ${opts?`<div class="pb-og-r pb-og-o">${opts.length?opts.map(o=>`<button class="pb-chp" onclick="pbOrgAdd('${jsq(s.id)}','${jsq(o.id)}')">${escHtml(o.name||'Step')}</button>`).join(''):'<span class="pb-hint">No other step can come before this one.</span>'}</div>`:''}</div>`;};
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>Workflows</em> / ${escHtml(p.name||'Untitled')}</div></div>
+  ${_pbHeadHtml(p)}
+  <div class="card"><div class="card-hd"><span class="card-title">Who does each step, and in what order?</span></div><div class="card-bd pb-orgl">${ord.length?ord.map((s,i)=>card(s,i+1)).join(''):'<div class="empty-txt" style="padding:20px;">No steps yet.</div>'}<button class="pb-og-add" onclick="pbAddStep()"${p.steps.length>=PB_MAX_STEPS?' disabled':''}>+ Add step</button><p class="pb-hint">Steps are listed in the order their connections give. “After” says what has to finish first; steps with nothing in front of them can start at once.</p></div></div></div>`;
+}
+function pbOrgPick(k){_pbUI.pick=_pbUI.pick===k?'':k;render();}
+function pbOrgAdd(sid,aid){_pbUI.pick='';pbToggleAfter(sid,aid,true);}
+function pbOrgMove(sid,dir){
+  const p=_pbCur();if(!p)return;const s=_pbStepOf(p,sid);if(!s)return;
+  const dep=_pbCalc(p).depth,d=dep[sid]||0;
+  const col=_pbOrder(p).filter(x=>(dep[x.id]||0)===d),i=col.indexOf(s),o=col[i+(dir<0?-1:1)];if(!o)return;
+  saveWithUndo('Reorder steps');
+  const a=p.steps.indexOf(s),b=p.steps.indexOf(o),r=s.r;s.r=o.r;o.r=r;      // swap their place in the list and on the map
+  p.steps[a]=o;p.steps[b]=s;p.updated=_localToday();save();render();
+}
+function _pbProjectsTabHtml(p){
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>Workflows</em> / ${escHtml(p.name||'Untitled')}</div></div>
+  ${_pbHeadHtml(p)}${_pbRunsHtml(p)}</div>`;
 }
 function pbRunModal(){
   const p=_pbCur();if(!p||!p.steps.length)return;
@@ -8668,9 +8728,12 @@ function _pbStat(p,run){
   });
   return out;
 }
-function _pbViewBar(p){
-  const runs=_pbRunsOf(p);if(!runs.length)return '';
-  return `<div class="pb-vw" role="tablist"><button class="${_pbUI.run?'':'on'}" onclick="pbSetView('')">Design</button>${runs.slice(-6).map(r=>`<button class="${_pbUI.run===r.id?'on':''}" onclick="pbSetView('${jsq(r.id)}')">${escHtml(r.name||'Project')}</button>`).join('')}</div>`;
+/* the Workflow picker and the Flowchart | Projects tabs; inside a project the Projects tab stays lit */
+function _pbHeadHtml(p){
+  const runs=_pbRunsOf(p),on=_pbUI.run||_pbUI.tab==='proj'?'proj':_pbUI.tab==='org'?'org':'flow';
+  const pills=_pbList().filter(q=>q&&(!q.archived||q.id===p.id)).map(q=>`<button class="pb-pill${q.id===p.id?' on':''}" onclick="pbOpen('${jsq(q.id)}')">${escHtml(q.name||'Untitled')}</button>`).join('');
+  return `<div class="pb-pick"><span class="pb-pk">Workflows</span>${pills}<button class="pb-pill" onclick="pbNewModal()">+ New workflow</button></div>
+  <div class="pb-tabs" role="tablist"><button role="tab" class="${on==='flow'?'on':''}" onclick="pbSetTab('flow')">Flowchart</button><button role="tab" class="${on==='org'?'on':''}" onclick="pbSetTab('org')">Organiser</button><button role="tab" class="${on==='proj'?'on':''}" onclick="pbSetTab('proj')">Projects (${runs.length})</button>${p.steps.length?'<button class="btn btn-acc btn-sm pb-go" onclick="pbRunModal()">Start a project</button>':''}</div>`;
 }
 function _pbRunViewHtml(p0,run){
   const ver=_pbVers(p0).find(v=>v.id===run.v),p=ver?Object.assign({},p0,{steps:ver.steps}):p0;
@@ -8683,9 +8746,9 @@ function _pbRunViewHtml(p0,run){
     ${sv.task?`<div class="pb-hint">Due ${escHtml(fmtD(sv.task.endDate)||'no date')}${sv.kids?` · ${sv.done} of ${sv.kids} tasks done`:''}${(sv.task.assignees||[]).length?'':' · no owner yet'}</div>
     ${isBlocked(sv.task)?`<div class="pb-hint">Waiting on: ${escHtml(blockerNames(sv.task).join(', '))}</div>`:''}
     <div style="display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="openModal('task','${jsq(sv.task.id)}')">Open task</button><button class="btn btn-ghost btn-sm" onclick="openDetail('${jsq(run.projectId)}')">Open project</button></div>`:'<div class="pb-hint">This step\'s task was deleted from the project.</div>'}</div>`:'';
-  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbBack()" aria-label="All Workflows">←</button> <em>${escHtml(p.name||'Workflow')}</em> / ${escHtml(run.name||'Project')}</div>
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><button class="btn btn-ghost btn-xs" onclick="pbSetView('')" aria-label="All projects">←</button> <em>${escHtml(p.name||'Workflow')}</em> / ${escHtml(run.name||'Project')}</div>
     <div class="bd-tools">${_pbRunLocked(run)?`<button class="btn btn-ghost btn-sm" onclick="pbUnlockRun()">Unlock steps</button>`:''}<button class="btn btn-ghost btn-sm" onclick="pbPrint()">Print / PDF</button><button class="btn btn-ghost btn-sm" onclick="pbRetroModal()">${run.retro?'Edit retro':'Retro'}</button><button class="btn btn-ghost btn-sm" onclick="pbRunModal()">Start another project</button></div></div>
-  ${_pbViewBar(p0)}
+  ${_pbHeadHtml(p0)}
   <div class="pb-sum"><span><b>${escHtml(fmtD(run.date))}</b>publish${days>=0?' · in '+days+'d':' · '+(-days)+'d ago'}</span><span><b>${cnt('done')} / ${n}</b>steps done</span><span class="${cnt('late')?'bad':''}"><b>${cnt('late')}</b>late</span><span><b>${escHtml(next?next.name:'All done')}</b>${next?'next up':''}</span></div>
   <div class="pb-layout${sel?' open':''}"><div><div class="card">${_pbMapHtml(p,stat)}<div class="pb-legend"><span><i class="s-done"></i>Done</span><span><i class="s-doing"></i>In progress</span><span><i class="s-late"></i>Late</span><span><i class="s-wait"></i>Waiting</span><span>Click a step for its task. Change the map in Design.</span></div></div>${_pbRetroCard(run)}</div>${info}</div></div>`;
 }
@@ -8882,6 +8945,8 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [180,'Workflows: a new Organiser tab lists the steps in order with owner, days, After and approval'],
+  [179,'Workflows: a picker for your Workflows, and Flowchart and Projects tabs'],
   [178,'Settings: the Advanced tab sits with the other tabs'],
   [177,'Smaller, quicker-loading app: unused styling removed behind the scenes'],
   [176,'Notes reminder in the bell every 5 days; the tab name label hides when you scroll'],
@@ -8892,8 +8957,6 @@ const PF_CHANGELOG=[
   [171,'Workflow tag on tasks; Tidy puts a step after the one you chose, not at the end'],
   [170,'Workflows: runs are now called projects; start a project from a Workflow in New Project'],
   [169,'Workflows: Print / PDF sheet with the map, steps, notes, links and run dates'],
-  [168,'Workflow steps can have notes and links that flow into the run tasks'],
-  [166,'Workflows: type steps with days and gates in one go, and a dry run shows every date first']
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
