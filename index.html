@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <link rel="icon" id="favicon" type="image/png">
-  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-ebvIQsoD6FNOwOH427GWRtYsX0ddeNI2P/vLXse6FDw='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
+  <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'sha256-zcZTQyfu9seoSoEtJUVBNASTTEaT/7zi/j49X9nxOB8='; script-src-attr 'none'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob: https:; connect-src 'self' https://airwiggleshq.com https://hooks.slack.com https://api.exchangerate-api.com; manifest-src 'self' blob:; base-uri 'none'; form-action 'none'; object-src 'none'">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
 <meta name="theme-color" content="#62D0AA">
 <meta name="mobile-web-app-capable" content="yes">
@@ -2054,6 +2054,26 @@ button.spx-stage:focus-visible{outline:2px solid var(--acc)}
   .pb-li .fl-x,.pb-og-sub .fl-x{min-width:40px;min-height:34px}
   .pb-name{min-height:34px}
 }
+
+/* Workflows home */
+.pb-q{font-size:1.15rem;font-weight:500;margin:4px 0 12px;text-wrap:balance}
+.pb-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:10px}
+.pb-tile{all:unset;box-sizing:border-box;cursor:pointer;display:flex;flex-direction:column;gap:5px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-height:44px}
+.pb-tile:hover,.pb-tile:focus-visible{border-color:var(--acc);color:var(--acc)}
+.pb-tile b{font-size:.9rem;font-weight:600;color:var(--text)}.pb-tile:hover b{color:var(--acc)}
+.pb-tile span{font-size:.76rem;color:var(--muted);line-height:1.4}
+.pb-ti-i{display:grid!important;place-items:center;width:34px;height:34px;border-radius:9px;background:var(--surface2);color:var(--muted)!important;margin-bottom:4px}.pb-tile:hover .pb-ti-i{color:var(--acc)!important}
+.pb-sec{font:600 .66rem 'DM Mono',monospace;letter-spacing:.08em;text-transform:uppercase;color:var(--muted);margin:22px 0 8px}
+.pb-rgrid{display:grid;grid-template-columns:repeat(auto-fill,minmax(270px,1fr));gap:10px}
+.pb-rcard{display:flex;flex-direction:column;gap:8px;background:var(--surface);border:1px solid var(--border);border-radius:12px;padding:14px 16px;min-width:0}
+.pb-rc-h{display:flex;gap:8px;align-items:flex-start;justify-content:space-between}.pb-rc-h b{font-size:.88rem;font-weight:600;overflow-wrap:anywhere}
+.pb-wtag{font-size:.64rem;border:1px solid var(--border);border-radius:99px;padding:2px 8px;color:var(--muted);white-space:nowrap}
+.pb-bar{height:7px;background:var(--surface2);border-radius:99px;overflow:hidden}.pb-bar i{display:block;height:100%;background:var(--acc)}
+.pb-rc-m{font-size:.72rem;color:var(--muted)}
+.pb-next{background:var(--teal-dim);border:1px solid var(--acc);border-radius:9px;padding:8px 10px;font-size:.76rem;overflow-wrap:anywhere}.pb-next b{color:var(--acc);font-weight:600}
+.pb-rcard .btn{align-self:flex-start}
+.pb-lib-row{display:flex;gap:8px;align-items:stretch;min-width:0}.pb-lib-row .pb-card{flex:1;min-width:0}.pb-lib-go{align-self:center}
+@media (max-width:640px){.pb-lib-row{flex-direction:column}.pb-lib-go{align-self:flex-start}}
 </style>
 </head>
 <body>
@@ -2535,6 +2555,8 @@ pbDueCw:()=>pbDueCw,
 pbDuplicate:()=>pbDuplicate,
 pbExample:()=>pbExample,
 pbFinanceStarter:()=>pbFinanceStarter,
+pbHomeImprove:()=>pbHomeImprove,
+pbHomeStart:()=>pbHomeStart,
 pbNewBack:()=>pbNewBack,
 pbNewModal:()=>pbNewModal,
 pbNewNext:()=>pbNewNext,
@@ -4529,7 +4551,7 @@ function _pfCheckSizeOnce(){
 
 /* ════ DATA INTEGRITY: consistency rules, one-time migrations, change-only edits, size + health checks ════ */
 try{const _bn=document.getElementById('boot-note');if(_bn)_bn.remove();}catch(_){}      // the page started: drop the "not started" safety note (see index.template.html)
-const PF_BUILD=192;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
+const PF_BUILD=193;               // release number: sent with every save so the server can refuse copies older than the minimum it requires (bump each release)
 const PF_SCHEMA=1;              // bump when adding a migration below
 let _pfSchemaTooNew=false;
 
@@ -8361,7 +8383,7 @@ function _boardBarHtml(V,count,extra){
   const sw=(v,l)=>canAccess(v)?`<button role="tab" aria-selected="${V===v}" class="${V===v?'on':''}" onclick="boardGo('${v}')">${l}</button>`:'';
   return `<div class="bd-bar"><div class="bd-seg" role="tablist" aria-label="Board view">${sw('kanban','Status')}${sw('campaign','Labels')}</div>${extra||''}<span class="bd-count">Showing ${count} task${count===1?'':'s'}</span></div>`;
 }
-//@act pbCreate pbSaveSettings pbDeletePb pbSaveBack pbRetroUse pbPickDate pbDueCw pbSaveRetro pbNewPreview pbNewNext pbNewBack pbAskDelete   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
+//@act pbCreate pbSaveSettings pbDeletePb pbSaveBack pbRetroUse pbPickDate pbDueCw pbSaveRetro pbNewPreview pbNewNext pbNewBack pbAskDelete pbHomeStart pbHomeImprove   (passed to _coModal as text, so the build cannot see them in an onclick= attribute)
 /* ── Workflows: a process drawn once as a map of steps, run again and again ──
    S.playbooks=[{id,name,outcome,trigger:'once'|'repeat',updated,
      steps:[{id,name,owner(member id),days,inp,out,toolName,toolUrl,gate,c,r,after:[step ids],checks:[{id,text}],tasks:[{id,text}]}]}]
@@ -8426,16 +8448,59 @@ function pbTidy(){
   save();render();
 }
 /* ── pages ── */
+/* ── Home: "What would you like to do?" Three choices, what is running, then the library ── */
+const _PB_IC={
+  go:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12h14M13 6l6 6-6 6"/></svg>',
+  add:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>',
+  imp:'<svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 12a8 8 0 0 1 14-5.3M20 4v4h-4M20 12a8 8 0 0 1-14 5.3M4 20v-4h4"/></svg>'};
+/* projects started from a Workflow that still have open steps: progress, late count and "your next step" */
+function _pbRunning(){
+  const out=[],me=typeof getMyMember==='function'?getMyMember():null;
+  _pbList().forEach(p=>{
+    if(!p||p.archived||!Array.isArray(p.steps))return;
+    _pbRunsOf(p).forEach(r=>{
+      if(!getProject(r.projectId))return;
+      const ver=_pbVers(p).find(v=>v.id===r.v),pp=ver?Object.assign({},p,{steps:ver.steps}):p;
+      if(!pp.steps.length)return;
+      const st=_pbStat(pp,r),n=pp.steps.length;let done=0,late=0;
+      pp.steps.forEach(x=>{const k=st[x.id]&&st[x.id].k;if(k==='done')done++;else if(k==='late')late++;});
+      if(done>=n)return;
+      const ord=_pbOrder(pp).filter(x=>!st[x.id]||st[x.id].k!=='done'&&st[x.id].k!=='gone');
+      const mine=me&&ord.find(x=>st[x.id]&&st[x.id].task&&(st[x.id].task.assignees||[]).includes(me.id));
+      out.push({p,r,n,done,late,next:mine||ord[0]||null,isMine:!!mine});
+    });
+  });
+  return out.sort((a,b)=>String(b.r.created||'').localeCompare(String(a.r.created||''))).slice(0,6);
+}
+function _pbRetroWaiting(){
+  const L=[];_pbList().forEach(p=>{if(!p||p.archived)return;_pbRunsOf(p).forEach(r=>{if(r.retro&&r.retro.change&&!r.retro.applied)L.push({p,r});});});return L;
+}
+function pbHomeStart(){
+  const L=_pbList().filter(q=>q&&!q.archived&&Array.isArray(q.steps)&&q.steps.length);
+  if(!L.length)return showToast('Create a workflow first, then you can start a project from it.');
+  if(L.length===1)return pbTplUse(L[0].id);
+  const lib=el('pb-lib');if(lib)lib.scrollIntoView({behavior:'smooth',block:'start'});showToast('Pick a workflow below and press Start');
+}
+function pbHomeImprove(){
+  const w=_pbRetroWaiting()[0];if(w)return pbOpenRun(w.p.id,w.r.id);
+  const lib=el('pb-lib');if(lib)lib.scrollIntoView({behavior:'smooth',block:'start'});showToast('Pick a workflow below and press its name to edit it');
+}
 function renderPlaybooks(){
   const p=_pbCur();
   if(p)return _pbDesignHtml(p);
   _pbUI.pb='';_pbUI.step='';
-  const all=_pbList(),arch=all.filter(q=>q.archived),list=all.filter(q=>!q.archived||_pbUI.arch);
-  const card=q=>{const n=(q.steps||[]).length;
-    return `<button class="pb-card" onclick="pbOpen('${jsq(q.id)}')"><b>${escHtml(q.name||'Untitled')}</b><span class="pb-oc">${escHtml(q.outcome||'No outcome written yet')}</span><span class="pb-meta"><span class="chip">${n} step${n===1?'':'s'}</span><span class="chip">${q.trigger==='repeat'?'Repeats':'One-off'}</span>${q.archived?'<span class="chip">Archived</span>':''}</span></button>`;};
-  return `<div class="fu"><div class="page-hd"><div class="page-title"><em>Workflows</em></div><button class="btn btn-acc btn-sm" onclick="pbNewModal()">+ New Workflow</button></div>
-  <p class="pb-lede">A Workflow is an editable template for a process you draw once and run again and again: the steps, who does them, how long they take and where the work lives. You will also find them under Templates.</p>
-  ${list.length?`<div class="pb-grid">${list.map(card).join('')}</div>`:`<div class="empty"><div class="empty-txt">No Workflows yet.<br>Start from the YouTube example, or write your own.</div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="pbExample()">Start with the YouTube example</button><button class="btn btn-ghost btn-sm" onclick="pbFinanceStarter()">Quarterly finance review</button><button class="btn btn-ghost btn-sm" onclick="pbNewModal()">Write my own</button></div></div>`}
+  const all=_pbList(),arch=all.filter(q=>q.archived),list=all.filter(q=>!q.archived||_pbUI.arch),wait=_pbRetroWaiting().length,run=_pbRunning();
+  const tile=(ic,t,d,fn)=>`<button class="pb-tile" onclick="${fn}"><span class="pb-ti-i">${ic}</span><b>${t}</b><span>${d}</span></button>`;
+  const rc=x=>{const pc=Math.round(x.done/x.n*100),nx=x.next?escHtml(x.next.name||'Step'):'';
+    return `<div class="pb-rcard"><div class="pb-rc-h"><b>${escHtml(x.r.name||'Project')}</b><span class="pb-wtag">${escHtml(x.p.name||'Workflow')}</span></div><div class="pb-bar" role="progressbar" aria-valuenow="${pc}" aria-valuemin="0" aria-valuemax="100"><i style="width:${pc}%"></i></div><div class="pb-rc-m">${x.done} of ${x.n} steps${x.late?' · '+x.late+' late':''}${x.r.date?' · due '+escHtml(fmtD(x.r.date)):''}</div>${nx?`<div class="pb-next"><b>${x.isMine?'Your next step':'Next step'}:</b> ${nx}</div>`:''}<button class="btn btn-acc btn-sm" onclick="pbOpenRun('${jsq(x.p.id)}','${jsq(x.r.id)}')">Open project</button></div>`;};
+  const row=q=>{const n=(q.steps||[]).length,g=(q.steps||[]).filter(s=>s&&s.gate).length;
+    return `<div class="pb-lib-row"><button class="pb-card" onclick="pbOpen('${jsq(q.id)}')"><b>${escHtml(q.name||'Untitled')}</b><span class="pb-oc">${escHtml(q.outcome||'No outcome written yet')}</span><span class="pb-meta"><span class="chip">${n} step${n===1?'':'s'}${g?' · '+g+' gate'+(g===1?'':'s'):''}</span><span class="chip">${q.trigger==='repeat'?'Repeats':'One-off'}</span>${q.archived?'<span class="chip">Archived</span>':''}</span></button>${n&&!q.archived?`<button class="btn btn-ghost btn-sm pb-lib-go" onclick="pbTplUse('${jsq(q.id)}')">Start</button>`:''}</div>`;};
+  return `<div class="fu"><div class="page-hd"><div class="page-title"><em>Workflows</em></div></div>
+  <div class="pb-q">What would you like to do?</div>
+  <div class="pb-tiles">${tile(_PB_IC.add,'Create a workflow','Name it, list the steps, say who does what.','pbNewModal()')}${tile(_PB_IC.go,'Start a project','Pick a workflow. Tasks are made for you.','pbHomeStart()')}${tile(_PB_IC.imp,'Improve one',wait?wait+' suggestion'+(wait===1?'':'s')+' waiting from your last retro.':'Edit a workflow, or learn from a finished project.','pbHomeImprove()')}</div>
+  ${run.length?`<div class="pb-sec">Running now</div><div class="pb-rgrid">${run.map(rc).join('')}</div>`:''}
+  <div class="pb-sec" id="pb-lib">Workflow library</div>
+  ${list.length?`<div class="pb-grid">${list.map(row).join('')}</div>`:`<div class="empty"><div class="empty-txt">No Workflows yet.<br>Start from the YouTube example, or write your own.</div><div style="display:flex;gap:8px;justify-content:center;margin-top:12px;flex-wrap:wrap;"><button class="btn btn-acc btn-sm" onclick="pbExample()">Start with the YouTube example</button><button class="btn btn-ghost btn-sm" onclick="pbFinanceStarter()">Quarterly finance review</button></div></div>`}
   ${all.length?`<div style="margin-top:14px;display:flex;gap:8px;flex-wrap:wrap;"><button class="btn btn-ghost btn-xs" onclick="pbExample()">+ Add the YouTube example</button><button class="btn btn-ghost btn-xs" onclick="pbFinanceStarter()">+ Add the quarterly finance review</button>${arch.length?`<button class="btn btn-ghost btn-xs" onclick="pbToggleArch()">${_pbUI.arch?'Hide':'Show'} archived (${arch.length})</button>`:''}</div>`:''}</div>`;
 }
 function _pbMapHtml(p,stat){
@@ -9230,6 +9295,7 @@ function _pbTemplatesHtml(){
    Kept small on purpose: add one line per release and delete the oldest beyond 12 (scripts/infra-check.js fails the release
    if the newest line is not the current PF_BUILD, there are more than 12 lines, a line is over 110 characters, or the file passes 3 KB). */
 const PF_CHANGELOG=[
+  [193,'Workflows home: Create, Start, Improve; running projects with your next step; security audit'],
   [192,'Workflows: arrows move steps, Back in New Workflow, Delete, steps link to Sponsors/Finance, co-working lists'],
   [191,'Phones: full task names, a shorter add-task bar; the edit window has Delete, Reminder, Dependencies, Subtask'],
   [190,'Undated tasks listed under project calendars; search finds workflows; projects get an owner and priority'],
@@ -9241,7 +9307,6 @@ const PF_CHANGELOG=[
   [184,'Start a project is now a full screen: name, optional finish date and who does each step this time'],
   [183,'Workflow projects: dates are yours to set; the finish date is optional and tasks are never dated for you'],
   [182,'Workflow subtasks: add them in the Organiser; a step finishes itself when its last subtask is ticked'],
-  [181,'Workflow steps can have labels; they carry onto the project tasks so the board can filter them'],
 ];
 function _changelogHtml(){
   return '<div class="settings-sec"><div class="settings-ttl">What’s new</div><div class="cl-list">'+PF_CHANGELOG.map(([n,t],i)=>`<div class="cl-row${i===0?' cl-now':''}"><b>${escHtml(n)}</b><span>${escHtml(t)}</span></div>`).join('')+'</div></div>';
