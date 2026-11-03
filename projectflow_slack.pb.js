@@ -2,7 +2,7 @@
 /*
  ProjectFlow Slack (runs on the server, replaces slack_reminders.pb.js)
  ---------------------------------------------------------------------
- * Every five minutes: sends task reminders, "due in 3 days" and the Monday weekly digest to Slack.
+ * Every five minutes: sends task reminders, "due in 3 days", the Monday weekly digest and (when switched on) private messages to Slack.
  * Small endpoints for the Settings screen (signed-in users only): status, send, and the tick queue the app collects.
  * POST /api/pf/slack/interact (Done buttons) and POST /api/pf/slack/events (link previews) are for Slack itself; each is only accepted with a valid Slack signature.
  * The Slack webhook lives in the server's environment (PF_SLACK_WEBHOOK), never in the browser. See SLACK_SERVER.md.
@@ -30,9 +30,9 @@ routerAdd("GET", "/api/pf/slack/status", (e) => {
 routerAdd("POST", "/api/pf/slack/send", (e) => {
   try {
     const L = require(`${__hooks}/pf_slack_lib.js`);
-    let kind = "";
-    try { const b = typeof e.requestInfo === "function" ? e.requestInfo().body : $apis.requestInfo(e).data; kind = String((b || {}).kind || ""); } catch (x) {}
-    const r = L.runtime({ app: $app, http: $http, os: $os, Record: Record }).sendNow(kind, new Date());
+    let kind = "", to = "";
+    try { const b = typeof e.requestInfo === "function" ? e.requestInfo().body : $apis.requestInfo(e).data; kind = String((b || {}).kind || ""); to = String((b || {}).to || ""); } catch (x) {}
+    const r = L.runtime({ app: $app, http: $http, os: $os, Record: Record }).sendNow(kind, new Date(), to);
     return e.json(r.code, { ok: r.ok, error: r.error });
   } catch (err) { return e.json(500, { ok: false, error: "send failed" }); }
 }, _pfAuth());

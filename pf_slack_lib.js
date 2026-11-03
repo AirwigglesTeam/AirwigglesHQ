@@ -78,12 +78,13 @@ function alertOpts(S) {
   else { var r = parseInt(st.alertRate, 10); days = !isNaN(r) && ALERT_DAYS[r] ? ALERT_DAYS[r] : ALERT_DAYS[3]; }   // chosen before release 220, or never chosen: 3 a week
   return { days: days, hour: num(st.alertHour, 0, 23, 9), soon: num(st.alertSoon, 0, 14, 2), overdue: st.alertOverdue !== false, blocked: st.alertBlocked === true, max: num(st.alertMax, 1, 30, 10) };
 }
-function alertParts(S, appUrl, now) {
+function alertParts(S, appUrl, now, only) {   // only: one person's own reminder (for a private message)
   var o = alertOpts(S), today = london(now || new Date()).iso, soon = addDays(today, o.soon), tasks = S.tasks || [], byId = {};
   (S.projects || []).forEach(function (p) { byId[p.id] = p; });
   var byDate = function (a, b) { return a.endDate < b.endDate ? -1 : a.endDate > b.endDate ? 1 : 0; };
-  var lines = ['*\u23F0 ProjectFlow reminder*'], ids = {};
+  var lines = [only ? '*\u23F0 Your ProjectFlow reminder*' : '*\u23F0 ProjectFlow reminder*'], ids = {};
   (S.members || []).forEach(function (m) {
+    if (only && m.id !== only) return;
     var mine = tasks.filter(function (t) { return !t.done && (t.assignees || []).indexOf(m.id) >= 0 && byId[t.projectId]; });
     var od = o.overdue ? mine.filter(function (t) { return t.endDate && t.endDate < today; }).sort(byDate) : [];
     var sn = mine.filter(function (t) { return t.endDate && t.endDate >= today && t.endDate <= soon; }).sort(byDate);
@@ -93,7 +94,7 @@ function alertParts(S, appUrl, now) {
     if (od.length) bit.push('\uD83D\uDD34 ' + od.length + ' overdue');
     if (sn.length) bit.push('\u23F3 ' + sn.length + ' due ' + (o.soon === 0 ? 'today' : 'in the next ' + o.soon + ' day' + (o.soon === 1 ? '' : 's')));
     if (bl.length) bit.push('\uD83D\uDEAB ' + bl.length + ' blocked');
-    lines.push(who + ': ' + bit.join(' \u00B7 '));
+    lines.push((only ? '' : who + ': ') + bit.join(' \u00B7 '));
     od.slice(0, o.max).forEach(function (t) {
       var days = Math.round((Date.parse(today) - Date.parse(t.endDate)) / 864e5);
       lines.push('      \u2022 ' + taskRef(t, byId, appUrl) + ' \u00B7 due ' + fmtD(t.endDate) + ', ' + days + ' day' + (days === 1 ? '' : 's') + ' late');
@@ -234,7 +235,8 @@ function plan(S, sentLog, now, opts) {
     if (isNaN(at.getTime()) || at > now) return;
     var key = 'manual_' + t.id + '_' + r.datetime;
     if (sentLog[key] || r.sent) return;   // r.sent: already sent by an older browser-based version
-    out.push({ key: key, header: 'Reminder', fallback: 'Reminder: ' + t.name, blocks: taskBlocks(S, t, 'Reminder', appUrl, bt) });
+    if (opts.bellChan === false) out.push({ key: key, silent: true });   // the channel copy is switched off: only remember that it was due
+    else out.push({ key: key, header: 'Reminder', fallback: 'Reminder: ' + t.name, blocks: taskBlocks(S, t, 'Reminder', appUrl, bt) });
   });
   // 2. Monday from 08:00 UK: the weekly digest (switch in Settings), once per week
   if (lt.dow === 1 && lt.hour >= 8 && S.settings && S.settings.digestAuto) {
@@ -243,7 +245,7 @@ function plan(S, sentLog, now, opts) {
   }
   // 2b. the team reminder: on the chosen days from the chosen hour (UK time) for 8 hours, once a day; on a Monday the weekly digest already covers it
   var ao = alertOpts(S);
-  if (ao.days.indexOf(lt.dow) >= 0 && lt.hour >= ao.hour && lt.hour < Math.min(24, ao.hour + 8) && !(lt.dow === 1 && S.settings && S.settings.digestAuto)) {
+  if (opts.alertChan !== false && ao.days.indexOf(lt.dow) >= 0 && lt.hour >= ao.hour && lt.hour < Math.min(24, ao.hour + 8) && !(lt.dow === 1 && S.settings && S.settings.digestAuto)) {
     var ak = 'alert_' + lt.iso;
     if (!sentLog[ak]) { var ap = alertParts(S, appUrl, now); if (ap) out.push({ key: ak, text: ap.lines.join('\n'), kind: 'alert', lines: bt ? ap.lines : null, ids: ap.ids }); }
   }
@@ -266,6 +268,60 @@ function plan(S, sentLog, now, opts) {
     if (!sentLog[key]) out.push({ key: key, header: 'Due in 3 Days', fallback: 'Due in 3 days: ' + t.name, blocks: taskBlocks(S, t, 'Due in 3 days', appUrl, bt) });
   });
   return out;
+}
+
+/* Private messages (a bot token is needed). Returns {key, to, ...message} items: each person's own reminder on the chosen days, and the
+   task reminders set with the bell, sent to the people assigned. */
+function planDm(S, sentLog, now, opts) {
+  var out = [], st = (S && S.settings) || {}, lt = london(now), appUrl = opts.appUrl, bt = !!opts.buttons, mem = S.members || [];
+  var okm = function (m) { return m && ID_OK.test(String(m.id)) && idOk(m.slackId); };
+  if (st.alertDm === true) {
+    var ao = alertOpts(S);
+    if (ao.days.indexOf(lt.dow) >= 0 && lt.hour >= ao.hour && lt.hour < Math.min(24, ao.hour + 8)) {
+      mem.forEach(function (m) {
+        if (!okm(m)) return;
+        var key = 'dmalert_' + lt.iso + '_' + m.id;
+        if (sentLog[key]) return;
+        var a = alertParts(S, appUrl, now, m.id);
+        if (a) out.push({ key: key, to: m.slackId, text: a.lines.join('\n'), lines: bt ? a.lines : null, ids: a.ids });
+      });
+    }
+  }
+  if (st.bellDm === true) {
+    (S.tasks || []).forEach(function (t) {
+      var r = t.slackReminder;
+      if (!r || !r.datetime || t.done) return;
+      var at = new Date(r.datetime);
+      if (isNaN(at.getTime()) || at > now || now.getTime() - at.getTime() > 864e5) return;   // due, and not older than a day (a switch turned on later must not send old ones)
+      (t.assignees || []).forEach(function (id) {
+        var m = null; mem.forEach(function (x) { if (x.id === id) m = x; });
+        if (!okm(m) || !ID_OK.test(String(t.id))) return;
+        var key = 'dmmanual_' + t.id + '_' + r.datetime + '_' + m.id;
+        if (!sentLog[key]) out.push({ key: key, to: m.slackId, header: 'Reminder', fallback: 'Reminder: ' + t.name, blocks: taskBlocks(S, t, 'Reminder', appUrl, bt) });
+      });
+    });
+  }
+  return out;
+}
+/* "You were assigned": a person-and-task pair seen for the first time. The first run only remembers what already exists, and pairs are
+   remembered even while the switch is off, so turning it on later never sends a flood about old assignments. */
+function planAssign(S, h, now, opts) {
+  var st = (S && S.settings) || {}, items = [], on = st.assignDm === true && !!h.d.init, nowIso = now.toISOString(), cur = {}, mem = {};
+  (S.members || []).forEach(function (m) { mem[m.id] = m; });
+  (S.tasks || []).forEach(function (t) {
+    if (!t || !ID_OK.test(String(t.id))) return;
+    (t.assignees || []).forEach(function (id) {
+      if (!ID_OK.test(String(id))) return;
+      var k = t.id + ':' + id; cur[k] = 1;
+      if (h.d.p[k]) return;
+      var m = mem[id];
+      if (on && !t.done && m && idOk(m.slackId)) items.push({ asg: true, key: k, to: m.slackId, header: 'Assigned to you', fallback: 'You were assigned: ' + t.name, blocks: taskBlocks(S, t, 'Assigned to you', opts.appUrl, !!opts.buttons) });
+      else h.d.p[k] = nowIso;
+    });
+  });
+  Object.keys(h.d.p).forEach(function (k) { if (!cur[k]) delete h.d.p[k]; });   // unassigned: assigning again later tells them again
+  h.d.init = true;
+  return items;
 }
 
 /* Slack message body for a plan item */
@@ -315,6 +371,27 @@ function runtime(g) {
       var r = g.http.send({ url: webhook, method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), timeout: 10 });
       return { ok: r.statusCode === 200, status: r.statusCode };
     } catch (e) { return { ok: false, status: 0, error: String(e).replace(/https?:\/\/\S*/gi, '[address]').slice(0, 120) }; /* Go errors quote the address (it holds the Slack secret): never keep it */ }
+  }
+  function botToken() { var t = (g.os.getenv('PF_SLACK_BOT_TOKEN') || '').trim(); return /^xox[bp]-[\w-]{10,200}$/.test(t) ? t : ''; }
+  function slackApi(token, method, body) {   // Slack answers 200 even for errors; the reason is in the body. Only the error name is ever kept.
+    try {
+      var r = g.http.send({ url: 'https://slack.com/api/' + method, method: 'POST', headers: { 'Content-Type': 'application/json; charset=utf-8', Authorization: 'Bearer ' + token }, body: JSON.stringify(body), timeout: 8 });
+      var j = {}; try { j = r.json || JSON.parse(String(r.raw || '{}')); } catch (e) {}
+      if (r.statusCode === 200 && j && j.ok === true) return { ok: true };
+      return { ok: false, error: String((j && j.error) || ('status ' + r.statusCode)).replace(/[^\w .:-]/g, '').slice(0, 60) };
+    } catch (e) { return { ok: false, error: 'request failed' }; }
+  }
+  function asgRec() {
+    var rec = find('airwiggles-sr-assigned'), d = {};
+    if (rec) { try { d = JSON.parse(rec.getString('data') || '{}'); } catch (e) { d = {}; } }
+    if (!d || typeof d !== 'object' || Array.isArray(d)) d = {};
+    if (!d.p || typeof d.p !== 'object' || Array.isArray(d.p)) d.p = {};
+    return { rec: rec, d: d };
+  }
+  function saveAsg(h) {
+    if (!h.rec) { h.rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); h.rec.set('workspace', 'airwiggles-sr-assigned'); }
+    h.rec.set('data', JSON.stringify(h.d));
+    if (typeof g.app.save === 'function') g.app.save(h.rec); else db.saveRecord(h.rec);
   }
   function hasSecret() { return !!(g.os.getenv('PF_SLACK_SIGNING_SECRET') || ''); }
   function conf(S) { return config(function (k) { return g.os.getenv(k) || ''; }, S || {}); }
@@ -416,28 +493,58 @@ function runtime(g) {
   function tick(now) {
     now = now || new Date();
     var S = state(); if (!S) return { sent: 0, why: 'no workspace' };
-    var c = conf(S); if (!c.webhook) return { sent: 0, why: 'no webhook' };
+    var c = conf(S), tok = botToken(), st = S.settings || {};
+    var dmOn = !!tok && (st.alertDm === true || st.bellDm === true), ag = tok ? asgRec() : null, agBefore = ag ? JSON.stringify(ag.d) : '';   // without a bot token there is nothing to remember yet: the first run with one only learns what already exists
+    if (!c.webhook && !tok) return { sent: 0, why: 'no webhook' };
     var pend = queuePending(now), und = queuePending(now, 'undo');
     if (Object.keys(pend).length || Object.keys(und).length) S.tasks = (S.tasks || []).map(function (t) { return und[t.id] ? Object.assign({}, t, { done: false }) : pend[t.id] ? Object.assign({}, t, { done: true }) : t; });
-    var h = logRec(), items = plan(S, h.log, now, { appUrl: c.appUrl, buttons: hasSecret() }), sent = 0, dirty = false;
+    var h = logRec(), sent = 0, dirty = false, bt = hasSecret();
+    var items = c.webhook ? plan(S, h.log, now, { appUrl: c.appUrl, buttons: bt, alertChan: st.alertChan !== false, bellChan: st.bellChan !== false }) : [];
     for (var i = 0; i < items.length; i++) {
+      if (items[i].silent) { h.log[items[i].key] = now.toISOString(); dirty = true; continue; }
       var r = deliver(c.webhook, payload(items[i]));
       if (r.ok) { h.log[items[i].key] = now.toISOString(); h.log._lastOk = now.toISOString(); delete h.log._lastErr; sent++; dirty = true; }
       else { h.log._lastErr = now.toISOString() + ' status ' + r.status + (r.error ? ' ' + r.error : ''); dirty = true; break; }   // stop; the next run retries
     }
+    // private messages (at most 15 per run; one that fails is tried again after an hour)
+    var dmSent = 0;
+    if (tok) {
+      var dm = dmOn ? planDm(S, h.log, now, { appUrl: c.appUrl, buttons: bt }) : [];
+      var as = planAssign(S, ag, now, { appUrl: c.appUrl, buttons: bt }), all = dm.concat(as);
+      for (var d = 0; d < all.length && dmSent < 15; d++) {
+        var it = all[d], fk = '_f_' + it.key, ft = Date.parse(h.log[fk] || '');
+        if (!isNaN(ft) && now.getTime() - ft < 3600e3) continue;
+        var dr = slackApi(tok, 'chat.postMessage', Object.assign({ channel: it.to }, payload(it)));
+        if (dr.ok) { if (it.asg) ag.d.p[it.key] = now.toISOString(); else h.log[it.key] = now.toISOString(); delete h.log[fk]; dmSent++; dirty = true; }
+        else { h.log[fk] = now.toISOString(); h.log._dmErr = now.toISOString() + ' ' + dr.error; dirty = true; }
+      }
+      if (JSON.stringify(ag.d) !== agBefore) { try { saveAsg(ag); } catch (e) { return { sent: sent + dmSent, why: 'assignment memory save failed: ' + e }; } }
+    }
     if (trimLog(h.log, now)) dirty = true;
-    if (dirty) { try { saveLog(h); } catch (e) { return { sent: sent, why: 'log save failed: ' + e }; } }
-    return { sent: sent };
+    if (dirty) { try { saveLog(h); } catch (e) { return { sent: sent + dmSent, why: 'log save failed: ' + e }; } }
+    return { sent: sent + dmSent };
   }
   /* what the Settings screen shows: never the webhook itself */
   function status() {
     var S = state() || {}, c = conf(S), h = logRec(), manual = {};
     Object.keys(h.log).forEach(function (k) { var m = /^manual_(.+?)_(\d{4}-.*)$/.exec(k); if (m) manual[m[1]] = m[2]; });   // which task reminders went out (so the reminder window can say so)
-    return { manualSent: manual, configured: !!c.webhook, source: c.source, appUrl: c.appUrl, lastOk: h.log._lastOk || '', lastErr: h.log._lastErr || '', digestAuto: !!(S.settings && S.settings.digestAuto), buttons: hasSecret(), unfurls: hasSecret() && /^xox[bp]-/.test((g.os.getenv('PF_SLACK_BOT_TOKEN') || '').trim()) };
+    return { manualSent: manual, configured: !!c.webhook, source: c.source, appUrl: c.appUrl, lastOk: h.log._lastOk || '', lastErr: h.log._lastErr || '', digestAuto: !!(S.settings && S.settings.digestAuto), buttons: hasSecret(), dms: !!botToken(), dmErr: h.log._dmErr || '', unfurls: hasSecret() && /^xox[bp]-/.test((g.os.getenv('PF_SLACK_BOT_TOKEN') || '').trim()) };
   }
   /* buttons in Settings: kind is "test", "digest" or "alert", nothing else */
-  function sendNow(kind, now) {
+  function sendNow(kind, now, to) {
     now = now || new Date();
+    if (kind === 'dmtest') {   // a private test message to one linked team member
+      var S0 = state() || {}, tk = botToken();
+      if (!tk) return { code: 409, ok: false, error: 'Private messages are not set up on the server yet (PF_SLACK_BOT_TOKEN)' };
+      var ok0 = idOk(to) && (S0.members || []).some(function (m) { return m && m.slackId === to; });
+      if (!ok0) return { code: 400, ok: false, error: 'That Slack ID is not saved for anyone in Team' };
+      var h0 = logRec(), l0 = Date.parse(h0.log._ui || '');
+      if (!isNaN(l0) && now.getTime() - l0 < 10000) return { code: 429, ok: false, error: 'Please wait a few seconds' };
+      var r0 = slackApi(tk, 'chat.postMessage', { channel: to, text: '\u2713 ProjectFlow test: private messages from Airwiggles HQ work.' });
+      h0.log._ui = now.toISOString(); if (!r0.ok) h0.log._dmErr = now.toISOString() + ' ' + r0.error;
+      try { saveLog(h0); } catch (e) {}
+      return { code: r0.ok ? 200 : 502, ok: r0.ok, error: r0.ok ? '' : 'Slack said: ' + r0.error + (r0.error === 'missing_scope' ? ' (add the chat:write and im:write permissions to the Slack app and reinstall it)' : '') };
+    }
     if (kind !== 'test' && kind !== 'digest' && kind !== 'alert') return { code: 400, ok: false, error: 'unknown kind' };
     var S = state() || {}, c = conf(S);
     if (!c.webhook) return { code: 409, ok: false, error: 'Slack is not set up on the server yet' };
