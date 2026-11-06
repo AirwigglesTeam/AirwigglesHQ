@@ -122,29 +122,6 @@ function linkUrl(v) {
 }
 function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''; }
 
-/* The few numbers shown on a guest's project list: how many tasks, how many done, how many late, the next due date, and the project dates.
-   Counted from the same tasks the project screen shows (a whitelist of numbers and dates, nothing else). today = 'YYYY-MM-DD'. */
-function projectStats(S, pid, today) {
-  var out = { total: 0, done: 0, late: 0, next: '', startDate: '', endDate: '' };
-  if (!S || !Array.isArray(S.projects) || !idOk(pid)) return out;
-  var i, p = null;
-  for (i = 0; i < S.projects.length; i++) if (S.projects[i] && S.projects[i].id === pid) { p = S.projects[i]; break; }
-  if (!p) return out;
-  out.startDate = dateOk(p.startDate); out.endDate = dateOk(p.endDate);
-  var all = Array.isArray(S.tasks) ? S.tasks : [], seen = 0;
-  for (i = 0; i < all.length && seen < MAX_TASKS; i++) {
-    var t = all[i];
-    if (!t || t.projectId !== pid || !idOk(t.id)) continue;
-    seen++; out.total++;
-    if (t.done === true) { out.done++; continue; }
-    var e = dateOk(t.endDate);
-    if (!e) continue;
-    if (e < today) out.late++;
-    else if (!out.next || e < out.next) out.next = e;
-  }
-  return out;
-}
-
 /* What a guest is allowed to see of one shared project. A whitelist: every field is picked by name, so anything added to the app
    later (money, links, sponsors, emails, Slack ids, notes) stays on the server until it is added here on purpose.
    Assignees and labels are sent as plain names, never ids, emails or Slack ids. */
@@ -632,9 +609,9 @@ function runtime(g) {
   }
 
   /* guest: who am I and what has been shared with me (names only) */
-  function me(rec, now) {
-    var S = state() || {}, items = [], d = now instanceof Date ? now : new Date(), today = d.toISOString().slice(0, 10);
-    grantsOf(rec).forEach(function (x) { var b = projectBrief(S, x.p); if (b) { var st = projectStats(S, x.p, today); b.total = st.total; b.done = st.done; b.late = st.late; b.next = st.next; b.startDate = st.startDate; b.endDate = st.endDate; items.push(b); } });
+  function me(rec) {
+    var S = state() || {}, items = [];
+    grantsOf(rec).forEach(function (x) { var b = projectBrief(S, x.p); if (b) items.push(b); });
     return { name: rec.getString('name'), email: rec.getString('email'), projects: items };
   }
 
@@ -650,4 +627,4 @@ function runtime(g) {
   return { groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
