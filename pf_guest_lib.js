@@ -19,6 +19,7 @@ var MAX_SHOWN = 600;      // comments sent for one shared project (newest)
 var MAX_PER_HOUR = 20;    // comments one guest can post per hour
 var MAX_QUEUE = 300;      // ticks waiting for the team app, all sources together
 var MAX_MINE = 50;        // ticks one guest can have waiting
+var MAX_LINKS = 40;       // quick links sent for one shared project
 var MAX_UPDATES = 30;     // status updates sent for one shared project (newest first)
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
@@ -109,6 +110,16 @@ function projectBrief(S, pid) {
 
 
 function str(v, n) { return typeof v === 'string' ? v.slice(0, n) : ''; }
+/* A link a guest may be given: https only, ASCII only, a plain host name with a dot (no login in it, no other-language look-alike letters), at most 500 characters.
+   Anything else is dropped, so a guest never gets a javascript:, data: or http: address. */
+function linkUrl(v) {
+  if (typeof v !== 'string') return '';
+  v = v.trim();
+  if (v.length > 500 || !/^https:\/\/[^\s<>"'`\\\x00-\x20\x7f-\uffff]+$/.test(v)) return '';
+  var m = /^https:\/\/([^\/?#]*)/.exec(v);
+  if (!m || !/^[A-Za-z0-9][A-Za-z0-9.-]*\.[A-Za-z0-9-]+(:[0-9]{1,5})?$/.test(m[1])) return '';
+  return v;
+}
 function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''; }
 
 /* What a guest is allowed to see of one shared project. A whitelist: every field is picked by name, so anything added to the app
@@ -145,6 +156,17 @@ function shapeProject(S, pid, pend) {
       canUndo: t.done !== true && !!pend[t.id] && pend[t.id].mine === true   // only the guest who made it can take it back
     });
   }
+  /* quick links: only the ones the team has not switched off for guests (a link is shared unless it says noGuest:true); the Graphics folder and
+     Event page go together (noGuestFixed:true hides both). Name, https address and category only. */
+  var links = [];
+  var addLink = function (nm, url, cat) {
+    var u = linkUrl(url);
+    if (!u || links.length >= MAX_LINKS) return;
+    var c = typeof cat === 'string' ? (lab[cat] || (idOk(cat) && cat.length > 14 ? '' : str(cat, 40))) : '';
+    links.push({ name: str(nm, 60).trim() || u.replace(/^https:\/\//, '').split('/')[0], url: u, category: c });
+  };
+  if (p.noGuestFixed !== true) { addLink('Graphics folder', p.graphicsUrl, ''); addLink('Event page', p.eventUrl, ''); }
+  (Array.isArray(p.quickLinks) ? p.quickLinks : []).forEach(function (q) { if (q && typeof q === 'object' && q.noGuest !== true) addLink(q.name, q.url, q.category); });
   /* status updates (read only for guests): date, first name of the author and the text; newest first */
   var upd = [];
   (Array.isArray(p.updates) ? p.updates : []).forEach(function (u) {
@@ -156,6 +178,7 @@ function shapeProject(S, pid, pend) {
   return {
     project: { id: brief.id, name: brief.name, type: brief.type, description: str(p.description, 600), startDate: dateOk(p.startDate), endDate: dateOk(p.endDate), status: str(p.status, 20) },
     tasks: tasks,
+    links: links,
     updates: upd
   };
 }
@@ -604,4 +627,4 @@ function runtime(g) {
   return { groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
