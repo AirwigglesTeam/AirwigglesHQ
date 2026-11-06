@@ -18,7 +18,8 @@ cronAdd("pf-slack", "*/5 * * * *", () => {
   } catch (err) { console.log("[pf-slack] error: " + err); }
 });
 
-const _pfAuth = () => (typeof $apis.requireAuth === "function" ? $apis.requireAuth() : $apis.requireAdminOrRecordAuth());
+// Team accounts only (and the PocketBase admin): a guest account is signed in too, but must never reach these.
+const _pfAuth = () => (typeof $apis.requireAuth === "function" ? $apis.requireAuth("users", "_superusers") : $apis.requireAdminOrRecordAuth());
 
 routerAdd("GET", "/api/pf/slack/status", (e) => {
   try {
