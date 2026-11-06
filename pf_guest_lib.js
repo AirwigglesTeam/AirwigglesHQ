@@ -11,6 +11,7 @@ var KSTATUS = ['todo', 'blocked', 'in-progress', 'done'];   // the board columns
 var PRIOS = ['High', 'Medium', 'Low'];
 var PHASES = ['Planning', 'Pre-launch', 'Live', 'Post-event'];
 var MAX_TASKS = 3000;     // tasks sent for one shared project
+var MAX_UPDATES = 30;     // status updates sent for one shared project (newest first)
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
 
@@ -106,9 +107,18 @@ function shapeProject(S, pid) {
       labels: names(t.labels, lab, 10), assignees: names(t.assignees, mem, 5)
     });
   }
+  /* status updates (read only for guests): date, first name of the author and the text; newest first */
+  var upd = [];
+  (Array.isArray(p.updates) ? p.updates : []).forEach(function (u) {
+    if (!u || typeof u !== 'object' || !idOk(u.id)) return;
+    upd.push({ id: u.id, d: dateOk(u.d), at: typeof u.at === 'number' && isFinite(u.at) ? u.at : 0, by: str(u.by, 40), text: str(u.text, 1000) });
+  });
+  upd.sort(function (a, b) { return (b.d || '').localeCompare(a.d || '') || (b.at - a.at); });
+  upd = upd.slice(0, MAX_UPDATES);
   return {
     project: { id: brief.id, name: brief.name, type: brief.type, description: str(p.description, 600), startDate: dateOk(p.startDate), endDate: dateOk(p.endDate), status: str(p.status, 20) },
-    tasks: tasks
+    tasks: tasks,
+    updates: upd
   };
 }
 
@@ -218,4 +228,4 @@ function runtime(g) {
   return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me };
 }
 
-module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS };
+module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES };
