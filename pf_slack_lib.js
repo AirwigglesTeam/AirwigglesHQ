@@ -118,6 +118,21 @@ function taskRef(t, byId, appUrl) {   // "<link|name> (project)", escaped for Sl
   return '<' + link(appUrl, 'task', t.id) + '|' + esc(String(t.name || 'Task').slice(0, 80)) + '>' + (pr ? ' (' + esc(String(pr.name || '').slice(0, 40)) + ')' : '');
 }
 
+/* ---- a guest wrote a comment: one channel message with the comment text, @mentioning the people on the task ---- */
+function guestCommentText(S, c, appUrl) {
+  var task = null, pr = null, mem = {};
+  (S.tasks || []).forEach(function (t) { if (t && t.id === c.task) task = t; });
+  (S.projects || []).forEach(function (p) { if (p && task && p.id === task.projectId) pr = p; });
+  (S.members || []).forEach(function (m) { if (m) mem[m.id] = m; });
+  var who = esc(String(c.who || 'A guest').slice(0, 60));
+  var head = '*\uD83D\uDCAC New comment from ' + who + '* (guest)';
+  if (task) head += ' on <' + link(appUrl, 'task', task.id) + '|' + esc(String(task.name || 'Task').slice(0, 80)) + '>' + (pr ? ' (' + esc(String(pr.name || '').slice(0, 40)) + ')' : '');
+  var text = esc(String(c.text || '').slice(0, 500)).replace(/\r?\n/g, '\n> ');
+  var cc = [];
+  if (task) (task.assignees || []).forEach(function (id) { var m = mem[id]; if (m && idOk(m.slackId) && cc.length < 5) cc.push('<@' + m.slackId + '>'); });
+  return head + '\n> ' + text + (cc.length ? '\n' + cc.join(' ') : '');
+}
+
 /* ---- Done buttons. The button carries only the task id; who may press it is decided on the server when it is pressed ---- */
 var ID_OK = /^[\w-]{1,60}$/;
 function doneButton(id) {
@@ -524,6 +539,37 @@ function runtime(g) {
     if (dirty) { try { saveLog(h); } catch (e) { return { sent: sent + dmSent, why: 'log save failed: ' + e }; } }
     return { sent: sent + dmSent };
   }
+  /* guest comments -> the channel. Runs every minute. The first run only learns "now" so old comments are never posted; a comment is
+     marked as sent only after Slack accepted it. Off when Settings > Slack has the switch cleared (guestCommentChan === false). */
+  function commentTick(now) {
+    now = now || new Date();
+    var S = state(); if (!S) return { sent: 0, why: 'no workspace' };
+    var c = conf(S); if (!c.webhook) return { sent: 0, why: 'no webhook' };
+    /* its own small record, so this minute-by-minute job never rewrites the sent-log the five-minute reminders use */
+    var rec = find('airwiggles-sr-cm'), mark = '';
+    if (rec) { try { mark = String((JSON.parse(rec.getString('data') || '{}') || {}).m || ''); } catch (e) { mark = ''; } }
+    function put(m) {
+      if (!rec) { rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); rec.set('workspace', 'airwiggles-sr-cm'); }
+      rec.set('data', JSON.stringify({ m: m }));
+      if (typeof g.app.save === 'function') g.app.save(rec); else db.saveRecord(rec);
+    }
+    if (!/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d/.test(mark)) { try { put(now.toISOString().replace('T', ' ')); } catch (e) {} return { sent: 0, why: 'learned the start time' }; }
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'kind = "guest" && created > {:t}', 'created', 10, 0, { t: mark }); } catch (e) { return { sent: 0 }; }   // no comments collection yet
+    if (!recs.length) return { sent: 0 };
+    var on = !(S.settings && S.settings.guestCommentChan === false), sent = 0, last = '';
+    for (var i = 0; i < recs.length; i++) {
+      var r = recs[i], at = String(r.getString('created') || '');
+      if (on) {
+        var d = deliver(c.webhook, { text: guestCommentText(S, { task: r.getString('task'), who: r.getString('author'), text: r.getString('body') }, c.appUrl) });
+        if (!d.ok) break;   // the next run tries again
+        sent++;
+      }
+      last = at;
+    }
+    if (last) { try { put(last); } catch (e) { return { sent: sent, why: 'marker save failed: ' + e }; } }
+    return { sent: sent };
+  }
   /* what the Settings screen shows: never the webhook itself */
   function status() {
     var S = state() || {}, c = conf(S), h = logRec(), manual = {};
@@ -655,6 +701,6 @@ function runtime(g) {
     }
     return { code: 200 };
   }
-  return { events: events, interact: interact, tick: tick, status: status, sendNow: sendNow, state: state, queueAdd: queueAdd, queueCancel: queueCancel, queueClaim: queueClaim, queueAck: queueAck, queuePending: queuePending };
+  return { commentTick: commentTick, events: events, interact: interact, tick: tick, status: status, sendNow: sendNow, state: state, queueAdd: queueAdd, queueCancel: queueCancel, queueClaim: queueClaim, queueAck: queueAck, queuePending: queuePending };
 }
-module.exports = { unfurlFor: unfurlFor, digestParts: digestParts, alertParts: alertParts, linesToBlocks: linesToBlocks, doneButton: doneButton, runtime: runtime,  esc: esc, idOk: idOk, urlOk: urlOk, appUrlOk: appUrlOk, london: london, weekKey: weekKey, fmtD: fmtD, link: link, digestText: digestText, alertText: alertText, alertOpts: alertOpts, ALERT_DAYS: ALERT_DAYS, taskBlocks: taskBlocks, plan: plan, payload: payload, trimLog: trimLog, config: config, OD_MAX: OD_MAX };
+module.exports = { guestCommentText: guestCommentText, unfurlFor: unfurlFor, digestParts: digestParts, alertParts: alertParts, linesToBlocks: linesToBlocks, doneButton: doneButton, runtime: runtime,  esc: esc, idOk: idOk, urlOk: urlOk, appUrlOk: appUrlOk, london: london, weekKey: weekKey, fmtD: fmtD, link: link, digestText: digestText, alertText: alertText, alertOpts: alertOpts, ALERT_DAYS: ALERT_DAYS, taskBlocks: taskBlocks, plan: plan, payload: payload, trimLog: trimLog, config: config, OD_MAX: OD_MAX };

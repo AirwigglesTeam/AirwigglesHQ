@@ -14,6 +14,7 @@ var MAX_TASKS = 3000;     // tasks sent for one shared project
 var ID_OK = /^[\w-]{1,60}$/;
 var MAX_COMMENT = 1000;   // characters in one comment
 var MAX_PER_TASK = 200;   // comments on one task
+var MAX_FEED = 30;       // guest comments the bell can show
 var MAX_SHOWN = 600;      // comments sent for one shared project (newest)
 var MAX_PER_HOUR = 20;    // comments one guest can post per hour
 var MAX_QUEUE = 300;      // ticks waiting for the team app, all sources together
@@ -150,13 +151,21 @@ function runtime(g) {
   }
 
   function ensureGuests() {
-    try { if (db.findCollectionByNameOrId('guests')) return 'exists'; } catch (e) { /* not there yet: create it below */ }
+    try {
+      var have = db.findCollectionByNameOrId('guests');
+      if (have) {
+        /* guests sign in with a code and have no password: PocketBase's "login from a new location" email would only confuse them */
+        if (have.authAlert && have.authAlert.enabled) { have.authAlert.enabled = false; db.save(have); }
+        return 'exists';
+      }
+    } catch (e) { /* not there yet: create it below */ }
     var c = new g.Collection({
       type: 'auth', name: 'guests',
       listRule: 'id = @request.auth.id', viewRule: 'id = @request.auth.id',
       createRule: null, updateRule: null, deleteRule: null,       // only the server (and the PocketBase admin) can change a guest
       passwordAuth: { enabled: false },
       otp: { enabled: true, duration: 600, length: 6 },
+      authAlert: { enabled: false },
       fields: [
         { type: 'text', name: 'name', max: 60 },
         { type: 'json', name: 'grants', maxSize: 20000 },
@@ -246,7 +255,7 @@ function runtime(g) {
     recs.forEach(function (r) {
       var gr = grantsOf(r);
       if (pid && !gr.some(function (x) { return x.p === pid; })) return;
-      out.push({ id: r.id, email: r.getString('email'), name: r.getString('name'), projects: gr.length });
+      out.push({ id: r.id, email: r.getString('email'), name: r.getString('name'), projects: gr.length, ids: gr.map(function (x) { return x.p; }), at: String(r.getString('created') || '') });
     });
     return { guests: out };
   }
@@ -414,6 +423,12 @@ function runtime(g) {
     var c = addComment(task.projectId, tid, 'team', user.id, name || user.getString('name') || email.split('@')[0], text);
     return { code: 200, body: { ok: true, comment: shapeComment(c) } };
   }
+  /* team: the newest guest comments across all projects (for the bell). Same account rule as the task thread: any team account. */
+  function feed() {
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'kind = "guest"', '-created', MAX_FEED, 0); } catch (e) { recs = []; }
+    return { ok: true, items: recs.map(function (r) { var c = shapeComment(r); c.project = r.getString('project'); return c; }) };
+  }
   /* team (full access): remove a comment */
   function commentDelete(body) {
     var id = body && body.id;
@@ -441,7 +456,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { ensureCollection: ensureCollection, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };

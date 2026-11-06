@@ -18,6 +18,15 @@ cronAdd("pf-slack", "*/5 * * * *", () => {
   } catch (err) { console.log("[pf-slack] error: " + err); }
 });
 
+// Every minute: a guest comment goes to the channel (see pf_slack_lib.js commentTick). Quiet when there is nothing new.
+cronAdd("pf-slack-comments", "* * * * *", () => {
+  try {
+    const L = require(`${__hooks}/pf_slack_lib.js`);
+    const r = L.runtime({ app: $app, http: $http, os: $os, Record: Record }).commentTick(new Date());
+    if (r.sent) console.log("[pf-slack] guest comments sent: " + r.sent);
+  } catch (err) { console.log("[pf-slack] comment error: " + err); }
+});
+
 // Team accounts only (and the PocketBase admin): a guest account is signed in too, but must never reach these.
 const _pfAuth = () => (typeof $apis.requireAuth === "function" ? $apis.requireAuth("users", "_superusers") : $apis.requireAdminOrRecordAuth());
 
