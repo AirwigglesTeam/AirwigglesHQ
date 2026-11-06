@@ -23,7 +23,7 @@ var MAX_LINKS = 40;       // quick links sent for one shared project
 var MAX_UPDATES = 30;     // status updates sent for one shared project (newest first)
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
-var GUEST_TOKEN_SECONDS = 86400;   // how long a guest sign-in lasts
+var GUEST_TOKEN_SECONDS = 1209600;   // how long a guest sign-in lasts: 14 days, renewed each time the guest comes back (release 249; was one day since the 238 audit)
 var MAX_GROUPS = 30;      // saved groups of guests
 var MAX_GROUP_MEMBERS = 100;
 
@@ -78,20 +78,40 @@ function cleanGrants(v) {
   v.forEach(function (g) {
     if (!g || typeof g !== 'object' || !idOk(g.p) || seen[g.p] || out.length >= MAX_GRANTS) return;
     seen[g.p] = 1;
-    out.push({ p: g.p, by: idOk(g.by) ? g.by : '', at: typeof g.at === 'string' ? g.at.slice(0, 30) : '' });
+    var o = { p: g.p, by: idOk(g.by) ? g.by : '', at: typeof g.at === 'string' ? g.at.slice(0, 30) : '' };
+    if (dateOk(g.x)) o.x = g.x;                                   // access ends after this day (release 251)
+    if (typeof g.v === 'string' && /^\d{4}-\d{2}-\d{2}T/.test(g.v)) o.v = g.v.slice(0, 30);   // last time the guest opened this project
+    out.push(o);
   });
   return out;
 }
 
-function hasGrant(grants, pid) { return cleanGrants(grants).some(function (g) { return g.p === pid; }); }
+function todayOf(now) { return (now instanceof Date && !isNaN(now.getTime()) ? now : new Date()).toISOString().slice(0, 10); }
+/* a grant that has an end date stops working the day after it */
+function liveGrants(grants, now) { var t = todayOf(now); return cleanGrants(grants).filter(function (g) { return !g.x || g.x >= t; }); }
+function hasGrant(grants, pid, now) { return liveGrants(grants, now).some(function (g) { return g.p === pid; }); }
 
-function addGrant(grants, pid, by, nowIso) {
+function addGrant(grants, pid, by, nowIso, expires) {
   var list = cleanGrants(grants);
   if (!idOk(pid)) return { ok: false, why: 'bad project', grants: list };
-  if (list.some(function (g) { return g.p === pid; })) return { ok: true, added: false, grants: list };
+  if (list.some(function (g) { return g.p === pid; })) {
+    if (expires !== undefined) list.forEach(function (g) { if (g.p === pid) { if (expires) g.x = expires; else delete g.x; } });   // '' clears the end date
+    return { ok: true, added: false, grants: list };
+  }
   if (list.length >= MAX_GRANTS) return { ok: false, why: 'too many', grants: list };
-  list.push({ p: pid, by: idOk(by) ? by : '', at: String(nowIso || '').slice(0, 30) });
+  var ng = { p: pid, by: idOk(by) ? by : '', at: String(nowIso || '').slice(0, 30) };
+  if (expires) ng.x = expires;
+  list.push(ng);
   return { ok: true, added: true, grants: list };
+}
+
+/* the end date a team member may set: nothing (leave as is), '' (no end date), or a real date from today to two years ahead */
+function expiryOf(v, now) {
+  if (v === undefined || v === null) return { ok: true, val: undefined };
+  if (v === '') return { ok: true, val: '' };
+  var d = dateOk(v), t = todayOf(now);
+  if (!d || isNaN(Date.parse(d + 'T00:00:00Z')) || d < t || Date.parse(d + 'T00:00:00Z') - Date.parse(t + 'T00:00:00Z') > 731 * 864e5) return { ok: false };
+  return { ok: true, val: d };
 }
 
 function removeGrant(grants, pid) {
@@ -121,6 +141,29 @@ function linkUrl(v) {
   return v;
 }
 function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''; }
+
+/* The few numbers shown on a guest's project list: how many tasks, how many done, how many late, the next due date, and the project dates.
+   Counted from the same tasks the project screen shows (a whitelist of numbers and dates, nothing else). today = 'YYYY-MM-DD'. */
+function projectStats(S, pid, today) {
+  var out = { total: 0, done: 0, late: 0, next: '', startDate: '', endDate: '' };
+  if (!S || !Array.isArray(S.projects) || !idOk(pid)) return out;
+  var i, p = null;
+  for (i = 0; i < S.projects.length; i++) if (S.projects[i] && S.projects[i].id === pid) { p = S.projects[i]; break; }
+  if (!p) return out;
+  out.startDate = dateOk(p.startDate); out.endDate = dateOk(p.endDate);
+  var all = Array.isArray(S.tasks) ? S.tasks : [], seen = 0;
+  for (i = 0; i < all.length && seen < MAX_TASKS; i++) {
+    var t = all[i];
+    if (!t || t.projectId !== pid || !idOk(t.id)) continue;
+    seen++; out.total++;
+    if (t.done === true) { out.done++; continue; }
+    var e = dateOk(t.endDate);
+    if (!e) continue;
+    if (e < today) out.late++;
+    else if (!out.next || e < out.next) out.next = e;
+  }
+  return out;
+}
 
 /* What a guest is allowed to see of one shared project. A whitelist: every field is picked by name, so anything added to the app
    later (money, links, sponsors, emails, Slack ids, notes) stays on the server until it is added here on purpose.
@@ -201,8 +244,8 @@ function runtime(g) {
         /* guests sign in with a code and have no password: PocketBase's "login from a new location" email would only confuse them */
         var dirty = false;
         if (have.authAlert && have.authAlert.enabled) { have.authAlert.enabled = false; dirty = true; }
-        /* release 238 audit: a guest sign-in lasts one day (PocketBase's default is seven) */
-        if (have.authToken && have.authToken.duration > GUEST_TOKEN_SECONDS) { have.authToken.duration = GUEST_TOKEN_SECONDS; dirty = true; }
+        /* release 238 audit set a guest sign-in to one day; release 249 sets 14 days (renewed on each visit); PocketBase's default is seven */
+        if (have.authToken && have.authToken.duration !== GUEST_TOKEN_SECONDS) { have.authToken.duration = GUEST_TOKEN_SECONDS; dirty = true; }
         if (dirty) db.save(have);
         return 'exists';
       }
@@ -278,6 +321,7 @@ function runtime(g) {
     try { return db.countRecords('guests'); } catch (e) { return 0; }
   }
   function grantsOf(rec) { return cleanGrants(rec.getString('grants') || '[]'); }
+  function liveOf(rec, now) { return liveGrants(rec.getString('grants') || '[]', now); }
   function putGrants(rec, list) { rec.set('grants', JSON.stringify(list)); db.save(rec); }
 
   /* team: give a guest (made on the spot if new) access to one project */
@@ -296,7 +340,9 @@ function runtime(g) {
       rec.set('name', cleanName(body.name)); rec.set('grants', '[]');
       made = true;
     } else if (!rec.getString('name') && cleanName(body.name)) rec.set('name', cleanName(body.name));
-    var r = addGrant(rec.getString('grants') || '[]', pid, by, now.toISOString());
+    var ex = expiryOf(body.expires, now);
+    if (!ex.ok) return { code: 400, body: { ok: false, error: 'the end date must be a date from today to two years ahead' } };
+    var r = addGrant(rec.getString('grants') || '[]', pid, by, now.toISOString(), ex.val);
     if (!r.ok) return { code: 409, body: { ok: false, error: r.why === 'too many' ? 'this guest already has the most projects allowed' : 'bad project' } };
     putGrants(rec, r.grants);
     return { code: 200, body: { ok: true, id: rec.id, created: made, added: r.added, project: brief } };
@@ -320,7 +366,8 @@ function runtime(g) {
     recs.forEach(function (r) {
       var gr = grantsOf(r);
       if (pid && !gr.some(function (x) { return x.p === pid; })) return;
-      out.push({ id: r.id, email: r.getString('email'), name: r.getString('name'), projects: gr.length, ids: gr.map(function (x) { return x.p; }), at: String(r.getString('created') || '') });
+      var mine = null; gr.forEach(function (x) { if (x.p === pid) mine = x; });
+      out.push({ id: r.id, email: r.getString('email'), name: r.getString('name'), projects: gr.length, ids: gr.map(function (x) { return x.p; }), at: String(r.getString('created') || ''), ends: mine ? (mine.x || '') : '', opened: mine ? (mine.v || '') : '', grants: gr.map(function (x) { return { p: x.p, x: x.x || '', v: x.v || '' }; }) });
     });
     return { guests: out };
   }
@@ -391,10 +438,12 @@ function runtime(g) {
     var brief = projectBrief(S, pid); if (!brief) return { code: 404, body: { ok: false, error: 'project not found' } };
     var gr = null; gLoad().list.forEach(function (x) { if (x.id === gid) gr = x; });
     if (!gr) return { code: 404, body: { ok: false, error: 'group not found' } };
+    var gex = expiryOf(body.expires, now);
+    if (!gex.ok) return { code: 400, body: { ok: false, error: 'the end date must be a date from today to two years ahead' } };
     var added = 0, already = 0, failed = 0;
     gr.members.forEach(function (m) {
       var rec = byId(m); if (!rec) return;
-      var r = addGrant(rec.getString('grants') || '[]', pid, by, now.toISOString());
+      var r = addGrant(rec.getString('grants') || '[]', pid, by, now.toISOString(), gex.val);
       if (!r.ok) { failed++; return; }
       if (r.added) { putGrants(rec, r.grants); added++; } else already++;
     });
@@ -609,10 +658,19 @@ function runtime(g) {
   }
 
   /* guest: who am I and what has been shared with me (names only) */
-  function me(rec) {
-    var S = state() || {}, items = [];
-    grantsOf(rec).forEach(function (x) { var b = projectBrief(S, x.p); if (b) items.push(b); });
+  function me(rec, now) {
+    var S = state() || {}, items = [], d = now instanceof Date ? now : new Date(), today = d.toISOString().slice(0, 10);
+    liveOf(rec, d).forEach(function (x) { var b = projectBrief(S, x.p); if (b) { var st = projectStats(S, x.p, today); b.total = st.total; b.done = st.done; b.late = st.late; b.next = st.next; b.startDate = st.startDate; b.endDate = st.endDate; items.push(b); } });
     return { name: rec.getString('name'), email: rec.getString('email'), projects: items };
+  }
+
+  /* remember when a guest last opened a project (the team sees it in Share and Settings); written at most once every ten minutes per guest and project */
+  function touchOpened(rec, pid) {
+    try {
+      var list = cleanGrants(rec.getString('grants') || '[]'), now = new Date(), hit = false;
+      list.forEach(function (x) { if (x.p === pid && (!x.v || now.getTime() - Date.parse(x.v) > 600000)) { x.v = now.toISOString(); hit = true; } });
+      if (hit) putGrants(rec, list);
+    } catch (e) { /* the page still loads */ }
   }
 
   /* guest: the tasks of one shared project. A project the guest does not have answers exactly like one that does not exist. */
@@ -620,11 +678,11 @@ function runtime(g) {
     var S = state();
     if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
     var out = shapeProject(S, pid, pendingMap(rec.id));
-    if (out) out.comments = commentsOfProject(pid);
+    if (out) { out.comments = commentsOfProject(pid); touchOpened(rec, pid); }
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
   return { groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
