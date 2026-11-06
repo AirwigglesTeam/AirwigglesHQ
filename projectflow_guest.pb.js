@@ -59,7 +59,7 @@ if (typeof onBootstrap === "function") {
   routerAdd("GET", "/api/pf/guest/me", (e) => {
     try {
       const L = require(`${__hooks}/pf_guest_lib.js`);
-      return e.json(200, L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).me(e.auth));
+      return e.json(200, L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).me(e.auth, new Date()));
     } catch (err) { return e.json(500, { ok: false, error: "me failed" }); }
   }, $apis.requireAuth("guests"));
 
