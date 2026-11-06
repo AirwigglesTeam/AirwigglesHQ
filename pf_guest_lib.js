@@ -12,6 +12,10 @@ var PRIOS = ['High', 'Medium', 'Low'];
 var PHASES = ['Planning', 'Pre-launch', 'Live', 'Post-event'];
 var MAX_TASKS = 3000;     // tasks sent for one shared project
 var ID_OK = /^[\w-]{1,60}$/;
+var MAX_COMMENT = 1000;   // characters in one comment
+var MAX_PER_TASK = 200;   // comments on one task
+var MAX_SHOWN = 600;      // comments sent for one shared project (newest)
+var MAX_PER_HOUR = 20;    // comments one guest can post per hour
 var MAX_QUEUE = 300;      // ticks waiting for the team app, all sources together
 var MAX_MINE = 50;        // ticks one guest can have waiting
 var MAX_UPDATES = 30;     // status updates sent for one shared project (newest first)
@@ -29,6 +33,12 @@ function normEmail(v) {
 
 function cleanName(v) {
   return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+}
+
+/* A comment: plain text, control characters out (new lines kept, at most two in a row), trimmed, capped. Shown only as text. */
+function cleanComment(v) {
+  if (typeof v !== 'string') return '';
+  return v.replace(/\r\n?/g, '\n').replace(/[\u0000-\u0008\u000b\u000c\u000e-\u001f\u007f]/g, '').replace(/\n{3,}/g, '\n\n').trim().slice(0, MAX_COMMENT);
 }
 
 /* Who may share: a team account whose page permissions list is empty (empty means every page, as in the app). */
@@ -139,7 +149,7 @@ function runtime(g) {
     } catch (e) { return null; }
   }
 
-  function ensureCollection() {
+  function ensureGuests() {
     try { if (db.findCollectionByNameOrId('guests')) return 'exists'; } catch (e) { /* not there yet: create it below */ }
     var c = new g.Collection({
       type: 'auth', name: 'guests',
@@ -156,6 +166,31 @@ function runtime(g) {
     });
     db.save(c);
     return 'created';
+  }
+  /* comments live in their own collection: no client rule at all, so only the endpoints below (and the PocketBase admin) can read or write */
+  function ensureComments() {
+    try { if (db.findCollectionByNameOrId('pf_comments')) return 'exists'; } catch (e) { /* create it below */ }
+    var c = new g.Collection({
+      type: 'base', name: 'pf_comments',
+      listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
+      fields: [
+        { type: 'text', name: 'project', max: 60 },
+        { type: 'text', name: 'task', max: 60 },
+        { type: 'text', name: 'kind', max: 10 },
+        { type: 'text', name: 'authorId', max: 60 },
+        { type: 'text', name: 'author', max: 60 },
+        { type: 'text', name: 'body', max: 1200 },
+        { type: 'autodate', name: 'created', onCreate: true },
+        { type: 'autodate', name: 'updated', onCreate: true, onUpdate: true }
+      ],
+      indexes: ['CREATE INDEX idx_pfc_task ON pf_comments (task)', 'CREATE INDEX idx_pfc_project ON pf_comments (project)']
+    });
+    db.save(c);
+    return 'created';
+  }
+  function ensureCollection() {
+    var a = ensureGuests(), b = ensureComments();
+    return a === 'created' || b === 'created' ? 'created' : 'exists';
   }
 
   function byEmail(email) {
@@ -310,6 +345,86 @@ function runtime(g) {
     return c.cancelled ? { code: 200, body: { ok: true, cancelled: true } } : { code: 409, body: { ok: false, error: 'applied' } };
   }
 
+  /* ---- comments ---- */
+  function shapeComment(rec) {
+    return { id: rec.id, task: rec.getString('task'), who: str(rec.getString('author'), 60), guest: rec.getString('kind') === 'guest', at: String(rec.getString('created') || ''), text: str(rec.getString('body'), MAX_COMMENT) };
+  }
+  function commentsOfProject(pid) {
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'project = {:p}', '-created', MAX_SHOWN, 0, { p: pid }); } catch (e) { recs = []; }
+    return recs.map(shapeComment).reverse();   // oldest first
+  }
+  function commentsOfTask(tid) {
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'task = {:t}', '-created', MAX_PER_TASK, 0, { t: tid }); } catch (e) { recs = []; }
+    return recs.map(shapeComment).reverse();
+  }
+  function findTask(S, tid) {
+    var all = Array.isArray(S && S.tasks) ? S.tasks : [];
+    for (var i = 0; i < all.length; i++) if (all[i] && all[i].id === tid) return all[i];
+    return null;
+  }
+  function addComment(pid, tid, kind, authorId, author, text) {
+    var rec = new g.Record(db.findCollectionByNameOrId('pf_comments'));
+    rec.set('project', pid); rec.set('task', tid); rec.set('kind', kind); rec.set('authorId', authorId);
+    rec.set('author', cleanName(author) || (kind === 'guest' ? 'Guest' : 'Team')); rec.set('body', text);
+    db.save(rec);
+    return rec;
+  }
+  /* guest: write a comment on a task of a shared project */
+  function guestComment(rec, body, now) {
+    var pid = body && body.project, tid = body && body.task, text = cleanComment(body && body.text);
+    if (!idOk(pid) || !idOk(tid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    if (!text) return { code: 400, body: { ok: false, error: 'write something first' } };
+    var S = state();
+    if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
+    var task = findTask(S, tid);
+    if (!task || task.projectId !== pid) return { code: 404, body: { ok: false, error: 'not found' } };
+    now = now || new Date();
+    var since = new Date(now.getTime() - 3600000).toISOString().replace('T', ' ');
+    var recent = [];
+    try { recent = db.findRecordsByFilter('pf_comments', 'authorId = {:a} && created > {:t}', '-created', MAX_PER_HOUR + 1, 0, { a: rec.id, t: since }); } catch (e) { recent = []; }
+    if (recent.length >= MAX_PER_HOUR) return { code: 429, body: { ok: false, error: 'too many comments in the last hour' } };
+    if (commentsOfTask(tid).length >= MAX_PER_TASK) return { code: 409, body: { ok: false, error: 'this task has the most comments allowed' } };
+    var c = addComment(pid, tid, 'guest', rec.id, rec.getString('name') || String(rec.getString('email')).split('@')[0], text);
+    return { code: 200, body: { ok: true, comment: shapeComment(c) } };
+  }
+  /* team: the thread of one task, and whether its project is shared with anyone (the app shows the section only then) */
+  function teamComments(tid) {
+    if (!idOk(tid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var S = state(), task = S ? findTask(S, tid) : null;
+    if (!task) return { code: 404, body: { ok: false, error: 'not found' } };
+    var shared = false, recs = [];
+    try { recs = db.findRecordsByFilter('guests', 'id != ""', '-created', MAX_GUESTS, 0); } catch (e) { recs = []; }
+    recs.forEach(function (r) { if (!shared && hasGrant(r.getString('grants') || '[]', task.projectId)) shared = true; });
+    return { code: 200, body: { ok: true, shared: shared, items: commentsOfTask(tid) } };
+  }
+  /* team: reply on a task (the author name comes from the team list, never from the request) */
+  function teamComment(user, body) {
+    var tid = body && body.task, text = cleanComment(body && body.text);
+    if (!idOk(tid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    if (!text) return { code: 400, body: { ok: false, error: 'write something first' } };
+    var S = state(), task = S ? findTask(S, tid) : null;
+    if (!task || !idOk(task.projectId)) return { code: 404, body: { ok: false, error: 'not found' } };
+    if (commentsOfTask(tid).length >= MAX_PER_TASK) return { code: 409, body: { ok: false, error: 'this task has the most comments allowed' } };
+    var name = '', email = String(user.getString('email') || '').toLowerCase();
+    (Array.isArray(S.members) ? S.members : []).forEach(function (m) {
+      if (!name && m && (m.pbUserId === user.id || (email && typeof m.email === 'string' && m.email.toLowerCase() === email))) name = str(m.name, 60);
+    });
+    var c = addComment(task.projectId, tid, 'team', user.id, name || user.getString('name') || email.split('@')[0], text);
+    return { code: 200, body: { ok: true, comment: shapeComment(c) } };
+  }
+  /* team (full access): remove a comment */
+  function commentDelete(body) {
+    var id = body && body.id;
+    if (!idOk(id)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var rec = null;
+    try { rec = db.findRecordById('pf_comments', id); } catch (e) { rec = null; }
+    if (!rec) return { code: 404, body: { ok: false, error: 'not found' } };
+    db.delete(rec);
+    return { code: 200, body: { ok: true } };
+  }
+
   /* guest: who am I and what has been shared with me (names only) */
   function me(rec) {
     var S = state() || {}, items = [];
@@ -322,10 +437,11 @@ function runtime(g) {
     var S = state();
     if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
     var out = shapeProject(S, pid, pendingMap(rec.id));
+    if (out) out.comments = commentsOfProject(pid);
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick };
+  return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };

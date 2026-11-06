@@ -6,7 +6,9 @@
    can never read the workspace record: they only get what the endpoints below hand back.
  * Team endpoints (team accounts with full page access only): POST /api/pf/guest/grant, POST /api/pf/guest/revoke, GET /api/pf/guest/list
  * Guest endpoints (a signed-in guest only): GET /api/pf/guest/me, GET /api/pf/guest/project?id=<project> (the tasks of one shared project),
-   POST /api/pf/guest/tick (tick a task, or take back a tick that still waits: the tick is queued and the team app applies it)
+   POST /api/pf/guest/tick (tick a task, or take back a tick that still waits: the tick is queued and the team app applies it),
+   POST /api/pf/guest/comment (write a comment on a task of a shared project; the project answer carries the comments)
+ * Team endpoints for comments: GET /api/pf/guest/comments?task=<task>, POST /api/pf/guest/comment-team, POST /api/pf/guest/comment-del (full access only)
  * Needs pf_guest_lib.js in the same folder and PocketBase 0.23 or newer. On older versions this file does nothing.
  * If this file or the library fails, nothing else in ProjectFlow is affected.
 */
@@ -79,4 +81,45 @@ if (typeof onBootstrap === "function") {
       return e.json(r.code, r.body);
     } catch (err) { return e.json(500, { ok: false, error: "tick failed" }); }
   }, $apis.requireAuth("guests"));
+
+  routerAdd("POST", "/api/pf/guest/comment", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).guestComment(e.auth, body, new Date());
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "comment failed" }); }
+  }, $apis.requireAuth("guests"));
+
+  routerAdd("GET", "/api/pf/guest/comments", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let tid = "";
+      try { tid = String(e.request.url.query().get("task") || ""); } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).teamComments(tid);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "comments failed" }); }
+  }, $apis.requireAuth("users"));
+
+  routerAdd("POST", "/api/pf/guest/comment-team", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).teamComment(e.auth, body);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "comment failed" }); }
+  }, $apis.requireAuth("users"));
+
+  routerAdd("POST", "/api/pf/guest/comment-del", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      if (!L.canShare(e.auth.getString("permissions"))) return e.json(403, { ok: false, error: "not allowed" });
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).commentDelete(body);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "delete failed" }); }
+  }, $apis.requireAuth("users"));
 }
