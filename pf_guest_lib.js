@@ -178,7 +178,20 @@ function runtime(g) {
   }
   /* comments live in their own collection: no client rule at all, so only the endpoints below (and the PocketBase admin) can read or write */
   function ensureComments() {
-    try { if (db.findCollectionByNameOrId('pf_comments')) return 'exists'; } catch (e) { /* create it below */ }
+    try {
+      var have = db.findCollectionByNameOrId('pf_comments');
+      if (have) {
+        /* release 237: comments gained "seen by the team" and "handled" fields; add them to the collection made by earlier releases */
+        var changed = false;
+        [['seenAt', 30], ['handledAt', 30], ['handledBy', 60]].forEach(function (f) {
+          var ex = null;
+          try { ex = have.fields.getByName(f[0]); } catch (e) { ex = null; }
+          if (!ex) { have.fields.add(new g.TextField({ name: f[0], max: f[1] })); changed = true; }
+        });
+        if (changed) db.save(have);
+        return 'exists';
+      }
+    } catch (e) { /* create it below */ }
     var c = new g.Collection({
       type: 'base', name: 'pf_comments',
       listRule: null, viewRule: null, createRule: null, updateRule: null, deleteRule: null,
@@ -189,6 +202,9 @@ function runtime(g) {
         { type: 'text', name: 'authorId', max: 60 },
         { type: 'text', name: 'author', max: 60 },
         { type: 'text', name: 'body', max: 1200 },
+        { type: 'text', name: 'seenAt', max: 30 },
+        { type: 'text', name: 'handledAt', max: 30 },
+        { type: 'text', name: 'handledBy', max: 60 },
         { type: 'autodate', name: 'created', onCreate: true },
         { type: 'autodate', name: 'updated', onCreate: true, onUpdate: true }
       ],
@@ -356,7 +372,7 @@ function runtime(g) {
 
   /* ---- comments ---- */
   function shapeComment(rec) {
-    return { id: rec.id, task: rec.getString('task'), who: str(rec.getString('author'), 60), guest: rec.getString('kind') === 'guest', at: String(rec.getString('created') || ''), text: str(rec.getString('body'), MAX_COMMENT) };
+    return { id: rec.id, task: rec.getString('task'), who: str(rec.getString('author'), 60), guest: rec.getString('kind') === 'guest', at: String(rec.getString('created') || ''), text: str(rec.getString('body'), MAX_COMMENT), seen: !!rec.getString('seenAt'), handled: !!rec.getString('handledAt') };
   }
   function commentsOfProject(pid) {
     var recs = [];
@@ -398,6 +414,38 @@ function runtime(g) {
     var c = addComment(pid, tid, 'guest', rec.id, rec.getString('name') || String(rec.getString('email')).split('@')[0], text);
     return { code: 200, body: { ok: true, comment: shapeComment(c) } };
   }
+  /* the thread as the team sees it. Opening it marks the guests' comments as seen (that is what a guest sees as "Seen by the team").
+     handled: set by a team member with the Handled button; "by" is the name of who did it (shown to the team only). */
+  function teamThread(tid, now) {
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'task = {:t}', '-created', MAX_PER_TASK, 0, { t: tid }); } catch (e) { recs = []; }
+    recs.reverse().forEach(function (r) {
+      if (r.getString('kind') === 'guest' && !r.getString('seenAt')) { try { r.set('seenAt', now.toISOString()); db.save(r); } catch (e) { /* not fatal: it is marked on the next open */ } }
+    });
+    return recs.map(function (r) { var c = shapeComment(r); if (c.handled) c.by = str(r.getString('handledBy'), 60); return c; });
+  }
+  function memberName(S, user) {
+    var name = '', email = String(user.getString('email') || '').toLowerCase();
+    (Array.isArray(S && S.members) ? S.members : []).forEach(function (m) {
+      if (!name && m && (m.pbUserId === user.id || (email && typeof m.email === 'string' && m.email.toLowerCase() === email))) name = str(m.name, 60);
+    });
+    return name || user.getString('name') || email.split('@')[0];
+  }
+  /* team: mark a guest comment Handled (or take it back). Any team account, like replying. */
+  function commentHandled(user, body, now) {
+    var id = body && body.id;
+    if (!idOk(id)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var rec = null;
+    try { rec = db.findRecordById('pf_comments', id); } catch (e) { rec = null; }
+    if (!rec || rec.getString('kind') !== 'guest') return { code: 404, body: { ok: false, error: 'not found' } };
+    now = now || new Date();
+    var on = !(body && body.handled === false);
+    if (on) { rec.set('handledAt', now.toISOString()); rec.set('handledBy', memberName(state() || {}, user)); if (!rec.getString('seenAt')) rec.set('seenAt', now.toISOString()); }
+    else { rec.set('handledAt', ''); rec.set('handledBy', ''); }
+    db.save(rec);
+    var c = shapeComment(rec); if (c.handled) c.by = str(rec.getString('handledBy'), 60);
+    return { code: 200, body: { ok: true, comment: c } };
+  }
   /* team: the thread of one task, and whether its project is shared with anyone (the app shows the section only then) */
   function teamComments(tid) {
     if (!idOk(tid)) return { code: 400, body: { ok: false, error: 'bad request' } };
@@ -406,7 +454,7 @@ function runtime(g) {
     var shared = false, recs = [];
     try { recs = db.findRecordsByFilter('guests', 'id != ""', '-created', MAX_GUESTS, 0); } catch (e) { recs = []; }
     recs.forEach(function (r) { if (!shared && hasGrant(r.getString('grants') || '[]', task.projectId)) shared = true; });
-    return { code: 200, body: { ok: true, shared: shared, items: commentsOfTask(tid) } };
+    return { code: 200, body: { ok: true, shared: shared, items: teamThread(tid, new Date()) } };
   }
   /* team: reply on a task (the author name comes from the team list, never from the request) */
   function teamComment(user, body) {
@@ -416,11 +464,7 @@ function runtime(g) {
     var S = state(), task = S ? findTask(S, tid) : null;
     if (!task || !idOk(task.projectId)) return { code: 404, body: { ok: false, error: 'not found' } };
     if (commentsOfTask(tid).length >= MAX_PER_TASK) return { code: 409, body: { ok: false, error: 'this task has the most comments allowed' } };
-    var name = '', email = String(user.getString('email') || '').toLowerCase();
-    (Array.isArray(S.members) ? S.members : []).forEach(function (m) {
-      if (!name && m && (m.pbUserId === user.id || (email && typeof m.email === 'string' && m.email.toLowerCase() === email))) name = str(m.name, 60);
-    });
-    var c = addComment(task.projectId, tid, 'team', user.id, name || user.getString('name') || email.split('@')[0], text);
+    var c = addComment(task.projectId, tid, 'team', user.id, memberName(S, user), text);
     return { code: 200, body: { ok: true, comment: shapeComment(c) } };
   }
   /* team: the newest guest comments across all projects (for the bell). Same account rule as the task thread: any team account. */
@@ -456,7 +500,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { ensureCollection: ensureCollection, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
 module.exports = { MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
