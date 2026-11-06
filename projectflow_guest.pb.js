@@ -5,7 +5,8 @@
  * On start it makes sure a separate `guests` collection exists. Guests sign in with a one-time code sent by email and
    can never read the workspace record: they only get what the endpoints below hand back.
  * Team endpoints (team accounts with full page access only): POST /api/pf/guest/grant, POST /api/pf/guest/revoke, GET /api/pf/guest/list
- * Guest endpoints (a signed-in guest only): GET /api/pf/guest/me, GET /api/pf/guest/project?id=<project> (the tasks of one shared project)
+ * Guest endpoints (a signed-in guest only): GET /api/pf/guest/me, GET /api/pf/guest/project?id=<project> (the tasks of one shared project),
+   POST /api/pf/guest/tick (tick a task, or take back a tick that still waits: the tick is queued and the team app applies it)
  * Needs pf_guest_lib.js in the same folder and PocketBase 0.23 or newer. On older versions this file does nothing.
  * If this file or the library fails, nothing else in ProjectFlow is affected.
 */
@@ -67,5 +68,15 @@ if (typeof onBootstrap === "function") {
       const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).project(e.auth, pid);
       return e.json(r.code, r.body);
     } catch (err) { return e.json(500, { ok: false, error: "project failed" }); }
+  }, $apis.requireAuth("guests"));
+
+  routerAdd("POST", "/api/pf/guest/tick", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).tick(e.auth, body, new Date());
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "tick failed" }); }
   }, $apis.requireAuth("guests"));
 }

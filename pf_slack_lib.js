@@ -450,7 +450,7 @@ function runtime(g) {
         var c = Date.parse(x.claimedAt || '');
         if (!isNaN(c) && now.getTime() - c < 120000) return;
         x.claimedAt = now.toISOString();
-        out.push({ id: x.id, kind: x.kind === 'undo' ? 'undo' : 'done', taskId: x.taskId, memberId: x.memberId, slackId: x.slackId, at: x.at });
+        out.push({ id: x.id, kind: x.kind === 'undo' ? 'undo' : 'done', taskId: x.taskId, memberId: x.memberId, slackId: x.slackId, at: x.at, via: x.via === 'guest' ? 'guest' : '', who: typeof x.who === 'string' ? x.who.slice(0, 60) : '' });
       });
       if (out.length) qSave(h, save, t);
       return out;

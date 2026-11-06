@@ -11,6 +11,9 @@ var KSTATUS = ['todo', 'blocked', 'in-progress', 'done'];   // the board columns
 var PRIOS = ['High', 'Medium', 'Low'];
 var PHASES = ['Planning', 'Pre-launch', 'Live', 'Post-event'];
 var MAX_TASKS = 3000;     // tasks sent for one shared project
+var ID_OK = /^[\w-]{1,60}$/;
+var MAX_QUEUE = 300;      // ticks waiting for the team app, all sources together
+var MAX_MINE = 50;        // ticks one guest can have waiting
 var MAX_UPDATES = 30;     // status updates sent for one shared project (newest first)
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
@@ -79,7 +82,8 @@ function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(
 /* What a guest is allowed to see of one shared project. A whitelist: every field is picked by name, so anything added to the app
    later (money, links, sponsors, emails, Slack ids, notes) stays on the server until it is added here on purpose.
    Assignees and labels are sent as plain names, never ids, emails or Slack ids. */
-function shapeProject(S, pid) {
+function shapeProject(S, pid, pend) {
+  pend = pend || {};
   var brief = projectBrief(S, pid);
   if (!brief) return null;
   var p = null, i;
@@ -104,7 +108,9 @@ function shapeProject(S, pid) {
       priority: PRIOS.indexOf(t.priority) >= 0 ? t.priority : '',
       phase: PHASES.indexOf(t.phase) >= 0 ? t.phase : '',
       startDate: dateOk(t.startDate), endDate: dateOk(t.endDate),
-      labels: names(t.labels, lab, 10), assignees: names(t.assignees, mem, 5)
+      labels: names(t.labels, lab, 10), assignees: names(t.assignees, mem, 5),
+      pending: t.done !== true && !!pend[t.id],            // a tick from a guest or Slack that the team app has not applied yet
+      canUndo: t.done !== true && !!pend[t.id] && pend[t.id].mine === true   // only the guest who made it can take it back
     });
   }
   /* status updates (read only for guests): date, first name of the author and the text; newest first */
@@ -210,6 +216,100 @@ function runtime(g) {
     return { guests: out };
   }
 
+
+  /* ---- ticks: a guest never edits a task. The tick waits in the same server-only queue that Slack ticks use (record
+     airwiggles-sr-done); the team app completes it with its own code (recurring tasks, blockers, parents and Workflows behave as
+     when the team ticks). Queue changes run inside a database transaction. ---- */
+  var QWS = 'airwiggles-sr-done', LEASE_MS = 120000;
+  function qtx(fn) {
+    var last;
+    for (var i = 0; i < 4; i++) {
+      try {
+        var out;
+        var body = function (t) {
+          var find = function (ws) { try { return t.findFirstRecordByFilter('workspace_state', 'workspace = "' + ws + '"'); } catch (e) { return null; } };
+          var save = function (rec) { if (typeof t.save === 'function') t.save(rec); else t.saveRecord(rec); };
+          out = fn(find, save, t);
+        };
+        if (typeof db.runInTransaction === 'function') db.runInTransaction(body); else db.dao().runInTransaction(body);
+        return out;
+      } catch (e) { last = e; }
+    }
+    throw last;
+  }
+  function qLoad(find, now) {
+    var rec = find(QWS), q = {};
+    if (rec) { try { q = JSON.parse(rec.getString('data') || '{}'); } catch (e) { q = {}; } }
+    if (!q || !Array.isArray(q.items)) q = { items: [] };
+    var cut = now.getTime() - 14 * 864e5;
+    q.items = q.items.filter(function (x) { return x && ID_OK.test(String(x.id)) && ID_OK.test(String(x.taskId)) && Date.parse(x.at) > cut; });
+    return { rec: rec, q: q };
+  }
+  function qSave(h, save, t) {
+    if (!h.rec) { h.rec = new g.Record(t.findCollectionByNameOrId('workspace_state')); h.rec.set('workspace', QWS); }
+    h.rec.set('data', JSON.stringify(h.q));
+    save(h.rec);
+  }
+  /* which tasks have a tick waiting, and whether this guest made it */
+  function pendingMap(guestId) {
+    var out = {};
+    try {
+      var rec = db.findFirstRecordByFilter('workspace_state', 'workspace = "' + QWS + '"');
+      var q = JSON.parse(rec.getString('data') || '{}');
+      (Array.isArray(q.items) ? q.items : []).forEach(function (x) {
+        if (x && ID_OK.test(String(x.taskId)) && (x.kind || 'done') === 'done') out[x.taskId] = { mine: x.via === 'guest' && x.memberId === guestId };
+      });
+    } catch (e) { /* no queue yet */ }
+    return out;
+  }
+  function blockersOf(S, t) {
+    var names = [], ids = Array.isArray(t.blockedBy) ? t.blockedBy : [];
+    (Array.isArray(S.tasks) ? S.tasks : []).forEach(function (x) {
+      if (x && ids.indexOf(x.id) >= 0 && x.done !== true && names.length < 3) names.push(str(x.name, 80));
+    });
+    return names;
+  }
+  /* guest: tick a task (done:true) or take back a tick that still waits (done:false) */
+  function tick(rec, body, now) {
+    var pid = body && body.project, tid = body && body.task, want = !(body && body.done === false);
+    if (!idOk(pid) || !idOk(tid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var S = state();
+    if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
+    var task = null, all = Array.isArray(S.tasks) ? S.tasks : [];
+    for (var i = 0; i < all.length; i++) if (all[i] && all[i].id === tid) { task = all[i]; break; }
+    if (!task || task.projectId !== pid) return { code: 404, body: { ok: false, error: 'not found' } };
+    now = now || new Date();
+    if (want) {
+      if (task.done === true) return { code: 200, body: { ok: true, already: true } };
+      var by = blockersOf(S, task);
+      if (by.length) return { code: 409, body: { ok: false, error: 'blocked', by: by } };
+      var r = qtx(function (find, save, t) {
+        var h = qLoad(find, now), mine = 0;
+        for (var k = 0; k < h.q.items.length; k++) {
+          var x = h.q.items[k];
+          if (x.taskId === tid && (x.kind || 'done') === 'done') return { added: false };
+          if (x.via === 'guest' && x.memberId === rec.id) mine++;
+        }
+        if (h.q.items.length >= MAX_QUEUE || mine >= MAX_MINE) return { full: true };
+        h.q.items.push({ id: 'q' + now.getTime().toString(36) + Math.floor(Math.random() * 1679616).toString(36), kind: 'done', taskId: tid, memberId: rec.id, slackId: '', via: 'guest', who: cleanName(rec.getString('name') || rec.getString('email')).slice(0, 60), at: now.toISOString() });
+        qSave(h, save, t);
+        return { added: true };
+      });
+      if (r.full) return { code: 429, body: { ok: false, error: 'too many ticks are waiting; try again in a little while' } };
+      return { code: 200, body: { ok: true, pending: true } };
+    }
+    var c = qtx(function (find, save, t) {
+      var h = qLoad(find, now), hit = false, keep = [];
+      h.q.items.forEach(function (x) {
+        var cl = Date.parse(x.claimedAt || '');
+        if (x.taskId === tid && (x.kind || 'done') === 'done' && x.via === 'guest' && x.memberId === rec.id && (isNaN(cl) || now.getTime() - cl >= LEASE_MS)) hit = true; else keep.push(x);
+      });
+      if (hit) { h.q.items = keep; qSave(h, save, t); }
+      return { cancelled: hit };
+    });
+    return c.cancelled ? { code: 200, body: { ok: true, cancelled: true } } : { code: 409, body: { ok: false, error: 'applied' } };
+  }
+
   /* guest: who am I and what has been shared with me (names only) */
   function me(rec) {
     var S = state() || {}, items = [];
@@ -221,11 +321,11 @@ function runtime(g) {
   function project(rec, pid) {
     var S = state();
     if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
-    var out = shapeProject(S, pid);
+    var out = shapeProject(S, pid, pendingMap(rec.id));
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me };
+  return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick };
 }
 
-module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES };
+module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
