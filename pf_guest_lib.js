@@ -22,6 +22,9 @@ var MAX_MINE = 50;        // ticks one guest can have waiting
 var MAX_UPDATES = 30;     // status updates sent for one shared project (newest first)
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
+var GUEST_TOKEN_SECONDS = 86400;   // how long a guest sign-in lasts
+var MAX_GROUPS = 30;      // saved groups of guests
+var MAX_GROUP_MEMBERS = 100;
 
 function idOk(v) { return typeof v === 'string' && ID_OK.test(v) && v !== '__proto__' && v !== 'constructor' && v !== 'prototype'; }
 
@@ -34,6 +37,24 @@ function normEmail(v) {
 
 function cleanName(v) {
   return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 60) : '';
+}
+
+/* Saved groups of guests: [{id, name, members:[guest id]}]. Kept in one server-only record. A group is only a shortcut for sharing:
+   it never grants anything by itself, so removing someone from a group does not touch what they can see. */
+function cleanGroupName(v) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f<>]/g, '').replace(/\s+/g, ' ').trim().slice(0, 40) : ''; }
+function cleanGroups(v) {
+  if (typeof v === 'string') { try { v = JSON.parse(v); } catch (e) { v = []; } }
+  if (!Array.isArray(v)) return [];
+  var seen = Object.create(null), out = [];
+  v.forEach(function (gr) {
+    if (!gr || typeof gr !== 'object' || !idOk(gr.id) || seen[gr.id] || out.length >= MAX_GROUPS) return;
+    var name = cleanGroupName(gr.name); if (!name) return;
+    seen[gr.id] = 1;
+    var ms = [], ms2 = Object.create(null);
+    (Array.isArray(gr.members) ? gr.members : []).forEach(function (m) { if (idOk(m) && !ms2[m] && ms.length < MAX_GROUP_MEMBERS) { ms2[m] = 1; ms.push(m); } });
+    out.push({ id: gr.id, name: name, members: ms });
+  });
+  return out;
 }
 
 /* A comment: plain text, control characters out (new lines kept, at most two in a row), trimmed, capped. Shown only as text. */
@@ -155,7 +176,11 @@ function runtime(g) {
       var have = db.findCollectionByNameOrId('guests');
       if (have) {
         /* guests sign in with a code and have no password: PocketBase's "login from a new location" email would only confuse them */
-        if (have.authAlert && have.authAlert.enabled) { have.authAlert.enabled = false; db.save(have); }
+        var dirty = false;
+        if (have.authAlert && have.authAlert.enabled) { have.authAlert.enabled = false; dirty = true; }
+        /* release 238 audit: a guest sign-in lasts one day (PocketBase's default is seven) */
+        if (have.authToken && have.authToken.duration > GUEST_TOKEN_SECONDS) { have.authToken.duration = GUEST_TOKEN_SECONDS; dirty = true; }
+        if (dirty) db.save(have);
         return 'exists';
       }
     } catch (e) { /* not there yet: create it below */ }
@@ -166,6 +191,7 @@ function runtime(g) {
       passwordAuth: { enabled: false },
       otp: { enabled: true, duration: 600, length: 6 },
       authAlert: { enabled: false },
+      authToken: { duration: GUEST_TOKEN_SECONDS },
       fields: [
         { type: 'text', name: 'name', max: 60 },
         { type: 'json', name: 'grants', maxSize: 20000 },
@@ -276,6 +302,81 @@ function runtime(g) {
     return { guests: out };
   }
 
+
+  /* ---- saved groups (team, full access) ---- */
+  var GWS = 'airwiggles-sr-groups';
+  function gLoad() {
+    var rec = null, list = [];
+    try { rec = db.findFirstRecordByFilter('workspace_state', 'workspace = "' + GWS + '"'); } catch (e) { rec = null; }
+    if (rec) { try { list = cleanGroups(rec.getString('data') || '[]'); } catch (e) { list = []; } }
+    return { rec: rec, list: list };
+  }
+  function gSave(h) {
+    if (!h.rec) { h.rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); h.rec.set('workspace', GWS); }
+    h.rec.set('data', JSON.stringify(h.list));
+    db.save(h.rec);
+  }
+  function allGuests() {
+    var recs = [], map = Object.create(null);
+    try { recs = db.findRecordsByFilter('guests', 'id != ""', '-created', MAX_GUESTS, 0); } catch (e) { recs = []; }
+    recs.forEach(function (r) { map[r.id] = r; });
+    return map;
+  }
+  function groupShape(gr, map) {
+    return { id: gr.id, name: gr.name, members: gr.members.filter(function (id) { return map[id]; }).map(function (id) { return { id: id, email: map[id].getString('email'), name: map[id].getString('name') }; }) };
+  }
+  function groupList() {
+    var h = gLoad(), map = allGuests();
+    return { ok: true, groups: h.list.map(function (gr) { return groupShape(gr, map); }) };
+  }
+  function groupSave(body) {
+    var name = cleanGroupName(body && body.name);
+    if (!name) return { code: 400, body: { ok: false, error: 'a name is needed' } };
+    var h = gLoad(), map = allGuests(), id = body && body.id, gr = null;
+    if (id !== undefined && id !== null && id !== '') {
+      if (!idOk(id)) return { code: 400, body: { ok: false, error: 'bad request' } };
+      h.list.forEach(function (x) { if (x.id === id) gr = x; });
+      if (!gr) return { code: 404, body: { ok: false, error: 'group not found' } };
+    } else {
+      if (h.list.length >= MAX_GROUPS) return { code: 409, body: { ok: false, error: 'too many groups' } };
+      gr = { id: 'gr' + g.security.randomString(10).toLowerCase(), name: name, members: [] };
+      h.list.push(gr);
+    }
+    gr.name = name;
+    if (body && Array.isArray(body.members)) {
+      var ms = [], seen = Object.create(null);
+      body.members.forEach(function (m) { if (idOk(m) && map[m] && !seen[m] && ms.length < MAX_GROUP_MEMBERS) { seen[m] = 1; ms.push(m); } });
+      gr.members = ms;
+    }
+    gSave(h);
+    return { code: 200, body: { ok: true, group: groupShape(gr, map) } };
+  }
+  function groupDelete(body) {
+    var id = body && body.id;
+    if (!idOk(id)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var h = gLoad(), n = h.list.length;
+    h.list = h.list.filter(function (x) { return x.id !== id; });
+    if (h.list.length === n) return { code: 404, body: { ok: false, error: 'group not found' } };
+    gSave(h);
+    return { code: 200, body: { ok: true } };
+  }
+  /* give every member of a group one project (each guest keeps their own list; the group stays only a shortcut) */
+  function grantGroup(by, body, now) {
+    var gid = body && body.group, pid = body && body.project;
+    if (!idOk(gid) || !idOk(pid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var S = state(); if (!S) return { code: 503, body: { ok: false, error: 'workspace not found' } };
+    var brief = projectBrief(S, pid); if (!brief) return { code: 404, body: { ok: false, error: 'project not found' } };
+    var gr = null; gLoad().list.forEach(function (x) { if (x.id === gid) gr = x; });
+    if (!gr) return { code: 404, body: { ok: false, error: 'group not found' } };
+    var added = 0, already = 0, failed = 0;
+    gr.members.forEach(function (m) {
+      var rec = byId(m); if (!rec) return;
+      var r = addGrant(rec.getString('grants') || '[]', pid, by, now.toISOString());
+      if (!r.ok) { failed++; return; }
+      if (r.added) { putGrants(rec, r.grants); added++; } else already++;
+    });
+    return { code: 200, body: { ok: true, added: added, already: already, failed: failed, project: brief } };
+  }
 
   /* ---- ticks: a guest never edits a task. The tick waits in the same server-only queue that Slack ticks use (record
      airwiggles-sr-done); the team app completes it with its own code (recurring tasks, blockers, parents and Workflows behave as
@@ -500,7 +601,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
