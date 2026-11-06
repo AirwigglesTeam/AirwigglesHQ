@@ -1,6 +1,6 @@
 name: Deploy to Droplet
 
-# Upload any of these four files to the main folder of the repository on GitHub and they are checked, sent to the server and
+# Upload any of these six files to the main folder of the repository on GitHub and they are checked, sent to the server and
 # installed. Only the files that changed in that upload are sent. If PocketBase reports an error after a server file is
 # installed, the previous files are put back automatically and this run turns red.
 on:
@@ -12,6 +12,8 @@ on:
       - 'pf_slack_lib.js'
       - 'projectflow_slack.pb.js'
       - 'projectflow_guard.pb.js'
+      - 'pf_guest_lib.js'
+      - 'projectflow_guest.pb.js'
 
 jobs:
   deploy:
@@ -29,12 +31,12 @@ jobs:
           mkdir -p staged
           before="${{ github.event.before }}"
           if [ -z "$before" ] || [ "$before" = "0000000000000000000000000000000000000000" ]; then
-            changed="index.html pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js"
+            changed="index.html pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js pf_guest_lib.js projectflow_guest.pb.js"
           else
             changed="$(git diff --name-only "$before" "${{ github.sha }}")"
           fi
           n=0
-          for f in index.html pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js; do
+          for f in index.html pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js pf_guest_lib.js projectflow_guest.pb.js; do
             if echo "$changed" | tr ' ' '\n' | grep -qx "$f" && [ -f "$f" ]; then
               cp "$f" "staged/$f"; n=$((n+1)); echo "will send: $f"
             fi
@@ -54,6 +56,7 @@ jobs:
             echo "ok: $f"
           done
           if [ -f pf_slack_lib.js ]; then node -e "require('./pf_slack_lib.js')"; fi
+          if [ -f pf_guest_lib.js ]; then node -e "require('./pf_guest_lib.js')"; fi
           if [ -f index.html ]; then
             size=$(wc -c < index.html)
             if [ "$size" -lt 500000 ] || ! grep -q "PF_BUILD" index.html || ! grep -q "</html>" index.html; then echo "::error::index.html does not look like a complete ProjectFlow page"; exit 1; fi
@@ -87,7 +90,7 @@ jobs:
             BK="$PB/backups/$STAMP"
             mkdir -p "$BK"
             HOOKS=0
-            for f in pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js; do
+            for f in pf_slack_lib.js pf_guest_lib.js projectflow_slack.pb.js projectflow_guard.pb.js projectflow_guest.pb.js; do
               if [ -f "$IN/$f" ]; then
                 if [ -f "$PB/pb_hooks/$f" ]; then cp "$PB/pb_hooks/$f" "$BK/$f"; else : > "$BK/$f.new"; fi
                 HOOKS=1
@@ -96,7 +99,7 @@ jobs:
             if [ -f "$IN/index.html" ] && [ -f "$PB/pb_public/index.html" ]; then cp "$PB/pb_public/index.html" "$BK/index.html"; fi
             START="$(date '+%Y-%m-%d %H:%M:%S')"
             # the library first, then the hook files that use it
-            for f in pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js; do
+            for f in pf_slack_lib.js pf_guest_lib.js projectflow_slack.pb.js projectflow_guard.pb.js projectflow_guest.pb.js; do
               if [ -f "$IN/$f" ]; then cp "$IN/$f" "$PB/pb_hooks/$f"; echo "installed $f"; fi
             done
             if [ -f "$IN/index.html" ]; then cp "$IN/index.html" "$PB/pb_public/index.html"; echo "installed index.html"; fi
@@ -107,7 +110,7 @@ jobs:
               HEALTH=0; curl -fs -m 5 http://127.0.0.1:8090/api/health >/dev/null && HEALTH=1
               if [ -n "$BAD" ] || [ "$HEALTH" != "1" ]; then
                 echo "PocketBase reported a problem after the update:"; echo "$BAD" | head -n 6
-                for f in pf_slack_lib.js projectflow_slack.pb.js projectflow_guard.pb.js; do
+                for f in pf_slack_lib.js pf_guest_lib.js projectflow_slack.pb.js projectflow_guard.pb.js projectflow_guest.pb.js; do
                   if [ -f "$BK/$f" ]; then cp "$BK/$f" "$PB/pb_hooks/$f"; echo "put back $f"; fi
                   if [ -f "$BK/$f.new" ]; then rm -f "$PB/pb_hooks/$f"; echo "removed $f (it did not exist before)"; fi
                 done
