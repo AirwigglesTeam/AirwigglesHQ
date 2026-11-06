@@ -6,6 +6,11 @@
 'use strict';
 
 var ID_OK = /^[\w-]{1,60}$/;
+var TYPES = ['event', 'ongoing', 'improvement', 'admin'];   // the app's project kinds (PROJ_TYPES)
+var KSTATUS = ['todo', 'blocked', 'in-progress', 'done'];   // the board columns
+var PRIOS = ['High', 'Medium', 'Low'];
+var PHASES = ['Planning', 'Pre-launch', 'Live', 'Post-event'];
+var MAX_TASKS = 3000;     // tasks sent for one shared project
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
 
@@ -61,9 +66,50 @@ function projectBrief(S, pid) {
   if (!S || !Array.isArray(S.projects) || !idOk(pid)) return null;
   for (var i = 0; i < S.projects.length; i++) {
     var p = S.projects[i];
-    if (p && p.id === pid) return { id: p.id, name: String(p.name == null ? '' : p.name).slice(0, 120), type: String(p.type == null ? '' : p.type).slice(0, 20) };
+    if (p && p.id === pid) return { id: p.id, name: String(p.name == null ? '' : p.name).slice(0, 120), type: TYPES.indexOf(p.type) >= 0 ? p.type : 'event' };   // same rule as the app: no type means an event
   }
   return null;
+}
+
+
+function str(v, n) { return typeof v === 'string' ? v.slice(0, n) : ''; }
+function dateOk(v) { return typeof v === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(v) ? v : ''; }
+
+/* What a guest is allowed to see of one shared project. A whitelist: every field is picked by name, so anything added to the app
+   later (money, links, sponsors, emails, Slack ids, notes) stays on the server until it is added here on purpose.
+   Assignees and labels are sent as plain names, never ids, emails or Slack ids. */
+function shapeProject(S, pid) {
+  var brief = projectBrief(S, pid);
+  if (!brief) return null;
+  var p = null, i;
+  for (i = 0; i < S.projects.length; i++) if (S.projects[i] && S.projects[i].id === pid) { p = S.projects[i]; break; }
+  var mem = Object.create(null), lab = Object.create(null);
+  (Array.isArray(S.members) ? S.members : []).forEach(function (m) { if (m && idOk(m.id)) mem[m.id] = str(m.name, 60); });
+  (Array.isArray(S.labels) ? S.labels : []).forEach(function (l) { if (l && idOk(l.id)) lab[l.id] = str(l.name, 40); });
+  var names = function (ids, map, max) {
+    var out = [];
+    (Array.isArray(ids) ? ids : []).forEach(function (x) { if (out.length < max && typeof x === 'string' && map[x]) out.push(map[x]); });
+    return out;
+  };
+  var tasks = [], all = Array.isArray(S.tasks) ? S.tasks : [];
+  for (i = 0; i < all.length && tasks.length < MAX_TASKS; i++) {
+    var t = all[i];
+    if (!t || t.projectId !== pid || !idOk(t.id)) continue;
+    tasks.push({
+      id: t.id, name: str(t.name, 200), description: str(t.description, 2000),
+      parentId: idOk(t.parentId) ? t.parentId : '',
+      done: t.done === true,
+      kStatus: KSTATUS.indexOf(t.kStatus) >= 0 ? t.kStatus : (t.done === true ? 'done' : 'todo'),
+      priority: PRIOS.indexOf(t.priority) >= 0 ? t.priority : '',
+      phase: PHASES.indexOf(t.phase) >= 0 ? t.phase : '',
+      startDate: dateOk(t.startDate), endDate: dateOk(t.endDate),
+      labels: names(t.labels, lab, 10), assignees: names(t.assignees, mem, 5)
+    });
+  }
+  return {
+    project: { id: brief.id, name: brief.name, type: brief.type, description: str(p.description, 600), startDate: dateOk(p.startDate), endDate: dateOk(p.endDate), status: str(p.status, 20) },
+    tasks: tasks
+  };
 }
 
 /* ---- the part that talks to PocketBase. g = {app, Record, Collection, security}: the PocketBase globals, passed in so tests can fake them ---- */
@@ -161,7 +207,15 @@ function runtime(g) {
     return { name: rec.getString('name'), email: rec.getString('email'), projects: items };
   }
 
-  return { ensureCollection: ensureCollection, grant: grant, revoke: revoke, list: list, me: me };
+  /* guest: the tasks of one shared project. A project the guest does not have answers exactly like one that does not exist. */
+  function project(rec, pid) {
+    var S = state();
+    if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
+    var out = shapeProject(S, pid);
+    return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
+  }
+
+  return { ensureCollection: ensureCollection, project: project, grant: grant, revoke: revoke, list: list, me: me };
 }
 
-module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS };
+module.exports = { idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS };

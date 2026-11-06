@@ -5,7 +5,7 @@
  * On start it makes sure a separate `guests` collection exists. Guests sign in with a one-time code sent by email and
    can never read the workspace record: they only get what the endpoints below hand back.
  * Team endpoints (team accounts with full page access only): POST /api/pf/guest/grant, POST /api/pf/guest/revoke, GET /api/pf/guest/list
- * Guest endpoint (a signed-in guest only): GET /api/pf/guest/me
+ * Guest endpoints (a signed-in guest only): GET /api/pf/guest/me, GET /api/pf/guest/project?id=<project> (the tasks of one shared project)
  * Needs pf_guest_lib.js in the same folder and PocketBase 0.23 or newer. On older versions this file does nothing.
  * If this file or the library fails, nothing else in ProjectFlow is affected.
 */
@@ -57,5 +57,15 @@ if (typeof onBootstrap === "function") {
       const L = require(`${__hooks}/pf_guest_lib.js`);
       return e.json(200, L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).me(e.auth));
     } catch (err) { return e.json(500, { ok: false, error: "me failed" }); }
+  }, $apis.requireAuth("guests"));
+
+  routerAdd("GET", "/api/pf/guest/project", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let pid = "";
+      try { pid = String(e.request.url.query().get("id") || ""); } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security }).project(e.auth, pid);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "project failed" }); }
   }, $apis.requireAuth("guests"));
 }
