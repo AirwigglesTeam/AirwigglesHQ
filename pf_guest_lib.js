@@ -196,6 +196,7 @@ function shapeProject(S, pid, pend, gid) {
       startDate: dateOk(t.startDate), endDate: dateOk(t.endDate),
       labels: names(t.labels, lab, 10), assignees: names(t.assignees, mem, 5),
       mine: idOk(gid) && Array.isArray(t.guestAssignees) && t.guestAssignees.indexOf(gid) >= 0,   // assigned to this guest by the team (other guests' ids are never sent)
+      wants: typeof pend['s:' + t.id] === 'string' ? pend['s:' + t.id] : '',   // a status change this guest asked for that waits for the team
       pending: t.done !== true && !!pend[t.id],            // a tick from a guest or Slack that the team app has not applied yet
       canUndo: t.done !== true && !!pend[t.id] && pend[t.id].mine === true   // only the guest who made it can take it back
     });
@@ -247,9 +248,10 @@ function ukDay(ms) {   // UK calendar date and hour for a time in ms (BST from t
 function cleanLedger(raw) {
   var o = null;
   try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { o = null; }
-  var L = { sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
+  var L = { run: 0, sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
   if (!o || typeof o !== 'object') return L;
   var key = /^[acdu]:[A-Za-z0-9_:-]{1,200}$/;
+  if (typeof o.run === 'number' && o.run > 0) L.run = o.run;
   if (o.sent && typeof o.sent === 'object') Object.keys(o.sent).slice(0, MAIL_KEEP + 500).forEach(function (k) { if (key.test(k) && typeof o.sent[k] === 'number') L.sent[k] = o.sent[k]; });
   if (o.off && typeof o.off === 'object') Object.keys(o.off).slice(0, 5000).forEach(function (k) { if (idOk(k) && o.off[k]) L.off[k] = 1; });
   if (o.dig && typeof o.dig === 'object') Object.keys(o.dig).slice(0, 5000).forEach(function (k) { if (idOk(k) && typeof o.dig[k] === 'number') L.dig[k] = o.dig[k]; });
@@ -460,7 +462,10 @@ function runtime(g) {
   function mailTick(nowDate, send, appUrl) {
     var now = nowDate.getTime(), S = state();
     if (!S) return { sent: 0, why: 'no data' };
-    var h = mLoad(), first = !h.rec, map = allGuests(), guests = [];
+    var h = mLoad(), first = !h.rec;
+    /* a run that is still going (slow mail server) blocks the next one for ten minutes, so nothing is sent twice */
+    if (!first && h.L.run && now - h.L.run < 600000) return { sent: 0, why: 'busy' };
+    var map = allGuests(), guests = [];
     Object.keys(map).forEach(function (id) { var r = map[id]; guests.push({ id: id, email: r.getString('email'), name: r.getString('name'), grants: r.getString('grants') || '[]' }); });
     var team = [];
     try {
@@ -476,22 +481,35 @@ function runtime(g) {
     };
     var plan = planMail({ S: S, guests: guests, team: team, guestTasks: guestTasks, ledger: h.L, now: now, start: h.start, appUrl: appUrl, baseline: first });
     var uk = ukDay(now), sent = 0;
-    plan.seen.forEach(function (k) { if (first) h.L.sent[k] = now; });
+    if (first) {
+      plan.seen.forEach(function (k) { h.L.sent[k] = now; });
+      Object.keys(plan.dig).forEach(function (gid) { h.L.dig[gid] = plan.dig[gid]; });
+      mSave(h, now);
+      return { sent: 0, why: 'first run: existing items recorded' };
+    }
     plan.skip.forEach(function (k) { h.L.sent[k] = now; });
-    if (first) { Object.keys(plan.dig).forEach(function (gid) { h.L.dig[gid] = plan.dig[gid]; }); mSave(h, now); return { sent: 0, why: 'first run: existing items recorded' }; }
-    plan.mails.slice(0, MAIL_PER_RUN).forEach(function (m) {
-      var ok = false;
-      try { ok = send({ to: m.to, name: m.name, subject: m.subject, text: m.text, html: m.html }) === true; } catch (e) { ok = false; }
-      if (!ok) return;
-      sent++;
-      m.keys.forEach(function (k) { h.L.sent[k] = now; });
-      if (h.L.day.d !== uk.iso) h.L.day = { d: uk.iso, n: Object.create(null) };
-      h.L.day.n[m.gid] = (h.L.day.n[m.gid] || 0) + 1;
-      if (plan.dig[m.gid]) h.L.dig[m.gid] = plan.dig[m.gid];
-    });
-    /* a guest with nothing new still moves their daily update check forward, so old updates are not sent later */
-    Object.keys(plan.dig).forEach(function (gid) { if (!plan.mails.some(function (m) { return m.gid === gid; })) h.L.dig[gid] = plan.dig[gid]; });
-    mSave(h, now);
+    h.L.run = now; mSave(h, now);   // take the lock
+    /* save after every mail, and always take the guests' on/off switches from a fresh read, so a switch made during a run is never undone */
+    var commit = function () { h.L.off = mLoad().L.off; mSave(h, now); };
+    try {
+      var list = plan.mails.slice(0, MAIL_PER_RUN);
+      for (var i = 0; i < list.length; i++) {
+        var m = list[i];
+        if (mLoad().L.off[m.gid]) { m.keys.forEach(function (k) { h.L.sent[k] = now; }); continue; }
+        if (h.L.day.d !== uk.iso) h.L.day = { d: uk.iso, n: Object.create(null) };
+        h.L.day.n[m.gid] = (h.L.day.n[m.gid] || 0) + 1;   // a failed try counts too, so a bad address cannot be retried all day
+        var ok = false;
+        try { ok = send({ to: m.to, name: m.name, subject: m.subject, text: m.text, html: m.html }) === true; } catch (e) { ok = false; }
+        if (ok) { sent++; m.keys.forEach(function (k) { h.L.sent[k] = now; }); if (plan.dig[m.gid]) h.L.dig[m.gid] = plan.dig[m.gid]; }
+        commit();
+        if (!ok) break;   // the mail server is not answering: stop here and try again on the next run
+      }
+      /* a guest with nothing new still moves their daily update check forward, so old updates are not sent later */
+      Object.keys(plan.dig).forEach(function (gid) { if (!plan.mails.some(function (m) { return m.gid === gid; })) h.L.dig[gid] = plan.dig[gid]; });
+    } finally {
+      h.L.run = 0;
+      try { commit(); } catch (e) { /* the lock runs out by itself after ten minutes */ }
+    }
     return { sent: sent };
   }
   /* guest: switch emails on or off */
@@ -499,6 +517,7 @@ function runtime(g) {
     var on = body && body.on;
     if (on !== true && on !== false) return { code: 400, body: { ok: false, error: 'bad request' } };
     var h = mLoad();
+    if (!!h.L.off[rec.id] === !on) return { code: 200, body: { ok: true, on: on } };   // already so: no write
     if (on) delete h.L.off[rec.id]; else h.L.off[rec.id] = 1;
     mSave(h, Date.now());
     return { code: 200, body: { ok: true, on: on } };
@@ -672,6 +691,7 @@ function runtime(g) {
       var q = JSON.parse(rec.getString('data') || '{}');
       (Array.isArray(q.items) ? q.items : []).forEach(function (x) {
         if (x && ID_OK.test(String(x.taskId)) && (x.kind || 'done') === 'done') out[x.taskId] = { mine: x.via === 'guest' && x.memberId === guestId };
+        else if (x && ID_OK.test(String(x.taskId)) && x.kind === 'status' && x.via === 'guest' && x.memberId === guestId && (x.status === 'in-progress' || x.status === 'todo')) out['s:' + x.taskId] = x.status;   // this guest's own status request
       });
     } catch (e) { /* no queue yet */ }
     return out;
@@ -722,6 +742,38 @@ function runtime(g) {
       return { cancelled: hit };
     });
     return c.cancelled ? { code: 200, body: { ok: true, cancelled: true } } : { code: 409, body: { ok: false, error: 'applied' } };
+  }
+
+  /* guest: ask for a status change on a task assigned to them. Only "in-progress" and "todo" (not started); done is the tick and blocked follows the task's dependencies.
+     Like a tick it is queued and the team app applies it. */
+  function setStatus(rec, body, now) {
+    var pid = body && body.project, tid = body && body.task, st = body && body.status;
+    if (!idOk(pid) || !idOk(tid) || (st !== 'in-progress' && st !== 'todo')) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var S = state();
+    if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
+    var task = findTask(S, tid);
+    if (!task || task.projectId !== pid || !Array.isArray(task.guestAssignees) || task.guestAssignees.indexOf(rec.id) < 0) return { code: 404, body: { ok: false, error: 'not found' } };
+    if (task.done === true) return { code: 409, body: { ok: false, error: 'finished' } };
+    if (blockersOf(S, task).length) return { code: 409, body: { ok: false, error: 'blocked' } };
+    now = now || new Date();
+    var cur = task.kStatus === 'in-progress' ? 'in-progress' : 'todo';
+    var r = qtx(function (find, save, t) {
+      var h = qLoad(find, now), mine = 0, keep = [], had = false;
+      h.q.items.forEach(function (x) {
+        if (x.kind === 'status' && x.taskId === tid && x.via === 'guest' && x.memberId === rec.id) { had = true; return; }   // the newer request replaces the older one
+        if (x.via === 'guest' && x.memberId === rec.id) mine++;
+        keep.push(x);
+      });
+      if (cur === st && !had) return { same: true };
+      if (cur !== st) {
+        if (keep.length >= MAX_QUEUE || mine >= MAX_MINE) return { full: true };
+        keep.push({ id: 'q' + now.getTime().toString(36) + Math.floor(Math.random() * 1679616).toString(36), kind: 'status', status: st, taskId: tid, memberId: rec.id, slackId: '', via: 'guest', who: cleanName(rec.getString('name')) || 'A guest', at: now.toISOString() });
+      }
+      h.q.items = keep; qSave(h, save, t);
+      return { queued: cur !== st };
+    });
+    if (r.full) return { code: 429, body: { ok: false, error: 'too many changes are waiting; try again in a little while' } };
+    return { code: 200, body: { ok: true, same: !!r.same, pending: !!r.queued } };
   }
 
   /* ---- comments ---- */
@@ -863,7 +915,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
 module.exports = { planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };

@@ -7,6 +7,7 @@
  * Team endpoints (team accounts with full page access only): POST /api/pf/guest/grant, POST /api/pf/guest/revoke, GET /api/pf/guest/list
  * Guest endpoints (a signed-in guest only): GET /api/pf/guest/me, GET /api/pf/guest/project?id=<project> (the tasks of one shared project),
    POST /api/pf/guest/tick (tick a task, or take back a tick that still waits: the tick is queued and the team app applies it),
+   POST /api/pf/guest/status (ask to start, or un-start, a task assigned to them: queued like a tick and applied by the team app),
    POST /api/pf/guest/comment (write a comment on a task of a shared project; the project answer carries the comments)
  * Team endpoints for groups (full access only): GET /api/pf/guest/groups, POST group-save, group-delete, grant-group (share one project with every member of a saved group)
  * Team endpoints for comments: GET /api/pf/guest/feed (newest guest comments, for the bell), GET /api/pf/guest/comments?task=<task>, POST /api/pf/guest/comment-team, POST /api/pf/guest/comment-handled (mark a guest comment Handled), POST /api/pf/guest/comment-del (full access only)
@@ -64,6 +65,16 @@ if (typeof onBootstrap === "function") {
       const L = require(`${__hooks}/pf_guest_lib.js`);
       return e.json(200, L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).me(e.auth, new Date()));
     } catch (err) { return e.json(500, { ok: false, error: "me failed" }); }
+  }, $apis.requireAuth("guests"));
+
+  routerAdd("POST", "/api/pf/guest/status", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).setStatus(e.auth, body, new Date());
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "status failed" }); }
   }, $apis.requireAuth("guests"));
 
   routerAdd("POST", "/api/pf/guest/mail-pref", (e) => {

@@ -465,7 +465,7 @@ function runtime(g) {
         var c = Date.parse(x.claimedAt || '');
         if (!isNaN(c) && now.getTime() - c < 120000) return;
         x.claimedAt = now.toISOString();
-        out.push({ id: x.id, kind: x.kind === 'undo' ? 'undo' : 'done', taskId: x.taskId, memberId: x.memberId, slackId: x.slackId, at: x.at, via: x.via === 'guest' ? 'guest' : '', who: typeof x.who === 'string' ? x.who.slice(0, 60) : '' });
+        out.push({ id: x.id, kind: x.kind === 'undo' ? 'undo' : x.kind === 'status' ? 'status' : 'done', status: x.kind === 'status' && (x.status === 'in-progress' || x.status === 'todo') ? x.status : '', taskId: x.taskId, memberId: x.memberId, slackId: x.slackId, at: x.at, via: x.via === 'guest' ? 'guest' : '', who: typeof x.who === 'string' ? x.who.slice(0, 60) : '' });
       });
       if (out.length) qSave(h, save, t);
       return out;
@@ -487,7 +487,7 @@ function runtime(g) {
   function queuePending(now, kind) {   // task ids with a tick (or, kind "undo", an undo) waiting: reminders treat them as already changed
     var rec = find(QWS), out = {};
     if (!rec) return out;
-    try { var q = JSON.parse(rec.getString('data') || '{}'); (q.items || []).forEach(function (x) { if (x && ID_OK.test(String(x.taskId)) && (x.kind === 'undo' ? 'undo' : 'done') === (kind || 'done')) out[x.taskId] = true; }); } catch (e) {}
+    try { var q = JSON.parse(rec.getString('data') || '{}'); (q.items || []).forEach(function (x) { if (x && ID_OK.test(String(x.taskId)) && (x.kind === 'undo' ? 'undo' : x.kind === 'status' ? 'status' : 'done') === (kind || 'done')) out[x.taskId] = true; }); } catch (e) {}
     return out;
   }
   /* Undo pressed while the tick still waits: take it out of the queue so the app never ticks it. If a window already took it, say so (an undo is queued instead). */
