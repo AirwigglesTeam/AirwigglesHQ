@@ -88,13 +88,16 @@ if (typeof onBootstrap === "function") {
   }, $apis.requireAuth("guests"));
 
   // Every five minutes: email guests what is new. Quiet when there is nothing. PF_GUEST_MAIL=off stops it.
+  // Whatever it does (or why it does nothing) is noted for the status line in Settings > Guests.
   cronAdd("pf-guest-mail", "*/5 * * * *", () => {
+    let rt = null, L = null;
     try {
-      if (String($os.getenv("PF_GUEST_MAIL") || "").toLowerCase() === "off") return;
-      const L = require(`${__hooks}/pf_guest_lib.js`);
+      L = require(`${__hooks}/pf_guest_lib.js`);
+      rt = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField });
+      if (String($os.getenv("PF_GUEST_MAIL") || "").toLowerCase() === "off") { rt.mailNote(Date.now(), { why: "switched off (PF_GUEST_MAIL=off)" }); return; }
       const meta = $app.settings().meta;
       const from = { address: String(meta.senderAddress || ""), name: String(meta.senderName || "ProjectFlow") };
-      if (!from.address) return;
+      if (!from.address) { rt.mailNote(Date.now(), { why: "no sender address in the PocketBase mail settings" }); return; }
       let url = String($os.getenv("PF_APP_URL") || meta.appURL || "");
       if (!/^https:\/\//.test(url)) url = "";
       const send = (m) => {
@@ -102,11 +105,45 @@ if (typeof onBootstrap === "function") {
         $app.newMailClient().send(msg);
         return true;
       };
-      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).mailTick(new Date(), send, url);
+      const r = rt.mailTick(new Date(), send, url);
+      rt.mailNote(Date.now(), { sent: r.sent, why: r.why });
       if (r.sent) console.log("[pf-guest] emails sent: " + r.sent);
-      else if (r.why && r.why !== "no data") console.log("[pf-guest] " + r.why);
-    } catch (err) { console.log("[pf-guest] mail error: " + err); }
+      else if (r.why && r.why !== "no data" && r.why !== "busy") console.log("[pf-guest] " + r.why);
+    } catch (err) {
+      console.log("[pf-guest] mail error: " + err);
+      try { if (rt) rt.mailNote(Date.now(), { err: String(err && err.message ? err.message : err) }); } catch (x) {}
+    }
   });
+
+  // Team accounts with full access: how the email job is doing, and a test mail to your own address.
+  routerAdd("GET", "/api/pf/guest/mail-status", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      if (!L.canShare(e.auth.getString("permissions"))) return e.json(403, { ok: false, error: "not allowed" });
+      const meta = $app.settings().meta;
+      let url = String($os.getenv("PF_APP_URL") || meta.appURL || "");
+      if (!/^https:\/\//.test(url)) url = "";
+      const ctx = { enabled: String($os.getenv("PF_GUEST_MAIL") || "").toLowerCase() !== "off", sender: String(meta.senderAddress || ""), url: url };
+      return e.json(200, L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).mailStatus(new Date(), ctx));
+    } catch (err) { return e.json(500, { ok: false, error: "status failed" }); }
+  }, $apis.requireAuth("users"));
+
+  routerAdd("POST", "/api/pf/guest/mail-test", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      if (!L.canShare(e.auth.getString("permissions"))) return e.json(403, { ok: false, error: "not allowed" });
+      const meta = $app.settings().meta;
+      const from = { address: String(meta.senderAddress || ""), name: String(meta.senderName || "ProjectFlow") };
+      if (!from.address) return e.json(200, { ok: false, error: "There is no sender address in the PocketBase mail settings (Settings > Mail settings)." });
+      const send = (m) => {
+        const msg = new MailerMessage({ from: from, to: [{ address: m.to, name: m.name || "" }], subject: m.subject, html: m.html, text: m.text });
+        $app.newMailClient().send(msg);
+        return true;
+      };
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).mailTest(e.auth, send, Date.now());
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "test failed" }); }
+  }, $apis.requireAuth("users"));
 
   routerAdd("GET", "/api/pf/guest/project", (e) => {
     try {

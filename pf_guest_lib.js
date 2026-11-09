@@ -248,10 +248,12 @@ function ukDay(ms) {   // UK calendar date and hour for a time in ms (BST from t
 function cleanLedger(raw) {
   var o = null;
   try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { o = null; }
-  var L = { run: 0, sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
+  var L = { base: 0, info: null, run: 0, sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
   if (!o || typeof o !== 'object') return L;
   var key = /^[acdu]:[A-Za-z0-9_:-]{1,200}$/;
   if (typeof o.run === 'number' && o.run > 0) L.run = o.run;
+  if (o.base || !('base' in o)) L.base = 1;   // a ledger written before release 257 has no flag: it had its first run already
+  if (o.info && typeof o.info === 'object') L.info = { at: typeof o.info.at === 'number' ? o.info.at : 0, sent: typeof o.info.sent === 'number' ? o.info.sent : 0, msg: oneLine(o.info.msg, 200), testAt: typeof o.info.testAt === 'number' ? o.info.testAt : 0 };
   if (o.sent && typeof o.sent === 'object') Object.keys(o.sent).slice(0, MAIL_KEEP + 500).forEach(function (k) { if (key.test(k) && typeof o.sent[k] === 'number') L.sent[k] = o.sent[k]; });
   if (o.off && typeof o.off === 'object') Object.keys(o.off).slice(0, 5000).forEach(function (k) { if (idOk(k) && o.off[k]) L.off[k] = 1; });
   if (o.dig && typeof o.dig === 'object') Object.keys(o.dig).slice(0, 5000).forEach(function (k) { if (idOk(k) && typeof o.dig[k] === 'number') L.dig[k] = o.dig[k]; });
@@ -458,13 +460,10 @@ function runtime(g) {
     h.rec.set('data', ledgerOut(h.L, now));
     db.save(h.rec);
   }
-  /* run every few minutes; send(message) returns true when the mail went out. appUrl is the https address of the app. */
-  function mailTick(nowDate, send, appUrl) {
-    var now = nowDate.getTime(), S = state();
-    if (!S) return { sent: 0, why: 'no data' };
-    var h = mLoad(), first = !h.rec;
-    /* a run that is still going (slow mail server) blocks the next one for ten minutes, so nothing is sent twice */
-    if (!first && h.L.run && now - h.L.run < 600000) return { sent: 0, why: 'busy' };
+  /* what would be sent right now (used by the run and by the status line) */
+  function mailPlanNow(h, now, appUrl, first) {
+    var S = state();
+    if (!S) return { mails: [], seen: [], skip: [], dig: {} };
     var map = allGuests(), guests = [];
     Object.keys(map).forEach(function (id) { var r = map[id]; guests.push({ id: id, email: r.getString('email'), name: r.getString('name'), grants: r.getString('grants') || '[]' }); });
     var team = [];
@@ -479,9 +478,19 @@ function runtime(g) {
       recs.forEach(function (r) { m[r.getString('task')] = true; });
       return (cache[gid] = m);
     };
-    var plan = planMail({ S: S, guests: guests, team: team, guestTasks: guestTasks, ledger: h.L, now: now, start: h.start, appUrl: appUrl, baseline: first });
+    return planMail({ S: S, guests: guests, team: team, guestTasks: guestTasks, ledger: h.L, now: now, start: h.start, appUrl: appUrl, baseline: first });
+  }
+  /* run every few minutes; send(message) returns true when the mail went out. appUrl is the https address of the app. */
+  function mailTick(nowDate, send, appUrl) {
+    var now = nowDate.getTime(), S = state();
+    if (!S) return { sent: 0, why: 'no data' };
+    var h = mLoad(), first = !h.rec || !h.L.base;
+    /* a run that is still going (slow mail server) blocks the next one for ten minutes, so nothing is sent twice */
+    if (!first && h.L.run && now - h.L.run < 600000) return { sent: 0, why: 'busy' };
+    var plan = mailPlanNow(h, now, appUrl, first);
     var uk = ukDay(now), sent = 0;
     if (first) {
+      h.L.base = 1;
       plan.seen.forEach(function (k) { h.L.sent[k] = now; });
       Object.keys(plan.dig).forEach(function (gid) { h.L.dig[gid] = plan.dig[gid]; });
       mSave(h, now);
@@ -511,6 +520,40 @@ function runtime(g) {
       try { commit(); } catch (e) { /* the lock runs out by itself after ten minutes */ }
     }
     return { sent: sent };
+  }
+
+  /* the cron writes what it did (or why it did nothing), so the team can see it in Settings; written only when something changed or once an hour */
+  function mailNote(nowMs, note) {
+    try {
+      var h = mLoad(), cur = h.L.info || { at: 0, sent: 0, msg: '', testAt: 0 }, msg = oneLine(note && (note.err || note.why), 200);
+      if ((note && note.sent > 0) || cur.msg !== msg || nowMs - cur.at > 3600000) {
+        h.L.info = { at: nowMs, sent: (note && note.sent) || 0, msg: msg, testAt: cur.testAt || 0 };
+        mSave(h, nowMs);
+      }
+    } catch (e) { /* only a status line */ }
+  }
+  /* team (full access): is the email job set up, when did it last run, how many mails are waiting */
+  function mailStatus(now, ctx) {
+    var h = mLoad(), L = h.L, waiting = 0, tod = ukDay(now.getTime()).iso, sentToday = 0, off = 0;
+    try { if (L.base && ctx.enabled && ctx.sender) waiting = mailPlanNow(h, now.getTime(), ctx.url || '', false).mails.length; } catch (e) { waiting = 0; }
+    if (L.day.d === tod) Object.keys(L.day.n).forEach(function (k) { sentToday += L.day.n[k]; });
+    Object.keys(L.off).forEach(function () { off++; });
+    return { ok: true, enabled: !!ctx.enabled, sender: oneLine(ctx.sender, 120), url: ctx.url || '', started: !!L.base, lastAt: L.info ? L.info.at : 0, lastMsg: L.info ? L.info.msg : '', lastSent: L.info ? L.info.sent : 0, waiting: waiting, sentToday: sentToday, off: off };
+  }
+  /* team (full access): one test mail, always to the signed-in person's own address, at most one every 30 seconds */
+  function mailTest(user, send, nowMs) {
+    var to = normEmail(user.getString('email'));
+    if (!to) return { code: 400, body: { ok: false, error: 'your account has no email address' } };
+    var h = mLoad(), cur = h.L.info || { at: 0, sent: 0, msg: '', testAt: 0 };
+    if (nowMs - (cur.testAt || 0) < 30000) return { code: 429, body: { ok: false, error: 'wait a few seconds before sending another test' } };
+    h.L.info = { at: cur.at, sent: cur.sent, msg: cur.msg, testAt: nowMs };
+    try { mSave(h, nowMs); } catch (e) { /* still try the mail */ }
+    var err = '', ok = false;
+    try {
+      ok = send({ to: to, name: '', subject: 'ProjectFlow test email', text: 'This is a test email from ProjectFlow. If you can read it, guest emails can be sent from your server.\n', html: '<p style="font-family:Arial,sans-serif;font-size:15px">This is a test email from ProjectFlow. If you can read it, guest emails can be sent from your server.</p>' }) === true;
+    } catch (e) { err = oneLine(String(e && e.message ? e.message : e), 200) || 'the mail server refused it'; }
+    if (!ok && !err) err = 'the mail server did not accept it';
+    return { code: 200, body: ok ? { ok: true, to: to } : { ok: false, error: err } };
   }
   /* guest: switch emails on or off */
   function mailPref(rec, body) {
@@ -915,7 +958,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
 module.exports = { planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
