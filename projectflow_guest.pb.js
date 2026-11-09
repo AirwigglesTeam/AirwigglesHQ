@@ -202,6 +202,36 @@ if (typeof onBootstrap === "function") {
     } catch (err) { return e.json(500, { ok: false, error: "comment failed" }); }
   }, $apis.requireAuth("users"));
 
+  routerAdd("POST", "/api/pf/guest/suggest", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).guestSuggest(e.auth, body, new Date());
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "suggest failed" }); }
+  }, $apis.requireAuth("guests"));
+
+  routerAdd("GET", "/api/pf/guest/suggestions", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let v = "";
+      try { v = String(e.request.url.query().get("project") || ""); } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).teamSuggestions(v);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "suggestions failed" }); }
+  }, $apis.requireAuth("users"));
+
+  routerAdd("POST", "/api/pf/guest/suggestion-decide", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).suggestionDecide(e.auth, body, new Date());
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "decide failed" }); }
+  }, $apis.requireAuth("users"));
+
   routerAdd("POST", "/api/pf/guest/comment-handled", (e) => {
     try {
       const L = require(`${__hooks}/pf_guest_lib.js`);

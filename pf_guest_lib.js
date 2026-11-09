@@ -24,6 +24,8 @@ var MAX_UPDATES = 30;     // status updates sent for one shared project (newest 
 var MAX_GRANTS = 50;      // projects one guest can be given
 var MAX_GUESTS = 200;     // guest accounts in total
 var GUEST_TOKEN_SECONDS = 1209600;   // how long a guest sign-in lasts: 14 days, renewed each time the guest comes back (release 249; was one day since the 238 audit)
+var MAX_SUGG_PENDING = 20;   // suggestions one guest can have waiting for the team
+var MAX_SUGG_KEPT = 100;     // suggestions one guest can have in total (decided ones included)
 var MAX_GROUPS = 30;      // saved groups of guests
 var MAX_GROUP_MEMBERS = 100;
 
@@ -825,7 +827,7 @@ function runtime(g) {
   }
   function commentsOfProject(pid) {
     var recs = [];
-    try { recs = db.findRecordsByFilter('pf_comments', 'project = {:p}', '-created', MAX_SHOWN, 0, { p: pid }); } catch (e) { recs = []; }
+    try { recs = db.findRecordsByFilter('pf_comments', 'project = {:p} && kind != "suggest"', '-created', MAX_SHOWN, 0, { p: pid }); } catch (e) { recs = []; }
     return recs.map(shapeComment).reverse();   // oldest first
   }
   function commentsOfTask(tid) {
@@ -918,9 +920,69 @@ function runtime(g) {
   }
   /* team: the newest guest comments across all projects (for the bell). Same account rule as the task thread: any team account. */
   function feed() {
-    var recs = [];
+    var recs = [], sg = [];
     try { recs = db.findRecordsByFilter('pf_comments', 'kind = "guest"', '-created', MAX_FEED, 0); } catch (e) { recs = []; }
-    return { ok: true, items: recs.map(function (r) { var c = shapeComment(r); c.project = r.getString('project'); return c; }) };
+    try { sg = db.findRecordsByFilter('pf_comments', 'kind = "suggest" && handledAt = ""', '-created', MAX_FEED, 0); } catch (e) { sg = []; }   // suggestions still waiting
+    var items = recs.map(function (r) { var c = shapeComment(r); c.project = r.getString('project'); return c; });
+    sg.forEach(function (r) { var q = suggParse(r); if (q.s) return; items.push({ id: r.id, task: '', who: q.who || 'Guest', guest: true, at: q.at, text: q.t, handled: false, suggest: true, project: q.project }); });
+    items.sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
+    return { ok: true, items: items.slice(0, MAX_FEED) };
+  }
+  /* ---- guests suggesting tasks (release 259). A suggestion is a row in the comments collection with kind "suggest" (no new collection):
+     body holds {t: title, n: note, d: due, s: '' | 'ok' | 'no'}; handledAt / handledBy say when and who decided. The team accepts it
+     (the app then makes the task) or declines it; the guest only ever sees their own, with the word Suggested / Accepted / Declined. ---- */
+  function suggParse(rec) {
+    var o = {};
+    try { o = JSON.parse(rec.getString('body') || '{}'); } catch (e) { o = {}; }
+    if (!o || typeof o !== 'object') o = {};
+    return { id: rec.id, t: str(o.t, 100), n: str(o.n, 400), d: dateOk(o.d), s: o.s === 'ok' || o.s === 'no' ? o.s : '', at: String(rec.getString('created') || ''), who: str(rec.getString('author'), 60), by: str(rec.getString('handledBy'), 60), project: rec.getString('project') };
+  }
+  function suggOf(guestId) {
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'kind = "suggest" && authorId = {:a}', '-created', MAX_SUGG_KEPT + 1, 0, { a: guestId }); } catch (e) { recs = []; }
+    return recs;
+  }
+  /* guest: suggest a task for a shared project */
+  function guestSuggest(rec, body, now) {
+    var pid = body && body.project, title = suggTitle(body && body.title), note = suggNote(body && body.note), due = dateOk(body && body.due);
+    if (!idOk(pid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    if (!title) return { code: 400, body: { ok: false, error: 'give the task a short name first' } };
+    if (suggLinky(title) || suggLinky(note)) return { code: 400, body: { ok: false, error: 'web addresses cannot be sent in a suggestion: describe it in words instead' } };
+    var S = state();
+    if (!S || !hasGrant(rec.getString('grants') || '[]', pid) || !projectBrief(S, pid)) return { code: 404, body: { ok: false, error: 'not found' } };
+    var mine = suggOf(rec.id);
+    if (mine.length >= MAX_SUGG_KEPT) return { code: 409, body: { ok: false, error: 'you have sent the most suggestions allowed' } };
+    var waiting = mine.filter(function (r) { return !suggParse(r).s; }).length;
+    if (waiting >= MAX_SUGG_PENDING) return { code: 429, body: { ok: false, error: 'you already have ' + MAX_SUGG_PENDING + ' suggestions waiting for the team' } };
+    var c = addComment(pid, '', 'suggest', rec.id, rec.getString('name') || String(rec.getString('email')).split('@')[0], JSON.stringify({ t: title, n: note, d: due, s: '' }));
+    var q = suggParse(c); delete q.who; delete q.by; delete q.project;
+    return { code: 200, body: { ok: true, suggestion: q } };
+  }
+  function suggTitle(v) { return typeof v === 'string' ? v.replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100) : ''; }
+  function suggNote(v) { return typeof v === 'string' ? cleanComment(v).slice(0, 400) : ''; }
+  function suggLinky(v) { return /(https?:\/\/|www\.|[a-z0-9]\.(com|org|net|io|uk|app|dev|co)\b)/i.test(String(v || '')); }
+  /* team: the suggestions of one project (any team account, like replying) */
+  function teamSuggestions(pid) {
+    if (!idOk(pid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', 'kind = "suggest" && project = {:p}', '-created', 100, 0, { p: pid }); } catch (e) { recs = []; }
+    return { code: 200, body: { ok: true, items: recs.map(suggParse) } };
+  }
+  /* team: accept or decline. Only a waiting one can be decided, so two people pressing Accept cannot both make the task. */
+  function suggestionDecide(user, body, now) {
+    var id = body && body.id, dec = body && body.decision;
+    if (!idOk(id) || (dec !== 'ok' && dec !== 'no')) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var rec = null;
+    try { rec = db.findRecordById('pf_comments', id); } catch (e) { rec = null; }
+    if (!rec || rec.getString('kind') !== 'suggest') return { code: 404, body: { ok: false, error: 'not found' } };
+    var q = suggParse(rec);
+    if (q.s) return { code: 409, body: { ok: false, error: 'already decided', item: q } };
+    rec.set('body', JSON.stringify({ t: q.t, n: q.n, d: q.d, s: dec }));
+    rec.set('handledAt', (now instanceof Date ? now : new Date()).toISOString());
+    rec.set('handledBy', memberName(state() || {}, user));
+    if (!rec.getString('seenAt')) rec.set('seenAt', rec.getString('handledAt'));
+    db.save(rec);
+    return { code: 200, body: { ok: true, item: suggParse(rec) } };
   }
   /* team (full access): remove a comment */
   function commentDelete(body) {
@@ -954,11 +1016,14 @@ function runtime(g) {
     var S = state();
     if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
     var out = shapeProject(S, pid, pendingMap(rec.id), rec.id);
-    if (out) { out.comments = commentsOfProject(pid); touchOpened(rec, pid); }
+    if (out) {
+      out.comments = commentsOfProject(pid); touchOpened(rec, pid);
+      out.suggestions = suggOf(rec.id).map(suggParse).filter(function (q) { return q.project === pid; }).slice(0, 30).map(function (q) { return { id: q.id, t: q.t, n: q.n, d: q.d, s: q.s, at: q.at }; });
+    }
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { guestSuggest: guestSuggest, teamSuggestions: teamSuggestions, suggestionDecide: suggestionDecide, mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
 module.exports = { planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
