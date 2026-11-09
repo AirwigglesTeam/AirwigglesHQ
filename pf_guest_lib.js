@@ -168,7 +168,7 @@ function projectStats(S, pid, today) {
 /* What a guest is allowed to see of one shared project. A whitelist: every field is picked by name, so anything added to the app
    later (money, links, sponsors, emails, Slack ids, notes) stays on the server until it is added here on purpose.
    Assignees and labels are sent as plain names, never ids, emails or Slack ids. */
-function shapeProject(S, pid, pend) {
+function shapeProject(S, pid, pend, gid) {
   pend = pend || {};
   var brief = projectBrief(S, pid);
   if (!brief) return null;
@@ -195,6 +195,7 @@ function shapeProject(S, pid, pend) {
       phase: PHASES.indexOf(t.phase) >= 0 ? t.phase : '',
       startDate: dateOk(t.startDate), endDate: dateOk(t.endDate),
       labels: names(t.labels, lab, 10), assignees: names(t.assignees, mem, 5),
+      mine: idOk(gid) && Array.isArray(t.guestAssignees) && t.guestAssignees.indexOf(gid) >= 0,   // assigned to this guest by the team (other guests' ids are never sent)
       pending: t.done !== true && !!pend[t.id],            // a tick from a guest or Slack that the team app has not applied yet
       canUndo: t.done !== true && !!pend[t.id] && pend[t.id].mine === true   // only the guest who made it can take it back
     });
@@ -677,7 +678,7 @@ function runtime(g) {
   function project(rec, pid) {
     var S = state();
     if (!S || !hasGrant(rec.getString('grants') || '[]', pid)) return { code: 404, body: { ok: false, error: 'not found' } };
-    var out = shapeProject(S, pid, pendingMap(rec.id));
+    var out = shapeProject(S, pid, pendingMap(rec.id), rec.id);
     if (out) { out.comments = commentsOfProject(pid); touchOpened(rec, pid); }
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
