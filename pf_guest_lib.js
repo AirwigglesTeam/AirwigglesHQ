@@ -250,10 +250,11 @@ function ukDay(ms) {   // UK calendar date and hour for a time in ms (BST from t
 function cleanLedger(raw) {
   var o = null;
   try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { o = null; }
-  var L = { base: 0, info: null, run: 0, sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
+  var L = { base: 0, halt: 0, info: null, run: 0, sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
   if (!o || typeof o !== 'object') return L;
   var key = /^[acdu]:[A-Za-z0-9_:-]{1,200}$/;
   if (typeof o.run === 'number' && o.run > 0) L.run = o.run;
+  if (o.halt) L.halt = 1;   // the team switched all guest emails off
   if (o.base || !('base' in o)) L.base = 1;   // a ledger written before release 257 has no flag: it had its first run already
   if (o.info && typeof o.info === 'object') L.info = { at: typeof o.info.at === 'number' ? o.info.at : 0, sent: typeof o.info.sent === 'number' ? o.info.sent : 0, msg: oneLine(o.info.msg, 200), testAt: typeof o.info.testAt === 'number' ? o.info.testAt : 0 };
   if (o.sent && typeof o.sent === 'object') Object.keys(o.sent).slice(0, MAIL_KEEP + 500).forEach(function (k) { if (key.test(k) && typeof o.sent[k] === 'number') L.sent[k] = o.sent[k]; });
@@ -501,12 +502,13 @@ function runtime(g) {
     plan.skip.forEach(function (k) { h.L.sent[k] = now; });
     h.L.run = now; mSave(h, now);   // take the lock
     /* save after every mail, and always take the guests' on/off switches from a fresh read, so a switch made during a run is never undone */
-    var commit = function () { h.L.off = mLoad().L.off; mSave(h, now); };
+    var commit = function () { var f = mLoad().L; h.L.off = f.off; h.L.halt = f.halt; mSave(h, now); };
     try {
       var list = plan.mails.slice(0, MAIL_PER_RUN);
       for (var i = 0; i < list.length; i++) {
         var m = list[i];
-        if (mLoad().L.off[m.gid]) { m.keys.forEach(function (k) { h.L.sent[k] = now; }); continue; }
+        var fresh = mLoad().L;
+        if (fresh.halt || fresh.off[m.gid]) { m.keys.forEach(function (k) { h.L.sent[k] = now; }); continue; }
         if (h.L.day.d !== uk.iso) h.L.day = { d: uk.iso, n: Object.create(null) };
         h.L.day.n[m.gid] = (h.L.day.n[m.gid] || 0) + 1;   // a failed try counts too, so a bad address cannot be retried all day
         var ok = false;
@@ -540,7 +542,7 @@ function runtime(g) {
     try { if (L.base && ctx.enabled && ctx.sender) waiting = mailPlanNow(h, now.getTime(), ctx.url || '', false).mails.length; } catch (e) { waiting = 0; }
     if (L.day.d === tod) Object.keys(L.day.n).forEach(function (k) { sentToday += L.day.n[k]; });
     Object.keys(L.off).forEach(function () { off++; });
-    return { ok: true, enabled: !!ctx.enabled, sender: oneLine(ctx.sender, 120), url: ctx.url || '', started: !!L.base, lastAt: L.info ? L.info.at : 0, lastMsg: L.info ? L.info.msg : '', lastSent: L.info ? L.info.sent : 0, waiting: waiting, sentToday: sentToday, off: off };
+    return { ok: true, halt: !!L.halt, enabled: !!ctx.enabled, sender: oneLine(ctx.sender, 120), url: ctx.url || '', started: !!L.base, lastAt: L.info ? L.info.at : 0, lastMsg: L.info ? L.info.msg : '', lastSent: L.info ? L.info.sent : 0, waiting: waiting, sentToday: sentToday, off: off };
   }
   /* team (full access): one test mail, always to the signed-in person's own address, at most one every 30 seconds */
   function mailTest(user, send, nowMs) {
@@ -564,6 +566,25 @@ function runtime(g) {
     var h = mLoad();
     if (!!h.L.off[rec.id] === !on) return { code: 200, body: { ok: true, on: on } };   // already so: no write
     if (on) delete h.L.off[rec.id]; else h.L.off[rec.id] = 1;
+    mSave(h, Date.now());
+    return { code: 200, body: { ok: true, on: on } };
+  }
+  /* team (full access): switch one guest's emails, or all guest emails, on or off. A guest's own switch is the same one, so they can change it back. */
+  function mailAdmin(body) {
+    var on = body && body.on;
+    if (on !== true && on !== false) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var h = mLoad(), gid = body && body.guest;
+    if (body && body.all === true) {
+      if (!!h.L.halt === !on) return { code: 200, body: { ok: true, on: on } };
+      if (on) h.L.halt = 0; else h.L.halt = 1;
+    } else {
+      if (!idOk(gid)) return { code: 400, body: { ok: false, error: 'bad request' } };
+      var rec = null;
+      try { rec = db.findRecordById('guests', gid); } catch (e) { rec = null; }
+      if (!rec) return { code: 404, body: { ok: false, error: 'not found' } };
+      if (!!h.L.off[gid] === !on) return { code: 200, body: { ok: true, on: on } };
+      if (on) delete h.L.off[gid]; else h.L.off[gid] = 1;
+    }
     mSave(h, Date.now());
     return { code: 200, body: { ok: true, on: on } };
   }
@@ -607,12 +628,12 @@ function runtime(g) {
   function list(pid) {
     var recs = [];
     try { recs = db.findRecordsByFilter('guests', 'id != ""', '-created', MAX_GUESTS, 0); } catch (e) { recs = []; }
-    var out = [];
+    var out = [], ml = mLoad().L;
     recs.forEach(function (r) {
       var gr = grantsOf(r);
       if (pid && !gr.some(function (x) { return x.p === pid; })) return;
       var mine = null; gr.forEach(function (x) { if (x.p === pid) mine = x; });
-      out.push({ id: r.id, email: r.getString('email'), name: r.getString('name'), projects: gr.length, ids: gr.map(function (x) { return x.p; }), at: String(r.getString('created') || ''), ends: mine ? (mine.x || '') : '', opened: mine ? (mine.v || '') : '', grants: gr.map(function (x) { return { p: x.p, x: x.x || '', v: x.v || '' }; }) });
+      out.push({ mail: !ml.off[r.id], id: r.id, email: r.getString('email'), name: r.getString('name'), projects: gr.length, ids: gr.map(function (x) { return x.p; }), at: String(r.getString('created') || ''), ends: mine ? (mine.x || '') : '', opened: mine ? (mine.v || '') : '', grants: gr.map(function (x) { return { p: x.p, x: x.x || '', v: x.v || '' }; }) });
     });
     return { guests: out };
   }
@@ -1023,7 +1044,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { guestSuggest: guestSuggest, teamSuggestions: teamSuggestions, suggestionDecide: suggestionDecide, mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { mailAdmin: mailAdmin, guestSuggest: guestSuggest, teamSuggestions: teamSuggestions, suggestionDecide: suggestionDecide, mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
 module.exports = { planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };

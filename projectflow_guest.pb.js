@@ -13,7 +13,7 @@
  * Team endpoints for comments: GET /api/pf/guest/feed (newest guest comments, for the bell), GET /api/pf/guest/comments?task=<task>, POST /api/pf/guest/comment-team, POST /api/pf/guest/comment-handled (mark a guest comment Handled), POST /api/pf/guest/comment-del (full access only)
  * Emails (release 254): every five minutes a job emails guests what is new (tasks assigned to them, team replies, tasks due tomorrow, a daily
    update summary after 08:00 UK time), through the mail settings PocketBase already uses for sign-in codes. POST /api/pf/guest/mail-pref (a guest) switches
-   their own emails on or off. The first run only records what exists, so nothing old is sent. Set PF_GUEST_MAIL=off in the server's environment to stop the job.
+   their own emails on or off; POST /api/pf/guest/mail-admin (the team) switches one guest or all guest emails. The first run only records what exists, so nothing old is sent. Set PF_GUEST_MAIL=off in the server's environment to stop the job.
  * Needs pf_guest_lib.js in the same folder and PocketBase 0.23 or newer. On older versions this file does nothing.
  * If this file or the library fails, nothing else in ProjectFlow is affected.
 */
@@ -116,6 +116,17 @@ if (typeof onBootstrap === "function") {
   });
 
   // Team accounts with full access: how the email job is doing, and a test mail to your own address.
+  routerAdd("POST", "/api/pf/guest/mail-admin", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      if (!L.canShare(e.auth.getString("permissions"))) return e.json(403, { ok: false, error: "not allowed" });
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).mailAdmin(body);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "switch failed" }); }
+  }, $apis.requireAuth("users"));
+
   routerAdd("GET", "/api/pf/guest/mail-status", (e) => {
     try {
       const L = require(`${__hooks}/pf_guest_lib.js`);
