@@ -347,7 +347,7 @@ function renderMail(gu, items, projName, appUrl, total, keys) {
   var text = hi + '\n\n' + secs.map(function (x) { return x[0] + '\n' + x[1].slice(0, 15).map(function (l) { return '- ' + l; }).join('\n'); }).join('\n\n') + '\n\n' + (link ? 'Open it here (sign in with this email address): ' + link + '\n\n' : '') + foot + '\n';
   var html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px"><p>' + mailEsc(hi) + '</p>' +
     secs.map(function (x) { return '<p style="margin:14px 0 4px"><b>' + mailEsc(x[0]) + '</b></p><ul style="margin:0;padding-left:20px">' + x[1].slice(0, 15).map(function (l) { return '<li>' + mailEsc(l) + '</li>'; }).join('') + '</ul>'; }).join('') +
-    (link ? '<p style="margin:18px 0"><a href="' + mailEsc(link) + '" style="background:#62D0AA;color:#0f1a15;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:bold">Open ProjectFlow</a></p><p style="font-size:13px;color:#555">Sign in with this email address; a code is sent to you.</p>' : '') +
+    (link ? '<p style="margin:18px 0"><a href="' + mailEsc(link) + '" style="background:#62D0AA;color:#0f1a15;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:bold">Open Airwiggles HQ</a></p><p style="font-size:13px;color:#555">Sign in with this email address; a code is sent to you.</p>' : '') +
     '<p style="font-size:12px;color:#777;margin-top:20px">' + mailEsc(foot) + '</p></div>';
   return { gid: gu.id, to: gu.email, name: oneLine(gu.name, 60), subject: oneLine(subject, 150), text: text, html: html, keys: keys };
 }
@@ -1020,7 +1020,7 @@ function runtime(g) {
   /* the workspace's brand image and name, so the guest page matches the app (only a plain picture of a sensible size; never a script-capable image) */
   function brandOf(S) {
     var st = S && S.settings && typeof S.settings === 'object' ? S.settings : {}, logo = typeof st.logoUrl === 'string' ? st.logoUrl.trim() : '', name = typeof st.brandName === 'string' ? st.brandName.replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 80) : '';
-    if (!(/^https:\/\/[^\s"'<>]{1,400}$/i.test(logo) || /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]+$/i.test(logo)) || logo.length > 300000) logo = '';
+    if (!(/^https:\/\/[^\s"'<>]{1,400}$/i.test(logo) || /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]+$/i.test(logo)) || logo.length > 150000) logo = '';
     return { logo: logo, name: name };
   }
   function me(rec, now) {
