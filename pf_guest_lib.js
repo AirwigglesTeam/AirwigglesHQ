@@ -1017,10 +1017,16 @@ function runtime(g) {
   }
 
   /* guest: who am I and what has been shared with me (names only) */
+  /* the workspace's brand image and name, so the guest page matches the app (only a plain picture of a sensible size; never a script-capable image) */
+  function brandOf(S) {
+    var st = S && S.settings && typeof S.settings === 'object' ? S.settings : {}, logo = typeof st.logoUrl === 'string' ? st.logoUrl.trim() : '', name = typeof st.brandName === 'string' ? st.brandName.replace(/[\u0000-\u001f\u007f<>]/g, '').trim().slice(0, 80) : '';
+    if (!(/^https:\/\/[^\s"'<>]{1,400}$/i.test(logo) || /^data:image\/(png|jpeg|jpg|gif|webp);base64,[A-Za-z0-9+\/=]+$/i.test(logo)) || logo.length > 300000) logo = '';
+    return { logo: logo, name: name };
+  }
   function me(rec, now) {
     var S = state() || {}, items = [], d = now instanceof Date ? now : new Date(), today = d.toISOString().slice(0, 10);
     liveOf(rec, d).forEach(function (x) { var b = projectBrief(S, x.p); if (b) { var st = projectStats(S, x.p, today); b.total = st.total; b.done = st.done; b.late = st.late; b.next = st.next; b.startDate = st.startDate; b.endDate = st.endDate; items.push(b); } });
-    return { name: rec.getString('name'), email: rec.getString('email'), mail: mailOn(rec), projects: items };
+    return { name: rec.getString('name'), email: rec.getString('email'), mail: mailOn(rec), brand: brandOf(S), projects: items };
   }
 
   /* remember when a guest last opened a project (the team sees it in Share and Settings); written at most once every ten minutes per guest and project */
