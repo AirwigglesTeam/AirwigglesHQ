@@ -10,6 +10,9 @@
    POST /api/pf/guest/comment (write a comment on a task of a shared project; the project answer carries the comments)
  * Team endpoints for groups (full access only): GET /api/pf/guest/groups, POST group-save, group-delete, grant-group (share one project with every member of a saved group)
  * Team endpoints for comments: GET /api/pf/guest/feed (newest guest comments, for the bell), GET /api/pf/guest/comments?task=<task>, POST /api/pf/guest/comment-team, POST /api/pf/guest/comment-handled (mark a guest comment Handled), POST /api/pf/guest/comment-del (full access only)
+ * Emails (release 254): every five minutes a job emails guests what is new (tasks assigned to them, team replies, tasks due tomorrow, a daily
+   update summary after 08:00 UK time), through the mail settings PocketBase already uses for sign-in codes. POST /api/pf/guest/mail-pref (a guest) switches
+   their own emails on or off. The first run only records what exists, so nothing old is sent. Set PF_GUEST_MAIL=off in the server's environment to stop the job.
  * Needs pf_guest_lib.js in the same folder and PocketBase 0.23 or newer. On older versions this file does nothing.
  * If this file or the library fails, nothing else in ProjectFlow is affected.
 */
@@ -62,6 +65,37 @@ if (typeof onBootstrap === "function") {
       return e.json(200, L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).me(e.auth, new Date()));
     } catch (err) { return e.json(500, { ok: false, error: "me failed" }); }
   }, $apis.requireAuth("guests"));
+
+  routerAdd("POST", "/api/pf/guest/mail-pref", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).mailPref(e.auth, body);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "mail-pref failed" }); }
+  }, $apis.requireAuth("guests"));
+
+  // Every five minutes: email guests what is new. Quiet when there is nothing. PF_GUEST_MAIL=off stops it.
+  cronAdd("pf-guest-mail", "*/5 * * * *", () => {
+    try {
+      if (String($os.getenv("PF_GUEST_MAIL") || "").toLowerCase() === "off") return;
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      const meta = $app.settings().meta;
+      const from = { address: String(meta.senderAddress || ""), name: String(meta.senderName || "ProjectFlow") };
+      if (!from.address) return;
+      let url = String($os.getenv("PF_APP_URL") || meta.appURL || "");
+      if (!/^https:\/\//.test(url)) url = "";
+      const send = (m) => {
+        const msg = new MailerMessage({ from: from, to: [{ address: m.to, name: m.name || "" }], subject: m.subject, html: m.html, text: m.text });
+        $app.newMailClient().send(msg);
+        return true;
+      };
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).mailTick(new Date(), send, url);
+      if (r.sent) console.log("[pf-guest] emails sent: " + r.sent);
+      else if (r.why && r.why !== "no data") console.log("[pf-guest] " + r.why);
+    } catch (err) { console.log("[pf-guest] mail error: " + err); }
+  });
 
   routerAdd("GET", "/api/pf/guest/project", (e) => {
     try {

@@ -227,6 +227,124 @@ function shapeProject(S, pid, pend, gid) {
   };
 }
 
+
+/* ==== EMAILS TO GUESTS (release 254)
+   One email at most per guest per run, batching what is new: tasks assigned to them, team replies to their comments, tasks of theirs due
+   tomorrow and (once a day after 08:00 UK time) new project status updates. What was already sent is remembered in a server-only record
+   (the ledger), so nothing is sent twice. The first run only records what exists, so old items never produce a flood. A guest can switch
+   emails off on their own page. Everything below is plain data in, plain data out (the sending is passed in), so it is tested without a server. */
+var MAIL_CAP = 5;          // emails per guest per UK day
+var MAIL_PER_RUN = 30;     // emails per run
+var MAIL_KEEP = 3000;      // remembered items
+function mailEsc(v) { return String(v == null ? '' : v).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;'); }
+function oneLine(v, n) { return String(v == null ? '' : v).replace(/[\u0000-\u001f\u007f]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); }
+function ukDay(ms) {   // UK calendar date and hour for a time in ms (BST from the last Sunday of March to the last Sunday of October)
+  var d0 = new Date(ms), y = d0.getUTCFullYear();
+  var ls = function (m) { var d = new Date(Date.UTC(y, m + 1, 0, 1)); d.setUTCDate(d.getUTCDate() - d.getUTCDay()); return d.getTime(); };
+  var l = new Date(ms + (ms >= ls(2) && ms < ls(9) ? 3600000 : 0));
+  return { iso: l.toISOString().slice(0, 10), hour: l.getUTCHours() };
+}
+function cleanLedger(raw) {
+  var o = null;
+  try { o = typeof raw === 'string' ? JSON.parse(raw) : raw; } catch (e) { o = null; }
+  var L = { sent: Object.create(null), off: Object.create(null), dig: Object.create(null), day: { d: '', n: Object.create(null) } };
+  if (!o || typeof o !== 'object') return L;
+  var key = /^[acdu]:[A-Za-z0-9_:-]{1,200}$/;
+  if (o.sent && typeof o.sent === 'object') Object.keys(o.sent).slice(0, MAIL_KEEP + 500).forEach(function (k) { if (key.test(k) && typeof o.sent[k] === 'number') L.sent[k] = o.sent[k]; });
+  if (o.off && typeof o.off === 'object') Object.keys(o.off).slice(0, 5000).forEach(function (k) { if (idOk(k) && o.off[k]) L.off[k] = 1; });
+  if (o.dig && typeof o.dig === 'object') Object.keys(o.dig).slice(0, 5000).forEach(function (k) { if (idOk(k) && typeof o.dig[k] === 'number') L.dig[k] = o.dig[k]; });
+  if (o.day && typeof o.day === 'object' && /^\d{4}-\d{2}-\d{2}$/.test(o.day.d || '')) {
+    L.day.d = o.day.d;
+    if (o.day.n && typeof o.day.n === 'object') Object.keys(o.day.n).slice(0, 5000).forEach(function (k) { if (idOk(k) && typeof o.day.n[k] === 'number') L.day.n[k] = o.day.n[k]; });
+  }
+  return L;
+}
+function ledgerOut(L, now) {   // forget old items (due-date items after two weeks) and cap the size
+  var keys = Object.keys(L.sent), cut = now - 14 * 864e5;
+  keys.forEach(function (k) { if (k.charAt(0) === 'd' && L.sent[k] < cut) delete L.sent[k]; });
+  keys = Object.keys(L.sent);
+  if (keys.length > MAIL_KEEP) {
+    keys.sort(function (a, b) { return L.sent[a] - L.sent[b]; }).slice(0, keys.length - MAIL_KEEP + 500).forEach(function (k) { delete L.sent[k]; });
+  }
+  return JSON.stringify(L);
+}
+/* what to send. in = {S, guests:[{id,email,name,grants}], team:[{id,task,project,author,body,at}], guestTasks:function(gid)->{taskId:true}, ledger, now(ms), appUrl, baseline} */
+function planMail(inp) {
+  var S = inp.S || {}, L = inp.ledger, now = inp.now, uk = ukDay(now), tomorrow = ukDay(now + 864e5).iso;
+  var projName = Object.create(null);
+  (Array.isArray(S.projects) ? S.projects : []).forEach(function (p) { if (p && idOk(p.id)) projName[p.id] = oneLine(p.name, 80) || 'Project'; });
+  var tasks = Array.isArray(S.tasks) ? S.tasks : [];
+  var out = { mails: [], seen: [], skip: [], dig: Object.create(null) };
+  inp.guests.forEach(function (gu) {
+    if (!gu || !idOk(gu.id) || !normEmail(gu.email)) return;
+    var live = Object.create(null), n = 0;
+    liveGrants(gu.grants, new Date(now)).forEach(function (g) { if (projName[g.p]) { live[g.p] = true; n++; } });
+    if (!n) return;
+    var items = { assign: [], reply: [], due: [], upd: [] }, keys = [], seen = out.seen;
+    var addKey = function (k) { if (!L.sent[k]) keys.push(k); return !L.sent[k]; };
+    var assigned = Object.create(null);
+    tasks.forEach(function (t) {
+      if (!t || !idOk(t.id) || t.done === true || !live[t.projectId] || !Array.isArray(t.guestAssignees) || t.guestAssignees.indexOf(gu.id) < 0) return;
+      var nm = oneLine(t.name, 120) || 'Task';
+      if (addKey('a:' + t.id + ':' + gu.id)) { items.assign.push({ t: nm, p: t.projectId }); assigned[t.id] = true; }
+      var due = dateOk(t.endDate);
+      if (due && due === tomorrow && !assigned[t.id] && addKey('d:' + t.id + ':' + due + ':' + gu.id)) items.due.push({ t: nm, p: t.projectId, d: due });
+    });
+    var mine = null;
+    (inp.team || []).forEach(function (c) {
+      if (!c || !live[c.project] || L.sent['c:' + c.id] || !idOk(c.id)) return;
+      if (!mine) mine = inp.guestTasks(gu.id) || {};
+      if (!mine[c.task]) return;
+      keys.push('c:' + c.id);
+      var task = null; for (var i = 0; i < tasks.length; i++) if (tasks[i] && tasks[i].id === c.task) { task = tasks[i]; break; }
+      items.reply.push({ t: task ? oneLine(task.name, 120) : 'a task', p: c.project, by: oneLine(c.author, 40) || 'The team', body: oneLine(c.body, 160) });
+    });
+    /* once a day after 08:00 UK: status updates posted since the last check */
+    var lastDig = L.dig[gu.id] || 0;
+    if (uk.hour >= 8 && ukDay(lastDig).iso !== uk.iso) {
+      var from = lastDig || (inp.start || now);
+      Object.keys(live).forEach(function (pid) {
+        var p = null; for (var i = 0; i < S.projects.length; i++) if (S.projects[i] && S.projects[i].id === pid) { p = S.projects[i]; break; }
+        (p && Array.isArray(p.updates) ? p.updates : []).forEach(function (u) {
+          if (u && typeof u === 'object' && typeof u.at === 'number' && u.at > from && u.at <= now && typeof u.text === 'string') items.upd.push({ p: pid, by: oneLine(u.by, 40), text: oneLine(u.text, 200) });
+        });
+      });
+      out.dig[gu.id] = now;
+    }
+    keys.forEach(function (k) { seen.push(k); });
+    var total = items.assign.length + items.reply.length + items.due.length + items.upd.length;
+    if (L.off[gu.id] && !inp.baseline) { keys.forEach(function (k) { out.skip.push(k); }); return; }   // switched off: remember them so they are not sent if it is switched back on
+    if (!total || inp.baseline) return;
+    if (L.day.d === uk.iso && (L.day.n[gu.id] || 0) >= MAIL_CAP) return;
+    out.mails.push(renderMail(gu, items, projName, inp.appUrl, total, keys));
+  });
+  return out;
+}
+function renderMail(gu, items, projName, appUrl, total, keys) {
+  var first = items.assign[0] || items.reply[0] || items.due[0] || items.upd[0];
+  var one = total === 1;
+  var subject = one
+    ? (items.assign.length ? 'New task for you: ' + first.t : items.reply.length ? 'The team replied about: ' + first.t : items.due.length ? 'Due tomorrow: ' + first.t : 'Project update: ' + (projName[first.p] || 'Project'))
+    : 'ProjectFlow: ' + total + ' things for you';
+  var pids = Object.create(null); [items.assign, items.reply, items.due, items.upd].forEach(function (a) { a.forEach(function (x) { pids[x.p] = true; }); });
+  var plist = Object.keys(pids);
+  var link = /^https:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~\/-]*)?$/.test(appUrl || '') ? appUrl.replace(/\/+$/, '') + '/#guest' + (plist.length === 1 ? '=' + plist[0] : '') : '';
+  var secs = [
+    ['New tasks for you', items.assign.map(function (x) { return x.t + ' (' + (projName[x.p] || 'Project') + ')'; })],
+    ['Replies from the team', items.reply.map(function (x) { return x.by + ' on ' + x.t + ': ' + x.body; })],
+    ['Due tomorrow', items.due.map(function (x) { return x.t + ' (' + (projName[x.p] || 'Project') + ')'; })],
+    ['Project updates', items.upd.map(function (x) { return (projName[x.p] || 'Project') + ': ' + x.text + (x.by ? ' (' + x.by + ')' : ''); })]
+  ].filter(function (x) { return x[1].length; });
+  var foot = 'You get these because you have been given access to a project in ProjectFlow. You can switch emails off with the Emails switch on your project page.';
+  var hi = 'Hi' + (oneLine(gu.name, 60) ? ' ' + oneLine(gu.name, 60).split(' ')[0] : '') + ',';
+  var text = hi + '\n\n' + secs.map(function (x) { return x[0] + '\n' + x[1].slice(0, 15).map(function (l) { return '- ' + l; }).join('\n'); }).join('\n\n') + '\n\n' + (link ? 'Open it here (sign in with this email address): ' + link + '\n\n' : '') + foot + '\n';
+  var html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px"><p>' + mailEsc(hi) + '</p>' +
+    secs.map(function (x) { return '<p style="margin:14px 0 4px"><b>' + mailEsc(x[0]) + '</b></p><ul style="margin:0;padding-left:20px">' + x[1].slice(0, 15).map(function (l) { return '<li>' + mailEsc(l) + '</li>'; }).join('') + '</ul>'; }).join('') +
+    (link ? '<p style="margin:18px 0"><a href="' + mailEsc(link) + '" style="background:#62D0AA;color:#0f1a15;padding:10px 16px;border-radius:6px;text-decoration:none;font-weight:bold">Open ProjectFlow</a></p><p style="font-size:13px;color:#555">Sign in with this email address; a code is sent to you.</p>' : '') +
+    '<p style="font-size:12px;color:#777;margin-top:20px">' + mailEsc(foot) + '</p></div>';
+  return { gid: gu.id, to: gu.email, name: oneLine(gu.name, 60), subject: oneLine(subject, 150), text: text, html: html, keys: keys };
+}
+
 /* ---- the part that talks to PocketBase. g = {app, Record, Collection, security}: the PocketBase globals, passed in so tests can fake them ---- */
 function runtime(g) {
   var db = g.app;
@@ -324,6 +442,68 @@ function runtime(g) {
   function grantsOf(rec) { return cleanGrants(rec.getString('grants') || '[]'); }
   function liveOf(rec, now) { return liveGrants(rec.getString('grants') || '[]', now); }
   function putGrants(rec, list) { rec.set('grants', JSON.stringify(list)); db.save(rec); }
+
+
+  /* ---- emails to guests (release 254): the ledger is a server-only record, like the saved groups ---- */
+  var MWS = 'airwiggles-sr-mail';
+  function mLoad() {
+    var rec = null;
+    try { rec = db.findFirstRecordByFilter('workspace_state', 'workspace = "' + MWS + '"'); } catch (e) { rec = null; }
+    return { rec: rec, L: cleanLedger(rec ? rec.getString('data') : null), start: rec ? Date.parse(rec.getString('created')) || 0 : 0 };
+  }
+  function mSave(h, now) {
+    if (!h.rec) { h.rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); h.rec.set('workspace', MWS); }
+    h.rec.set('data', ledgerOut(h.L, now));
+    db.save(h.rec);
+  }
+  /* run every few minutes; send(message) returns true when the mail went out. appUrl is the https address of the app. */
+  function mailTick(nowDate, send, appUrl) {
+    var now = nowDate.getTime(), S = state();
+    if (!S) return { sent: 0, why: 'no data' };
+    var h = mLoad(), first = !h.rec, map = allGuests(), guests = [];
+    Object.keys(map).forEach(function (id) { var r = map[id]; guests.push({ id: id, email: r.getString('email'), name: r.getString('name'), grants: r.getString('grants') || '[]' }); });
+    var team = [];
+    try {
+      team = db.findRecordsByFilter('pf_comments', 'kind = "team"', '-created', 200, 0).map(function (r) { return { id: r.id, task: r.getString('task'), project: r.getString('project'), author: r.getString('author'), body: r.getString('body') }; });
+    } catch (e) { team = []; }
+    var cache = Object.create(null);
+    var guestTasks = function (gid) {
+      if (cache[gid]) return cache[gid];
+      var m = Object.create(null), recs = [];
+      try { recs = db.findRecordsByFilter('pf_comments', 'kind = "guest" && authorId = {:a}', '-created', 200, 0, { a: gid }); } catch (e) { recs = []; }
+      recs.forEach(function (r) { m[r.getString('task')] = true; });
+      return (cache[gid] = m);
+    };
+    var plan = planMail({ S: S, guests: guests, team: team, guestTasks: guestTasks, ledger: h.L, now: now, start: h.start, appUrl: appUrl, baseline: first });
+    var uk = ukDay(now), sent = 0;
+    plan.seen.forEach(function (k) { if (first) h.L.sent[k] = now; });
+    plan.skip.forEach(function (k) { h.L.sent[k] = now; });
+    if (first) { Object.keys(plan.dig).forEach(function (gid) { h.L.dig[gid] = plan.dig[gid]; }); mSave(h, now); return { sent: 0, why: 'first run: existing items recorded' }; }
+    plan.mails.slice(0, MAIL_PER_RUN).forEach(function (m) {
+      var ok = false;
+      try { ok = send({ to: m.to, name: m.name, subject: m.subject, text: m.text, html: m.html }) === true; } catch (e) { ok = false; }
+      if (!ok) return;
+      sent++;
+      m.keys.forEach(function (k) { h.L.sent[k] = now; });
+      if (h.L.day.d !== uk.iso) h.L.day = { d: uk.iso, n: Object.create(null) };
+      h.L.day.n[m.gid] = (h.L.day.n[m.gid] || 0) + 1;
+      if (plan.dig[m.gid]) h.L.dig[m.gid] = plan.dig[m.gid];
+    });
+    /* a guest with nothing new still moves their daily update check forward, so old updates are not sent later */
+    Object.keys(plan.dig).forEach(function (gid) { if (!plan.mails.some(function (m) { return m.gid === gid; })) h.L.dig[gid] = plan.dig[gid]; });
+    mSave(h, now);
+    return { sent: sent };
+  }
+  /* guest: switch emails on or off */
+  function mailPref(rec, body) {
+    var on = body && body.on;
+    if (on !== true && on !== false) return { code: 400, body: { ok: false, error: 'bad request' } };
+    var h = mLoad();
+    if (on) delete h.L.off[rec.id]; else h.L.off[rec.id] = 1;
+    mSave(h, Date.now());
+    return { code: 200, body: { ok: true, on: on } };
+  }
+  function mailOn(rec) { var h = mLoad(); return !h.L.off[rec.id]; }
 
   /* team: give a guest (made on the spot if new) access to one project */
   function grant(by, body, now) {
@@ -662,7 +842,7 @@ function runtime(g) {
   function me(rec, now) {
     var S = state() || {}, items = [], d = now instanceof Date ? now : new Date(), today = d.toISOString().slice(0, 10);
     liveOf(rec, d).forEach(function (x) { var b = projectBrief(S, x.p); if (b) { var st = projectStats(S, x.p, today); b.total = st.total; b.done = st.done; b.late = st.late; b.next = st.next; b.startDate = st.startDate; b.endDate = st.endDate; items.push(b); } });
-    return { name: rec.getString('name'), email: rec.getString('email'), projects: items };
+    return { name: rec.getString('name'), email: rec.getString('email'), mail: mailOn(rec), projects: items };
   }
 
   /* remember when a guest last opened a project (the team sees it in Share and Settings); written at most once every ten minutes per guest and project */
@@ -683,7 +863,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
-module.exports = { cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
