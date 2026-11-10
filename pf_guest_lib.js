@@ -332,7 +332,7 @@ function renderMail(gu, items, projName, appUrl, total, keys) {
   var one = total === 1;
   var subject = one
     ? (items.assign.length ? 'New task for you: ' + first.t : items.reply.length ? 'The team replied about: ' + first.t : items.due.length ? 'Due tomorrow: ' + first.t : 'Project update: ' + (projName[first.p] || 'Project'))
-    : 'ProjectFlow: ' + total + ' things for you';
+    : 'Airwiggles HQ: ' + total + ' things for you';
   var pids = Object.create(null); [items.assign, items.reply, items.due, items.upd].forEach(function (a) { a.forEach(function (x) { pids[x.p] = true; }); });
   var plist = Object.keys(pids);
   var link = /^https:\/\/[A-Za-z0-9.-]+(:\d+)?(\/[A-Za-z0-9._~\/-]*)?$/.test(appUrl || '') ? appUrl.replace(/\/+$/, '') + '/#guest' + (plist.length === 1 ? '=' + plist[0] : '') : '';
@@ -342,7 +342,7 @@ function renderMail(gu, items, projName, appUrl, total, keys) {
     ['Due tomorrow', items.due.map(function (x) { return x.t + ' (' + (projName[x.p] || 'Project') + ')'; })],
     ['Project updates', items.upd.map(function (x) { return (projName[x.p] || 'Project') + ': ' + x.text + (x.by ? ' (' + x.by + ')' : ''); })]
   ].filter(function (x) { return x[1].length; });
-  var foot = 'You get these because you have been given access to a project in ProjectFlow. You can switch emails off with the Emails switch on your project page.';
+  var foot = 'You get these because you have been given access to a project in Airwiggles HQ. You can switch emails off with the Emails switch on your project page.';
   var hi = 'Hi' + (oneLine(gu.name, 60) ? ' ' + oneLine(gu.name, 60).split(' ')[0] : '') + ',';
   var text = hi + '\n\n' + secs.map(function (x) { return x[0] + '\n' + x[1].slice(0, 15).map(function (l) { return '- ' + l; }).join('\n'); }).join('\n\n') + '\n\n' + (link ? 'Open it here (sign in with this email address): ' + link + '\n\n' : '') + foot + '\n';
   var html = '<div style="font-family:Arial,sans-serif;font-size:15px;color:#222;max-width:560px"><p>' + mailEsc(hi) + '</p>' +
@@ -554,7 +554,7 @@ function runtime(g) {
     try { mSave(h, nowMs); } catch (e) { /* still try the mail */ }
     var err = '', ok = false;
     try {
-      ok = send({ to: to, name: '', subject: 'ProjectFlow test email', text: 'This is a test email from ProjectFlow. If you can read it, guest emails can be sent from your server.\n', html: '<p style="font-family:Arial,sans-serif;font-size:15px">This is a test email from ProjectFlow. If you can read it, guest emails can be sent from your server.</p>' }) === true;
+      ok = send({ to: to, name: '', subject: 'Airwiggles HQ test email', text: 'This is a test email from Airwiggles HQ. If you can read it, guest emails can be sent from your server.\n', html: '<p style="font-family:Arial,sans-serif;font-size:15px">This is a test email from Airwiggles HQ. If you can read it, guest emails can be sent from your server.</p>' }) === true;
     } catch (e) { err = oneLine(String(e && e.message ? e.message : e), 200) || 'the mail server refused it'; }
     if (!ok && !err) err = 'the mail server did not accept it';
     return { code: 200, body: ok ? { ok: true, to: to } : { ok: false, error: err } };
