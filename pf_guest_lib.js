@@ -458,10 +458,28 @@ function runtime(g) {
     try { rec = db.findFirstRecordByFilter('workspace_state', 'workspace = "' + MWS + '"'); } catch (e) { rec = null; }
     return { rec: rec, L: cleanLedger(rec ? rec.getString('data') : null), start: rec ? Date.parse(rec.getString('created')) || 0 : 0 };
   }
+  /* Every write of the ledger runs inside one database transaction. A guest's switch, the team's switch and the 5-minute run can all write at the
+     same moment; each one reads the newest copy first, so one change cannot wipe out another (the run keeps its own sent list but always takes the
+     latest on/off switches, and a switch change keeps the run's sent list). */
   function mSave(h, now) {
-    if (!h.rec) { h.rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); h.rec.set('workspace', MWS); }
-    h.rec.set('data', ledgerOut(h.L, now));
-    db.save(h.rec);
+    qtx(function (find, save) {
+      var rec = find(MWS);
+      if (rec) { var f = cleanLedger(rec.getString('data')); h.L.off = f.off; h.L.halt = f.halt; }
+      else { rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); rec.set('workspace', MWS); }
+      rec.set('data', ledgerOut(h.L, now));
+      save(rec);
+      h.rec = rec;
+    });
+  }
+  function mChange(fn) {   // change the switches on the newest copy of the ledger; returns false when nothing needed changing
+    return qtx(function (find, save) {
+      var rec = find(MWS), L = cleanLedger(rec ? rec.getString('data') : null);
+      if (fn(L) === false) return false;
+      if (!rec) { rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); rec.set('workspace', MWS); }
+      rec.set('data', ledgerOut(L, Date.now()));
+      save(rec);
+      return true;
+    });
   }
   /* what would be sent right now (used by the run and by the status line) */
   function mailPlanNow(h, now, appUrl, first) {
@@ -502,7 +520,7 @@ function runtime(g) {
     plan.skip.forEach(function (k) { h.L.sent[k] = now; });
     h.L.run = now; mSave(h, now);   // take the lock
     /* save after every mail, and always take the guests' on/off switches from a fresh read, so a switch made during a run is never undone */
-    var commit = function () { var f = mLoad().L; h.L.off = f.off; h.L.halt = f.halt; mSave(h, now); };
+    var commit = function () { mSave(h, now); };
     try {
       var list = plan.mails.slice(0, MAIL_PER_RUN);
       for (var i = 0; i < list.length; i++) {
@@ -563,29 +581,26 @@ function runtime(g) {
   function mailPref(rec, body) {
     var on = body && body.on;
     if (on !== true && on !== false) return { code: 400, body: { ok: false, error: 'bad request' } };
-    var h = mLoad();
-    if (!!h.L.off[rec.id] === !on) return { code: 200, body: { ok: true, on: on } };   // already so: no write
-    if (on) delete h.L.off[rec.id]; else h.L.off[rec.id] = 1;
-    mSave(h, Date.now());
+    mChange(function (L) {
+      if (!!L.off[rec.id] === !on) return false;   // already so: no write
+      if (on) delete L.off[rec.id]; else L.off[rec.id] = 1;
+    });
     return { code: 200, body: { ok: true, on: on } };
   }
   /* team (full access): switch one guest's emails, or all guest emails, on or off. A guest's own switch is the same one, so they can change it back. */
   function mailAdmin(body) {
     var on = body && body.on;
     if (on !== true && on !== false) return { code: 400, body: { ok: false, error: 'bad request' } };
-    var h = mLoad(), gid = body && body.guest;
+    var gid = body && body.guest;
     if (body && body.all === true) {
-      if (!!h.L.halt === !on) return { code: 200, body: { ok: true, on: on } };
-      if (on) h.L.halt = 0; else h.L.halt = 1;
+      mChange(function (L) { if (!!L.halt === !on) return false; L.halt = on ? 0 : 1; });
     } else {
       if (!idOk(gid)) return { code: 400, body: { ok: false, error: 'bad request' } };
       var rec = null;
       try { rec = db.findRecordById('guests', gid); } catch (e) { rec = null; }
       if (!rec) return { code: 404, body: { ok: false, error: 'not found' } };
-      if (!!h.L.off[gid] === !on) return { code: 200, body: { ok: true, on: on } };
-      if (on) delete h.L.off[gid]; else h.L.off[gid] = 1;
+      mChange(function (L) { if (!!L.off[gid] === !on) return false; if (on) delete L.off[gid]; else L.off[gid] = 1; });
     }
-    mSave(h, Date.now());
     return { code: 200, body: { ok: true, on: on } };
   }
   function mailOn(rec) { var h = mLoad(); return !h.L.off[rec.id]; }
