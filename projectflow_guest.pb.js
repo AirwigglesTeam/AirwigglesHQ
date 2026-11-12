@@ -304,4 +304,22 @@ if (typeof onBootstrap === "function") {
       return e.json(r.code, r.body);
     } catch (err) { return e.json(500, { ok: false, error: "delete failed" }); }
   }, $apis.requireAuth("users"));
+
+  // The installed-app files (release 276): public on purpose, like the page itself, and fixed content only (name, colours, logo).
+  // Phones need them to offer "Install" with the Airwiggles icon. No sign-in, no workspace data, cached for a day.
+  ["/manifest.webmanifest", "/pf-icon-192.png", "/pf-icon-512.png", "/apple-touch-icon.png"].forEach((p) => {
+    routerAdd("GET", p, (e) => {
+      try {
+        const L = require(`${__hooks}/pf_guest_lib.js`);
+        let q = "", host = "";
+        try { q = String(e.request.url.rawQuery || ""); } catch (x) {}
+        try { host = String(e.request.host || ""); } catch (x) {}
+        const a = L.appAsset(String(e.request.url.path), q, host);
+        if (!a) return e.json(404, { ok: false });
+        e.response.header().set("Cache-Control", "public, max-age=86400");
+        e.response.header().set("X-Content-Type-Options", "nosniff");
+        return e.blob(200, a.type, a.bytes);
+      } catch (err) { return e.json(500, { ok: false }); }
+    });
+  });
 }
