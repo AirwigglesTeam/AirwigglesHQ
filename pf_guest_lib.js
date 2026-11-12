@@ -755,7 +755,7 @@ function runtime(g) {
     var rec = find(QWS), q = {};
     if (rec) { try { q = JSON.parse(rec.getString('data') || '{}'); } catch (e) { q = {}; } }
     if (!q || !Array.isArray(q.items)) q = { items: [] };
-    var cut = now.getTime() - 14 * 864e5;
+    var cut = now.getTime() - 60 * 864e5;   // a waiting tick is kept for 60 days (was 14 until release 269); MAX_QUEUE still caps the size
     q.items = q.items.filter(function (x) { return x && ID_OK.test(String(x.id)) && ID_OK.test(String(x.taskId)) && Date.parse(x.at) > cut; });
     return { rec: rec, q: q };
   }
