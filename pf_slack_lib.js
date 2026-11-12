@@ -133,6 +133,28 @@ function guestCommentText(S, c, appUrl) {
   return head + '\n> ' + text + (cc.length ? '\n' + cc.join(' ') : '');
 }
 
+/* ---- a guest suggested a task (release 269): one channel message naming the project, the title, the note and the date, @mentioning the project owner ---- */
+function guestSuggestText(S, c, appUrl) {
+  var pr = null, own = null;
+  (S.projects || []).forEach(function (p) { if (p && p.id === c.project) pr = p; });
+  (S.members || []).forEach(function (m) { if (m && pr && m.id === pr.ownerId) own = m; });
+  var b = {}; try { b = JSON.parse(c.body || '{}') || {}; } catch (e) { b = {}; }
+  var who = esc(String(c.who || 'A guest').slice(0, 60));
+  var head = '*\uD83D\uDCA1 ' + who + ' (guest) suggested a task*';
+  if (pr) head += ' for <' + link(appUrl, 'project', pr.id) + '|' + esc(String(pr.name || 'Project').slice(0, 60)) + '>';
+  var lines = ['> *' + esc(String(b.t || 'Untitled').slice(0, 120)) + '*'];
+  if (b.n) lines.push('> ' + esc(String(b.n).slice(0, 400)).replace(/\r?\n/g, '\n> '));
+  if (/^\d{4}-\d\d-\d\d$/.test(String(b.d || ''))) lines.push('> Wanted by ' + String(b.d));
+  var tail = 'Accept or decline it on the project page.';
+  if (own && idOk(own.slackId)) tail = '<@' + own.slackId + '> ' + tail;
+  return head + '\n' + lines.join('\n') + '\n' + tail;
+}
+/* ---- guest ticks that have waited over a day (release 269): the team app applies them, so the channel gets one note a day ---- */
+function waitingText(n, appUrl) {
+  var a = String(appUrl || '').replace(/\/+$/, '');
+  return '*\u23F3 ' + n + ' guest tick' + (n === 1 ? ' has' : 's have') + ' waited over a day.* They are applied when someone on the team opens ' + (a ? '<' + a + '|Airwiggles HQ>' : 'Airwiggles HQ') + '.';
+}
+
 /* ---- Done buttons. The button carries only the task id; who may press it is decided on the server when it is pressed ---- */
 var ID_OK = /^[\w-]{1,60}$/;
 function doneButton(id) {
@@ -433,7 +455,7 @@ function runtime(g) {
     var rec = find(QWS), q = {};
     if (rec) { try { q = JSON.parse(rec.getString('data') || '{}'); } catch (e) { q = {}; } }
     if (!q || !Array.isArray(q.items)) q = { items: [] };
-    var cut = now.getTime() - 14 * 864e5;   // anything nobody applied for two weeks is dropped
+    var cut = now.getTime() - 60 * 864e5;   // anything nobody applied for 60 days is dropped (14 until release 269)
     q.items = q.items.filter(function (x) { return x && ID_OK.test(String(x.id)) && ID_OK.test(String(x.taskId)) && Date.parse(x.at) > cut; });
     return { rec: rec, q: q };
   }
@@ -545,29 +567,42 @@ function runtime(g) {
     now = now || new Date();
     var S = state(); if (!S) return { sent: 0, why: 'no workspace' };
     var c = conf(S); if (!c.webhook) return { sent: 0, why: 'no webhook' };
-    /* its own small record, so this minute-by-minute job never rewrites the sent-log the five-minute reminders use */
-    var rec = find('airwiggles-sr-cm'), mark = '';
-    if (rec) { try { mark = String((JSON.parse(rec.getString('data') || '{}') || {}).m || ''); } catch (e) { mark = ''; } }
-    function put(m) {
+    /* its own small record, so this minute-by-minute job never rewrites the sent-log the five-minute reminders use.
+       m = the newest comment already handled, w = the London date of the last "ticks are waiting" note */
+    var rec = find('airwiggles-sr-cm'), mark = '', wday = '';
+    if (rec) { try { var o = JSON.parse(rec.getString('data') || '{}') || {}; mark = String(o.m || ''); wday = String(o.w || ''); } catch (e) { mark = ''; } }
+    function put(m, w) {
       if (!rec) { rec = new g.Record(db.findCollectionByNameOrId('workspace_state')); rec.set('workspace', 'airwiggles-sr-cm'); }
-      rec.set('data', JSON.stringify({ m: m }));
+      rec.set('data', JSON.stringify(w ? { m: m, w: w } : { m: m }));
       if (typeof g.app.save === 'function') g.app.save(rec); else db.saveRecord(rec);
     }
-    if (!/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d/.test(mark)) { try { put(now.toISOString().replace('T', ' ')); } catch (e) {} return { sent: 0, why: 'learned the start time' }; }
-    var recs = [];
-    try { recs = db.findRecordsByFilter('pf_comments', 'kind = "guest" && created > {:t}', 'created', 10, 0, { t: mark }); } catch (e) { return { sent: 0 }; }   // no comments collection yet
-    if (!recs.length) return { sent: 0 };
+    if (!/^\d{4}-\d\d-\d\d \d\d:\d\d:\d\d/.test(mark)) { try { put(now.toISOString().replace('T', ' '), wday); } catch (e) {} return { sent: 0, why: 'learned the start time' }; }
     var on = !(S.settings && S.settings.guestCommentChan === false), sent = 0, last = '';
+    var recs = [];
+    try { recs = db.findRecordsByFilter('pf_comments', '(kind = "guest" || kind = "suggest") && created > {:t}', 'created', 10, 0, { t: mark }); } catch (e) { recs = []; }   // no comments collection yet
     for (var i = 0; i < recs.length; i++) {
       var r = recs[i], at = String(r.getString('created') || '');
       if (on) {
-        var d = deliver(c.webhook, { text: guestCommentText(S, { task: r.getString('task'), who: r.getString('author'), text: r.getString('body') }, c.appUrl) });
+        var txt = r.getString('kind') === 'suggest'
+          ? guestSuggestText(S, { project: r.getString('project'), who: r.getString('author'), body: r.getString('body') }, c.appUrl)
+          : guestCommentText(S, { task: r.getString('task'), who: r.getString('author'), text: r.getString('body') }, c.appUrl);
+        var d = deliver(c.webhook, { text: txt });
         if (!d.ok) break;   // the next run tries again
         sent++;
       }
       last = at;
     }
-    if (last) { try { put(last); } catch (e) { return { sent: sent, why: 'marker save failed: ' + e }; } }
+    /* once a day, from 9am London: guest ticks older than a day that the team app has not applied yet */
+    var lo = london(now), w2 = wday;
+    if (on && wday !== lo.iso && lo.hour >= 9) {
+      var waiting = 0, cut = now.getTime() - 864e5;
+      try {
+        var qr = find(QWS), q = qr ? JSON.parse(qr.getString('data') || '{}') : {};
+        (Array.isArray(q && q.items) ? q.items : []).forEach(function (x) { if (x && x.via === 'guest' && (x.kind || 'done') === 'done' && Date.parse(x.at) < cut) waiting++; });
+      } catch (e) { waiting = 0; }
+      if (waiting) { var dw = deliver(c.webhook, { text: waitingText(waiting, c.appUrl) }); if (dw.ok) { sent++; w2 = lo.iso; } }   // one small record read a minute until a note goes out that day
+    }
+    if (last || w2 !== wday) { try { put(last || mark, w2); } catch (e) { return { sent: sent, why: 'marker save failed: ' + e }; } }
     return { sent: sent };
   }
   /* what the Settings screen shows: never the webhook itself */
@@ -703,4 +738,4 @@ function runtime(g) {
   }
   return { commentTick: commentTick, events: events, interact: interact, tick: tick, status: status, sendNow: sendNow, state: state, queueAdd: queueAdd, queueCancel: queueCancel, queueClaim: queueClaim, queueAck: queueAck, queuePending: queuePending };
 }
-module.exports = { guestCommentText: guestCommentText, unfurlFor: unfurlFor, digestParts: digestParts, alertParts: alertParts, linesToBlocks: linesToBlocks, doneButton: doneButton, runtime: runtime,  esc: esc, idOk: idOk, urlOk: urlOk, appUrlOk: appUrlOk, london: london, weekKey: weekKey, fmtD: fmtD, link: link, digestText: digestText, alertText: alertText, alertOpts: alertOpts, ALERT_DAYS: ALERT_DAYS, taskBlocks: taskBlocks, plan: plan, payload: payload, trimLog: trimLog, config: config, OD_MAX: OD_MAX };
+module.exports = { guestCommentText: guestCommentText, guestSuggestText: guestSuggestText, waitingText: waitingText, unfurlFor: unfurlFor, digestParts: digestParts, alertParts: alertParts, linesToBlocks: linesToBlocks, doneButton: doneButton, runtime: runtime,  esc: esc, idOk: idOk, urlOk: urlOk, appUrlOk: appUrlOk, london: london, weekKey: weekKey, fmtD: fmtD, link: link, digestText: digestText, alertText: alertText, alertOpts: alertOpts, ALERT_DAYS: ALERT_DAYS, taskBlocks: taskBlocks, plan: plan, payload: payload, trimLog: trimLog, config: config, OD_MAX: OD_MAX };
