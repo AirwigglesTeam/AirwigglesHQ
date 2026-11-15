@@ -9,6 +9,8 @@
    POST /api/pf/guest/tick (tick a task, or take back a tick that still waits: the tick is queued and the team app applies it),
    POST /api/pf/guest/status (ask to start, or un-start, a task assigned to them: queued like a tick and applied by the team app),
    POST /api/pf/guest/comment (write a comment on a task of a shared project; the project answer carries the comments)
+ * Team endpoints for Business access (release 300): GET /api/pf/team/access (anyone on the team: their own page list; the super user also gets
+   everyone with a Business on/off flag), POST /api/pf/team/business {id, on} (super user only, named in PF_SUPER_USERS on the server)
  * Team endpoints for groups (full access only): GET /api/pf/guest/groups, POST group-save, group-delete, grant-group (share one project with every member of a saved group)
  * Team endpoints for comments: GET /api/pf/guest/feed (newest guest comments, for the bell), GET /api/pf/guest/comments?task=<task>, POST /api/pf/guest/comment-team, POST /api/pf/guest/comment-handled (mark a guest comment Handled), POST /api/pf/guest/comment-del (full access only)
  * Emails (release 254): every five minutes a job emails guests what is new (tasks assigned to them, team replies, tasks due tomorrow, a daily
@@ -251,6 +253,30 @@ if (typeof onBootstrap === "function") {
       const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).commentHandled(e.auth, body, new Date());
       return e.json(r.code, r.body);
     } catch (err) { return e.json(500, { ok: false, error: "handled failed" }); }
+  }, $apis.requireAuth("users"));
+
+  /* Business access (release 300). Team accounts only. The super user is named in the server environment (PF_SUPER_USERS);
+     everyone else gets super:false and nothing more. GET also tells each person their own current page list, so a change
+     reaches their app within minutes. */
+  routerAdd("GET", "/api/pf/team/access", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      const mine = L.permList(e.auth.getString("permissions"));
+      if (!L.isSuper(e.auth.getString("email"), $os.getenv("PF_SUPER_USERS"))) return e.json(200, { ok: true, super: false, mine: mine });
+      return e.json(200, { ok: true, super: true, mine: mine, people: L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).accessList() });
+    } catch (err) { return e.json(500, { ok: false, error: "access failed" }); }
+  }, $apis.requireAuth("users"));
+
+  routerAdd("POST", "/api/pf/team/business", (e) => {
+    try {
+      const L = require(`${__hooks}/pf_guest_lib.js`);
+      if (!L.isSuper(e.auth.getString("email"), $os.getenv("PF_SUPER_USERS"))) return e.json(403, { ok: false, error: "not allowed" });
+      let body = {};
+      try { body = e.requestInfo().body || {}; } catch (x) {}
+      const r = L.runtime({ app: $app, Record: Record, Collection: Collection, security: $security, TextField: TextField }).accessSet(e.auth.id, body);
+      if (r.code === 200) console.log("[pf-access] " + e.auth.getString("email") + " set Business " + (r.body.business ? "on" : "off") + " for " + r.body.id);
+      return e.json(r.code, r.body);
+    } catch (err) { return e.json(500, { ok: false, error: "change failed" }); }
   }, $apis.requireAuth("users"));
 
   routerAdd("GET", "/api/pf/guest/groups", (e) => {

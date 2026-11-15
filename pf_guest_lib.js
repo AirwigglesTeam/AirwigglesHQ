@@ -70,7 +70,45 @@ function cleanComment(v) {
 function canShare(perms) {
   if (perms == null || perms === '') return true;
   if (typeof perms === 'string') { try { perms = JSON.parse(perms); } catch (e) { return false; } }
-  return perms == null || (Array.isArray(perms) && perms.length === 0);
+  /* release 300: 'share' keeps the right to share with guests for a full-access person whose Business access was switched off */
+  return perms == null || (Array.isArray(perms) && (perms.length === 0 || perms.indexOf('share') >= 0));
+}
+
+/* -- Business access, switched by the super user (release 300) --
+   The super user is named on the server only: PF_SUPER_USERS="greg@example.com" (one or more emails, comma separated) in the
+   PocketBase service environment. Nobody can make themselves super user from inside the app.
+   Business is the page 'finance' in a team account's permissions list. An empty list means every page (and the right to share
+   with guests); switching Business off for such a person gives them every page except Business, plus 'share' so they keep
+   sharing. Switching it back on gives them the empty list again. A list never becomes empty by switching Business off (empty
+   would mean everything): it keeps the dashboard instead. */
+var PF_PAGES = ['dashboard', 'kanban', 'campaign', 'finance', 'sponsors', 'templates', 'settings', 'cowork'];
+function superList(env) {
+  return String(env || '').split(',').map(function (x) { return normEmail(x); }).filter(function (x) { return !!x; }).slice(0, 5);
+}
+function isSuper(email, env) { var e = normEmail(email); return !!e && superList(env).indexOf(e) >= 0; }
+function permList(perms) {
+  if (perms == null || perms === '') return [];
+  if (typeof perms === 'string') { try { perms = JSON.parse(perms); } catch (e) { return null; } }
+  if (perms == null) return [];
+  if (!Array.isArray(perms)) return null;
+  var out = [];
+  perms.forEach(function (x) { if (typeof x === 'string' && (PF_PAGES.indexOf(x) >= 0 || x === 'share') && out.indexOf(x) < 0) out.push(x); });
+  return out;
+}
+function hasBusiness(perms) { var L = permList(perms); return !!L && (L.length === 0 || L.indexOf('finance') >= 0); }
+function setBusiness(perms, on) {
+  var L = permList(perms);
+  if (!L) return null;                                   // unreadable: leave it to the PocketBase admin
+  if (on) {
+    if (L.length === 0 || L.indexOf('finance') >= 0) return L;
+    L.push('finance');
+    var full = PF_PAGES.every(function (p) { return L.indexOf(p) >= 0; });
+    return full && L.indexOf('share') >= 0 ? [] : L;     // was full access before: back to the plain empty list
+  }
+  if (L.length === 0) return PF_PAGES.filter(function (p) { return p !== 'finance'; }).concat(['share']);
+  L = L.filter(function (p) { return p !== 'finance'; });
+  if (!L.filter(function (p) { return p !== 'share'; }).length) L.unshift('dashboard');
+  return L;
 }
 
 function cleanGrants(v) {
@@ -355,6 +393,28 @@ function renderMail(gu, items, projName, appUrl, total, keys) {
 /* ---- the part that talks to PocketBase. g = {app, Record, Collection, security}: the PocketBase globals, passed in so tests can fake them ---- */
 function runtime(g) {
   var db = g.app;
+
+  /* Business access (release 300): the people list for the super user, and one switch */
+  function accessList() {
+    var recs = [];
+    try { recs = db.findRecordsByFilter('users', 'id != ""', 'name', 100, 0); } catch (e) { recs = []; }
+    return recs.map(function (r) {
+      return { id: r.id, name: cleanName(r.getString('name')) || cleanName(String(r.getString('email') || '').split('@')[0]) || 'Team member', email: normEmail(r.getString('email')) || '', business: hasBusiness(r.getString('permissions')) };
+    });
+  }
+  function accessSet(callerId, body) {
+    var id = body && typeof body.id === 'string' ? body.id : '';
+    if (!/^[A-Za-z0-9]{1,30}$/.test(id)) return { code: 400, body: { ok: false, error: 'bad id' } };
+    if (id === callerId) return { code: 400, body: { ok: false, error: 'you cannot change your own access' } };
+    var rec = null;
+    try { rec = db.findRecordById('users', id); } catch (e) { rec = null; }
+    if (!rec) return { code: 404, body: { ok: false, error: 'not found' } };
+    var next = setBusiness(rec.getString('permissions'), !!(body && body.on));
+    if (!next) return { code: 409, body: { ok: false, error: 'this account has unusual permissions: change it in the PocketBase admin' } };
+    rec.set('permissions', next);
+    db.save(rec);
+    return { code: 200, body: { ok: true, id: id, business: hasBusiness(next) } };
+  }
 
   function state() {
     try {
@@ -1065,7 +1125,7 @@ function runtime(g) {
     return out ? { code: 200, body: out } : { code: 404, body: { ok: false, error: 'not found' } };
   }
 
-  return { mailAdmin: mailAdmin, guestSuggest: guestSuggest, teamSuggestions: teamSuggestions, suggestionDecide: suggestionDecide, mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
+  return { accessList: accessList, accessSet: accessSet, mailAdmin: mailAdmin, guestSuggest: guestSuggest, teamSuggestions: teamSuggestions, suggestionDecide: suggestionDecide, mailNote: mailNote, mailStatus: mailStatus, mailTest: mailTest, setStatus: setStatus, mailTick: mailTick, mailPref: mailPref, mailOn: mailOn, groupList: groupList, groupSave: groupSave, groupDelete: groupDelete, grantGroup: grantGroup, ensureCollection: ensureCollection, commentHandled: commentHandled, feed: feed, project: project, grant: grant, revoke: revoke, list: list, me: me, tick: tick, guestComment: guestComment, teamComments: teamComments, teamComment: teamComment, commentDelete: commentDelete };
 }
 
 
@@ -1107,4 +1167,4 @@ function appAsset(path, query, host) {   // what the four public addresses hand 
   return null;
 }
 
-module.exports = { appAsset: appAsset, appManifest: appManifest, planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
+module.exports = { PF_PAGES: PF_PAGES, superList: superList, isSuper: isSuper, permList: permList, hasBusiness: hasBusiness, setBusiness: setBusiness, appAsset: appAsset, appManifest: appManifest, planMail: planMail, cleanLedger: cleanLedger, ledgerOut: ledgerOut, ukDay: ukDay, MAIL_CAP: MAIL_CAP, cleanGroups: cleanGroups, MAX_GROUPS: MAX_GROUPS, MAX_GROUP_MEMBERS: MAX_GROUP_MEMBERS, MAX_FEED: MAX_FEED, cleanComment: cleanComment, MAX_COMMENT: MAX_COMMENT, MAX_PER_TASK: MAX_PER_TASK, MAX_PER_HOUR: MAX_PER_HOUR, MAX_SHOWN: MAX_SHOWN, idOk: idOk, normEmail: normEmail, cleanName: cleanName, canShare: canShare, cleanGrants: cleanGrants, hasGrant: hasGrant, liveGrants: liveGrants, expiryOf: expiryOf, addGrant: addGrant, removeGrant: removeGrant, projectBrief: projectBrief, projectStats: projectStats, shapeProject: shapeProject, runtime: runtime, MAX_GRANTS: MAX_GRANTS, MAX_GUESTS: MAX_GUESTS, MAX_TASKS: MAX_TASKS, MAX_UPDATES: MAX_UPDATES, MAX_LINKS: MAX_LINKS, linkUrl: linkUrl, MAX_QUEUE: MAX_QUEUE, MAX_MINE: MAX_MINE };
