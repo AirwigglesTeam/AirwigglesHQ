@@ -385,6 +385,95 @@ function config(get, S) {
 }
 
 
+/* ---- release 340: making a task from Slack (the "Make a ProjectFlow task" message shortcut and the /task command) ----
+   Pure helpers, unit-tested. Nothing here writes anything: the runtime queues the new task and the app adds it. */
+var WDAYS = ['sun', 'mon', 'tue', 'wed', 'thu', 'fri', 'sat'];
+var MON3 = ['jan', 'feb', 'mar', 'apr', 'may', 'jun', 'jul', 'aug', 'sep', 'oct', 'nov', 'dec'];
+function isoOk(d) { if (!/^\d{4}-\d{2}-\d{2}$/.test(String(d))) return false; var t = new Date(d + 'T00:00:00Z'); return !isNaN(t.getTime()) && t.toISOString().slice(0, 10) === d; }
+function plain(t, n) { return String(t == null ? '' : t).replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim().slice(0, n); }
+function normName(t) { return String(t || '').toLowerCase().replace(/[^a-z0-9]/g, ''); }
+function liveProjects(S) { return (S.projects || []).filter(function (p) { return p && typeof p.id === 'string' && p.status !== 'completed' && p.status !== 'archived' && !p.light; }); }
+function teamMembers(S) { return (S.members || []).filter(function (m) { return m && typeof m.id === 'string' && !m.isGuest; }); }
+/* a project from "#AirCon27", "aircon 27" or a Slack channel name: exact (ignoring case and spaces) first, then one that starts with it */
+function findProject(S, word) {
+  var w = normName(word); if (w.length < 2) return null;
+  var L = liveProjects(S), ex = L.filter(function (p) { return normName(p.name) === w; });
+  if (ex.length) return ex[0];
+  var pre = L.filter(function (p) { return normName(p.name).indexOf(w) === 0; });
+  return pre.length === 1 ? pre[0] : null;
+}
+/* a due date from one or two words, on UK time: today, tomorrow, a weekday (the next one), next week (Monday),
+   25/12, 25/12/2026, 2026-12-25, 25 dec, dec 25 */
+function parseDue(words, now) {
+  var L = london(now), today = L.iso, w = String(words || '').toLowerCase().replace(/[.,]$/, '');
+  if (w === 'today') return today;
+  if (w === 'tomorrow' || w === 'tmrw' || w === 'tmw') return addDays(today, 1);
+  if (w === 'next week') return addDays(today, ((8 - L.dow) % 7) || 7);
+  var wd = WDAYS.indexOf(w.slice(0, 3));
+  if (wd >= 0 && /^(sun|mon|tue|tues|wed|thu|thur|thurs|fri|sat)(day|nesday|rsday|urday)?$/.test(w)) return addDays(today, ((wd - L.dow + 7) % 7) || 7);
+  var m, y = parseInt(today.slice(0, 4), 10), pad = function (n) { return (n < 10 ? '0' : '') + n; };
+  var mk = function (yy, mm, dd, guessYear) { var d = yy + '-' + pad(mm) + '-' + pad(dd); if (!isoOk(d)) return ''; if (guessYear && d < today) d = (yy + 1) + d.slice(4); return isoOk(d) ? d : ''; };
+  if ((m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(w))) return mk(+m[1], +m[2], +m[3], false);
+  if ((m = /^(\d{1,2})\/(\d{1,2})(?:\/(\d{2}|\d{4}))?$/.exec(w))) return mk(m[3] ? (m[3].length === 2 ? 2000 + +m[3] : +m[3]) : y, +m[2], +m[1], !m[3]);
+  if ((m = /^(\d{1,2})(?:st|nd|rd|th)? ([a-z]{3})[a-z]*$/.exec(w)) && MON3.indexOf(m[2]) >= 0) return mk(y, MON3.indexOf(m[2]) + 1, +m[1], true);
+  if ((m = /^([a-z]{3})[a-z]* (\d{1,2})(?:st|nd|rd|th)?$/.exec(w)) && MON3.indexOf(m[1]) >= 0) return mk(y, MON3.indexOf(m[1]) + 1, +m[2], true);
+  return '';
+}
+/* "/task Book the mic list @Ann friday #AirCon27" -> name, assignees, due date, project. Slack sends people as <@U123|ann> and
+   channels as <#C123|aircon27> when "Escape channels, users, and links" is ticked; plain @Ann and #AirCon27 work too. */
+function parseTaskText(S, text, me, now) {
+  var out = { name: '', projectId: '', assignees: [], due: '', misses: [] }, rest = [];
+  var toks = String(text || '').slice(0, 1000).replace(/[\u0000-\u001f]/g, ' ').match(/<[^>]{1,120}>|\S+/g) || [];
+  var mem = teamMembers(S), addWho = function (m) { if (m && out.assignees.indexOf(m.id) < 0 && out.assignees.length < 5) out.assignees.push(m.id); };
+  for (var i = 0; i < toks.length; i++) {
+    var t = toks[i], m;
+    if ((m = /^<@([UW][A-Z0-9]{6,20})(?:\|[^>]*)?>$/.exec(t))) { var who = mem.filter(function (x) { return x.slackId === m[1]; })[0]; if (who) addWho(who); else out.misses.push('someone mentioned is not linked to a ProjectFlow person'); continue; }
+    if ((m = /^@([A-Za-z][\w.'-]{0,40})$/.exec(t))) {
+      var n = m[1].toLowerCase(), hit = mem.filter(function (x) { var nm = String(x.name || '').toLowerCase(); return nm === n || nm.split(/\s+/)[0] === n; });
+      if (hit.length === 1) { addWho(hit[0]); continue; }
+      out.misses.push('@' + m[1].slice(0, 30) + (hit.length ? ' matches more than one person' : ' is not a ProjectFlow person')); continue;
+    }
+    if ((m = /^<#[CG][A-Z0-9]{6,20}\|([^>]{1,80})>$/.exec(t)) || (m = /^#([^\s#]{2,60})$/.exec(t))) {
+      var pr = findProject(S, m[1]); if (pr && !out.projectId) { out.projectId = pr.id; continue; }
+      if (!pr) { out.misses.push('#' + plain(m[1], 30) + ' does not match a project'); continue; }
+    }
+    var two = i + 1 < toks.length ? parseDue(t + ' ' + toks[i + 1], now) : '';
+    if (two && !out.due) { out.due = two; i++; continue; }
+    var one = parseDue(t, now);
+    if (one && !out.due) { out.due = one; continue; }
+    rest.push(t.replace(/^<(https?:[^|>]+)\|([^>]+)>$/, '$2 ($1)').replace(/^<(https?:[^>]+)>$/, '$1'));
+  }
+  out.name = plain(rest.join(' '), 150);
+  if (!out.assignees.length && me) out.assignees.push(me.id);
+  return out;
+}
+/* the Slack window for a new task (message shortcut, or /task on its own) */
+function taskModal(S, me, name, meta) {
+  var opt = function (id, txt) { return { text: { type: 'plain_text', text: plain(txt, 75) || 'Untitled', emoji: true }, value: id }; };
+  var projs = liveProjects(S).slice().sort(function (a, b) { return String(a.name || '').localeCompare(String(b.name || '')); }).slice(0, 100).map(function (p) { return opt(p.id, p.name); });
+  var mems = teamMembers(S).slice(0, 100).map(function (m) { return opt(m.id, m.name); });
+  var mine = me ? mems.filter(function (o) { return o.value === me.id; }) : [];
+  var blocks = [
+    { type: 'input', block_id: 'b_name', label: { type: 'plain_text', text: 'Task' }, element: { type: 'plain_text_input', action_id: 'a', max_length: 150, initial_value: plain(name, 150) } },
+    { type: 'input', block_id: 'b_proj', optional: true, label: { type: 'plain_text', text: 'Project' }, element: projs.length ? { type: 'static_select', action_id: 'a', placeholder: { type: 'plain_text', text: 'No project' }, options: projs } : { type: 'plain_text_input', action_id: 'a', placeholder: { type: 'plain_text', text: 'No projects yet' } } },
+    { type: 'input', block_id: 'b_who', optional: true, label: { type: 'plain_text', text: 'For' }, element: Object.assign({ type: 'multi_static_select', action_id: 'a', max_selected_items: 5, placeholder: { type: 'plain_text', text: 'Nobody yet' }, options: mems.length ? mems : [opt('none', 'Nobody')] }, mine.length ? { initial_options: mine } : {}) },
+    { type: 'input', block_id: 'b_due', optional: true, label: { type: 'plain_text', text: 'Due' }, element: { type: 'datepicker', action_id: 'a' } },
+    { type: 'input', block_id: 'b_note', optional: true, label: { type: 'plain_text', text: 'Notes' }, element: { type: 'plain_text_input', action_id: 'a', multiline: true, max_length: 1000 } }
+  ];
+  if (!blocks[1].element.initial_value) delete blocks[1].element.initial_value;
+  if (!blocks[0].element.initial_value) delete blocks[0].element.initial_value;
+  return { type: 'modal', callback_id: 'pf_task_new', title: { type: 'plain_text', text: 'New ProjectFlow task' }, submit: { type: 'plain_text', text: 'Add task' }, close: { type: 'plain_text', text: 'Cancel' }, private_metadata: String(meta || '').slice(0, 2900), blocks: blocks };
+}
+/* a link back to the Slack message a task was made from */
+function msgLink(channel, ts) { return /^[CGD][A-Z0-9]{6,20}$/.test(String(channel)) && /^\d{9,12}\.\d{1,8}$/.test(String(ts)) ? 'https://slack.com/archives/' + channel + '/p' + String(ts).replace('.', '') : ''; }
+/* turn <@U123|ann>, <#C1|chan> and <https://x|text> in a Slack message into plain words for a task name */
+function slackPlain(t, S) {
+  var mem = teamMembers(S || {});
+  return String(t || '').replace(/<@([UW][A-Z0-9]{6,20})(?:\|([^>]*))?>/g, function (x, id, lab) { var m = mem.filter(function (y) { return y.slackId === id; })[0]; return '@' + (m ? m.name : (lab || 'someone')); })
+    .replace(/<#[CG][A-Z0-9]+\|([^>]*)>/g, '#$1').replace(/<(https?:[^|>]+)\|([^>]+)>/g, '$2').replace(/<(https?:[^>]+)>/g, '$1').replace(/<!([a-z]+)[^>]*>/g, '@$1')
+    .replace(/&lt;/g, '<').replace(/&gt;/g, '>').replace(/&amp;/g, '&');
+}
+
 /* ---- the part that talks to PocketBase and Slack. g = {app, http, os, Record}: the PocketBase globals, passed in so tests can fake them ---- */
 function runtime(g) {
   var db = typeof g.app.dao === 'function' ? g.app.dao() : g.app;   // 0.22 keeps these on $app.dao(), 0.23+ on $app
@@ -477,16 +566,37 @@ function runtime(g) {
       return { added: true };
     });
   }
+  /* release 340: a task made in Slack. It waits here, with an id chosen now, until an open ProjectFlow window adds it (the
+     same id every time, so a second window or a retry can never add it twice). At most 200 waiting. */
+  function queueTask(e, now) {
+    now = now || new Date();
+    if (!e || !ID_OK.test(String(e.memberId))) return { added: false, why: 'bad id' };
+    var name = plain(e.name, 150); if (!name) return { added: false, why: 'no name' };
+    var item = { id: 'q' + now.getTime().toString(36) + Math.floor(Math.random() * 1679616).toString(36), kind: 'add', taskId: 'sk' + now.getTime().toString(36) + Math.floor(Math.random() * 1679616).toString(36),
+      memberId: e.memberId, slackId: idOk(e.slackId) ? e.slackId : '', at: now.toISOString(), name: name,
+      projectId: ID_OK.test(String(e.projectId || '')) ? e.projectId : '', due: isoOk(e.due) ? e.due : '',
+      assignees: (Array.isArray(e.assignees) ? e.assignees : []).filter(function (a) { return ID_OK.test(String(a)); }).slice(0, 5),
+      note: String(e.note || '').replace(/[\u0000-\u0008\u000b-\u001f\u007f]/g, ' ').trim().slice(0, 1000), src: /^https:\/\/slack\.com\/archives\/[A-Z0-9]+\/p\d+$/.test(String(e.src || '')) ? e.src : '' };
+    return qtx(function (find, save, t) {
+      var h = qLoad(find, now);
+      if (h.q.items.filter(function (x) { return x.kind === 'add'; }).length >= 200) return { added: false, why: 'full' };
+      h.q.items.push(item);
+      qSave(h, save, t);
+      return { added: true, taskId: item.taskId };
+    });
+  }
   /* the app takes what is waiting. Each item is handed to one window at a time (a two minute lease), so two open windows never complete the same task twice. */
-  function queueClaim(now) {
+  function queueClaim(now, withAdds) {
     now = now || new Date();
     return qtx(function (find, save, t) {
       var h = qLoad(find, now), out = [];
       h.q.items.forEach(function (x) {
         if (out.length >= 20) return;
+        if (x.kind === 'add' && !withAdds) return;   // a window from before release 340 would not know what to do with it: it waits for a newer one
         var c = Date.parse(x.claimedAt || '');
         if (!isNaN(c) && now.getTime() - c < 120000) return;
         x.claimedAt = now.toISOString();
+        if (x.kind === 'add') { out.push({ id: x.id, kind: 'add', taskId: x.taskId, memberId: x.memberId, slackId: x.slackId || '', at: x.at, name: x.name, projectId: x.projectId || '', assignees: x.assignees || [], due: x.due || '', note: x.note || '', src: x.src || '' }); x.claimedAt = now.toISOString(); return; }
         out.push({ id: x.id, kind: x.kind === 'undo' ? 'undo' : x.kind === 'status' ? 'status' : 'done', status: x.kind === 'status' && (x.status === 'in-progress' || x.status === 'todo') ? x.status : '', taskId: x.taskId, memberId: x.memberId, slackId: x.slackId, at: x.at, via: x.via === 'guest' ? 'guest' : '', who: typeof x.who === 'string' ? x.who.slice(0, 60) : '' });
       });
       if (out.length) qSave(h, save, t);
@@ -509,7 +619,7 @@ function runtime(g) {
   function queuePending(now, kind) {   // task ids with a tick (or, kind "undo", an undo) waiting: reminders treat them as already changed
     var rec = find(QWS), out = {};
     if (!rec) return out;
-    try { var q = JSON.parse(rec.getString('data') || '{}'); (q.items || []).forEach(function (x) { if (x && ID_OK.test(String(x.taskId)) && (x.kind === 'undo' ? 'undo' : x.kind === 'status' ? 'status' : 'done') === (kind || 'done')) out[x.taskId] = true; }); } catch (e) {}
+    try { var q = JSON.parse(rec.getString('data') || '{}'); (q.items || []).forEach(function (x) { if (x && x.kind !== 'add' && ID_OK.test(String(x.taskId)) && (x.kind === 'undo' ? 'undo' : x.kind === 'status' ? 'status' : 'done') === (kind || 'done')) out[x.taskId] = true; }); } catch (e) {}
     return out;
   }
   /* Undo pressed while the tick still waits: take it out of the queue so the app never ticks it. If a window already took it, say so (an undo is queued instead). */
@@ -684,13 +794,68 @@ function runtime(g) {
       return { code: 200, unfurled: n, error: j && j.ok === false ? String(j.error || 'failed').slice(0, 60) : '' };
     } catch (e) { return { code: 200, error: 'request failed' }; }
   }
+  /* ---- release 340: tasks from Slack ---- */
+  function form(raw) { var o = {}; String(raw).split('&').slice(0, 40).forEach(function (kv) { var i = kv.indexOf('='); if (i < 1) return; try { o[decodeURIComponent(kv.slice(0, i))] = decodeURIComponent(kv.slice(i + 1).replace(/\+/g, ' ')); } catch (e) {} }); return o; }
+  function memberFor(S, slackId) { return idOk(slackId) ? teamMembers(S).filter(function (x) { return x.slackId === slackId; })[0] || null : null; }
+  var NOT_LINKED = 'Your Slack account is not linked to a ProjectFlow person yet. Ask an admin to add your Slack member ID in Team.';
+  var WAIT_NOTE = 'It shows up in ProjectFlow as soon as someone on the team has it open.';
+  function doneText(S, it, appUrl) {
+    var pr = (S.projects || []).filter(function (p) { return p && p.id === it.projectId; })[0], names = it.assignees.map(function (id) { var m = (S.members || []).filter(function (x) { return x && x.id === id; })[0]; return m ? esc(plain(m.name, 40)) : ''; }).filter(Boolean);
+    return '\u2705 Added *<' + link(appUrl, 'task', it.taskId) + '|' + esc(it.name) + '>*' + (names.length ? ' for ' + names.join(', ') : '') + (it.due ? ', due ' + fmtD(it.due) : '') + (pr ? ', in ' + esc(plain(pr.name, 60)) : ', with no project') + '. ' + WAIT_NOTE;
+  }
+  function slashTask(raw, now) {
+    var f = form(raw), say = function (t) { return { code: 200, body: { response_type: 'ephemeral', text: String(t).slice(0, 2900) } }; };
+    var S = state(); if (!S) return say('ProjectFlow could not be reached just now. Please try again in a minute.');
+    var me = memberFor(S, f.user_id); if (!me) return say(NOT_LINKED);
+    var text = String(f.text || '').trim();
+    if (!text || /^(new|form)$/i.test(text)) { var w = openTaskWindow({ trigger_id: f.trigger_id, user: { id: f.user_id } }, now, ''); return w.error ? say(w.error) : { code: 200 }; }
+    if (/^(help|\?)$/i.test(text)) return say('*Make a ProjectFlow task*\n`/task Book the mic list @Ann friday #AirCon27`\n\u2022 *@name*: who it is for (yourself if nobody is named)\n\u2022 *#project*: the project, by name\n\u2022 a due date: today, tomorrow, friday, next week, 25/12 or 25 dec\n`/task` on its own opens a form. You can also use *Make a ProjectFlow task* in any message\'s \u22ef menu.');
+    var x = parseTaskText(S, text, me, now);
+    if (!x.name) return say('What is the task? For example: `/task Book the mic list @Ann friday #AirCon27`');
+    var r; try { r = queueTask({ memberId: me.id, slackId: f.user_id, name: x.name, projectId: x.projectId, assignees: x.assignees, due: x.due, note: '' }, now); } catch (e) { return say('Could not save that just now. Please try again.'); }
+    if (!r.added) return say(r.why === 'full' ? 'Too many tasks are waiting for ProjectFlow to be opened. Open it once, then try again.' : 'Could not save that just now. Please try again.');
+    var it = { taskId: r.taskId, name: x.name, projectId: x.projectId, assignees: x.assignees, due: x.due };
+    return say(doneText(S, it, conf(S).appUrl) + (x.misses.length ? '\n_Not used: ' + esc(x.misses.slice(0, 3).join('; ')) + '._' : ''));
+  }
+  function openTaskWindow(p, now, nameIn) {
+    var S = state(), tok = botToken(), uid = p && p.user ? p.user.id : '';
+    var fail = function (t) { if (p.response_url) slackReply(p.response_url, { response_type: 'ephemeral', replace_original: false, text: t }); return { code: 200, error: t }; };
+    if (!S) return fail('ProjectFlow could not be reached just now. Please try again in a minute.');
+    var me = memberFor(S, uid); if (!me) return fail(NOT_LINKED);
+    if (!tok) return fail('The ProjectFlow Slack app needs its bot token on the server for this. Use `/task` with the task written out instead.');
+    if (!/^[\w.-]{5,200}$/.test(String(p.trigger_id || ''))) return { code: 200 };
+    var msg = p.message || {}, src = msgLink(p.channel && p.channel.id, msg.ts);
+    var name = nameIn != null && nameIn !== '' ? nameIn : slackPlain(msg.text, S);
+    var r = slackApi(tok, 'views.open', { trigger_id: p.trigger_id, view: taskModal(S, me, name, JSON.stringify({ s: src })) });
+    return r.ok ? { code: 200 } : fail('Slack would not open the form (' + r.error + '). Use `/task` with the task written out instead.');
+  }
+  function submitTask(p, now) {
+    var S = state(), uid = p.user ? p.user.id : '', v = (p.view && p.view.state && p.view.state.values) || {};
+    var errs = function (o) { return { code: 200, body: { response_action: 'errors', errors: o } }; };
+    if (!S) return errs({ b_name: 'ProjectFlow could not be reached just now. Please try again in a minute.' });
+    var me = memberFor(S, uid); if (!me) return errs({ b_name: NOT_LINKED });
+    var val = function (b) { var x = v[b] && v[b].a; return x || {}; };
+    var name = plain(val('b_name').value, 150); if (!name) return errs({ b_name: 'Give the task a name.' });
+    var pid = (val('b_proj').selected_option || {}).value || '', proj = (S.projects || []).filter(function (x) { return x && x.id === pid; })[0];
+    var ids = (val('b_who').selected_options || []).map(function (o) { return o && o.value; }), team = teamMembers(S);
+    var who = team.filter(function (m) { return ids.indexOf(m.id) >= 0; }).map(function (m) { return m.id; }).slice(0, 5);
+    var due = val('b_due').selected_date || ''; if (due && !isoOk(due)) return errs({ b_due: 'That date is not valid.' });
+    var meta = {}; try { meta = JSON.parse(String(p.view.private_metadata || '{}')) || {}; } catch (e) { meta = {}; }
+    var r; try { r = queueTask({ memberId: me.id, slackId: uid, name: name, projectId: proj ? proj.id : '', assignees: who, due: due, note: val('b_note').value || '', src: meta.s || '' }, now); } catch (e) { return errs({ b_name: 'Could not save that just now. Please press Add task again.' }); }
+    if (!r.added) return errs({ b_name: r.why === 'full' ? 'Too many tasks are waiting for ProjectFlow to be opened. Open it once, then try again.' : 'Could not save that just now.' });
+    var it = { taskId: r.taskId, name: name, projectId: proj ? proj.id : '', assignees: who, due: due };
+    return { code: 200, body: { response_action: 'update', view: { type: 'modal', title: { type: 'plain_text', text: 'Task added' }, close: { type: 'plain_text', text: 'Done' }, blocks: [{ type: 'section', text: { type: 'mrkdwn', text: doneText(S, it, conf(S).appUrl).slice(0, 2900) } }] } } };
+  }
   function interact(raw, ts, sig, now) {
     now = now || new Date();
     var secret = g.os.getenv('PF_SLACK_SIGNING_SECRET') || '';
     if (!secret) return { code: 503 };
     var bad = verify(raw, ts, sig, now, secret); if (bad) return bad;
+    if (/(?:^|&)command=/.test(raw) && !/(?:^|&)payload=/.test(raw)) return slashTask(raw, now);   // the /task command (release 340) posts plain form fields
     var m = /(?:^|&)payload=([^&]*)/.exec(raw), p;
     try { p = JSON.parse(decodeURIComponent(m[1].replace(/\+/g, ' '))); } catch (e) { return { code: 400 }; }
+    if (p && (p.type === 'message_action' || p.type === 'shortcut') && (p.callback_id === 'pf_task_msg' || p.callback_id === 'pf_task_new')) return openTaskWindow(p, now);
+    if (p && p.type === 'view_submission' && p.view && p.view.callback_id === 'pf_task_new') return submitTask(p, now);
     var a = p && p.type === 'block_actions' && Array.isArray(p.actions) ? p.actions[0] : null;
     var undo = !!a && a.action_id === 'pf_undo';
     if (!a || (a.action_id !== 'pf_done' && !undo) || !ID_OK.test(String(a.value)) || !p.user || !idOk(p.user.id)) return { code: 200 };   // not ours: ignore quietly
@@ -736,6 +901,6 @@ function runtime(g) {
     }
     return { code: 200 };
   }
-  return { commentTick: commentTick, events: events, interact: interact, tick: tick, status: status, sendNow: sendNow, state: state, queueAdd: queueAdd, queueCancel: queueCancel, queueClaim: queueClaim, queueAck: queueAck, queuePending: queuePending };
+  return { commentTick: commentTick, events: events, interact: interact, queueTask: queueTask, tick: tick, status: status, sendNow: sendNow, state: state, queueAdd: queueAdd, queueCancel: queueCancel, queueClaim: queueClaim, queueAck: queueAck, queuePending: queuePending };
 }
-module.exports = { guestCommentText: guestCommentText, guestSuggestText: guestSuggestText, waitingText: waitingText, unfurlFor: unfurlFor, digestParts: digestParts, alertParts: alertParts, linesToBlocks: linesToBlocks, doneButton: doneButton, runtime: runtime,  esc: esc, idOk: idOk, urlOk: urlOk, appUrlOk: appUrlOk, london: london, weekKey: weekKey, fmtD: fmtD, link: link, digestText: digestText, alertText: alertText, alertOpts: alertOpts, ALERT_DAYS: ALERT_DAYS, taskBlocks: taskBlocks, plan: plan, payload: payload, trimLog: trimLog, config: config, OD_MAX: OD_MAX };
+module.exports = { parseTaskText: parseTaskText, parseDue: parseDue, taskModal: taskModal, slackPlain: slackPlain, msgLink: msgLink, guestCommentText: guestCommentText, guestSuggestText: guestSuggestText, waitingText: waitingText, unfurlFor: unfurlFor, digestParts: digestParts, alertParts: alertParts, linesToBlocks: linesToBlocks, doneButton: doneButton, runtime: runtime,  esc: esc, idOk: idOk, urlOk: urlOk, appUrlOk: appUrlOk, london: london, weekKey: weekKey, fmtD: fmtD, link: link, digestText: digestText, alertText: alertText, alertOpts: alertOpts, ALERT_DAYS: ALERT_DAYS, taskBlocks: taskBlocks, plan: plan, payload: payload, trimLog: trimLog, config: config, OD_MAX: OD_MAX };

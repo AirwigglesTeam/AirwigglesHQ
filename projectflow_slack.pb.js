@@ -4,7 +4,7 @@
  ---------------------------------------------------------------------
  * Every five minutes: sends task reminders, "due in 3 days", the Monday weekly digest and (when switched on) private messages to Slack.
  * Small endpoints for the Settings screen (signed-in users only): status, send, and the tick queue the app collects.
- * POST /api/pf/slack/interact (Done buttons) and POST /api/pf/slack/events (link previews) are for Slack itself; each is only accepted with a valid Slack signature.
+ * POST /api/pf/slack/interact (Done buttons; since 340 also the /task command and the "Make a ProjectFlow task" shortcut and form) and POST /api/pf/slack/events (link previews) are for Slack itself; each is only accepted with a valid Slack signature.
  * The Slack webhook lives in the server's environment (PF_SLACK_WEBHOOK), never in the browser. See SLACK_SERVER.md.
  * Needs pf_slack_lib.js in the same folder. Works on PocketBase 0.22 and 0.23 and newer.
  * If this file or the library fails, nothing else in ProjectFlow is affected.
@@ -51,7 +51,9 @@ routerAdd("POST", "/api/pf/slack/send", (e) => {
 routerAdd("POST", "/api/pf/slack/done/claim", (e) => {
   try {
     const L = require(`${__hooks}/pf_slack_lib.js`);
-    return e.json(200, { items: L.runtime({ app: $app, http: $http, os: $os, Record: Record }).queueClaim(new Date()) });
+    let adds = false;
+    try { const b = typeof e.requestInfo === "function" ? e.requestInfo().body : $apis.requestInfo(e).data; adds = !!(b && b.adds === 1); } catch (x) {}
+    return e.json(200, { items: L.runtime({ app: $app, http: $http, os: $os, Record: Record }).queueClaim(new Date(), adds) });   // adds: tasks made in Slack, only for windows that know them (340)
   } catch (err) { return e.json(500, { items: [] }); }
 }, _pfAuth());
 
@@ -74,7 +76,7 @@ routerAdd("POST", "/api/pf/slack/interact", (e) => {
     try { raw = typeof readerToString === "function" ? readerToString(req.body, 262144) : toString(req.body); } catch (x) { raw = ""; }
     const r = L.runtime({ app: $app, http: $http, os: $os, Record: Record, security: $security })
       .interact(raw, req.header.get("X-Slack-Request-Timestamp"), req.header.get("X-Slack-Signature"), new Date());
-    return e.json(r.code, {});
+    return e.json(r.code, r.body || {});   // release 340: the /task reply, or the "Task added" window
   } catch (err) { return e.json(500, {}); }
 });
 
